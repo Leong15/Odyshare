@@ -1,0 +1,6 @@
+{
+  "name": "Co-Travel Group Workspace",
+  "description": "Collaborative travel workspace: vote on flight routes, build daily itineraries, track & auto-split budgets among friends, check offline simulated maps with google-style traffic, translate / chat with AI Travel Assistant, and lock travel documents.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

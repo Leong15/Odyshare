@@ -1,0 +1,202 @@
+import React, { useState } from "react";
+import { FolderLock, FolderPlus, Trash, MapPin, LogOut, Moon, Sun, Languages, Users, UserPlus, X, Check } from "lucide-react";
+import { Trip, Participant } from "../types";
+import { translations } from "../lib/translations";
+
+interface HeaderWorkspaceProps {
+  lang: "en" | "zh";
+  setLang: (l: "en" | "zh") => void;
+  theme: string;
+  setTheme: React.Dispatch<React.SetStateAction<any>>;
+  syncing: boolean;
+  trip: Trip;
+  currentUser: Participant | null;
+  onSelectTrip: (id: string) => void;
+  onShowCreateTripModal: () => void;
+  onDeleteTrip: (id: string) => void;
+  onLogout: () => void;
+  onOpenInviteModal?: () => void;
+}
+
+export default function HeaderWorkspace({
+  lang,
+  setLang,
+  theme,
+  setTheme,
+  syncing,
+  trip,
+  currentUser,
+  onSelectTrip,
+  onShowCreateTripModal,
+  onDeleteTrip,
+  onLogout,
+  onOpenInviteModal,
+}: HeaderWorkspaceProps) {
+  const isLight = theme === "light";
+
+  return (
+    <header className="glass-container border-b border-white/15 py-4 px-4 sm:px-6 sticky top-0 z-40 shadow-xl backdrop-blur-md font-sans">
+      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+        
+        {/* Brand Block & Project Switcher List */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 border border-white/10 shrink-0">
+              <span className="font-extrabold text-xs tracking-wider leading-none select-none">W/S</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="font-extrabold text-white text-xs tracking-tight leading-none sm:text-sm">{translations[lang].brandTitle}</h1>
+                {syncing && (
+                  <span className="p-0.5 px-1 bg-blue-500/20 border border-blue-400/30 rounded text-[7px] text-blue-300 animate-pulse uppercase select-none">
+                    {translations[lang].syncing}
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-450 mt-1 flex items-center gap-1.5 leading-none select-none">
+                <MapPin size={9} className="text-blue-400" />
+                <span>
+                  {translations[lang].destination}: <span className="font-bold text-slate-200">{trip.destination}</span>
+                </span>
+              </p>
+            </div>
+          </div>
+
+          {/* Trip Project Dropdown */}
+          <div className="flex items-center flex-wrap gap-2">
+            <div className="flex items-center bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl backdrop-blur-md text-xs">
+              <FolderLock size={12} className="text-blue-300 mr-2" />
+              <span className="text-[9.5px] font-extrabold text-slate-400 mr-1.5 uppercase tracking-wide select-none">
+                {lang === "zh" ? "旅程專案結構" : "Workspace:"}
+              </span>
+              
+              <select
+                id="trip-project-dropdown"
+                value={trip.id}
+                onChange={(e) => onSelectTrip(e.target.value)}
+                className="bg-transparent border-0 font-bold text-white text-xs leading-none focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none"
+              >
+                {(trip.tripsList || []).map(tOpt => (
+                  <option key={tOpt.id} value={tOpt.id} className="bg-slate-900 text-slate-100 font-extrabold text-xs">
+                    {tOpt.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Create project button */}
+            <button
+              id="create-new-trip-btn"
+              onClick={onShowCreateTripModal}
+              className="p-1.5 px-2.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/20 rounded-xl font-bold flex items-center gap-1 cursor-pointer transition text-[11px] text-blue-300"
+            >
+              <FolderPlus size={11.5} />
+              <span>{lang === "zh" ? "新增" : "+ New"}</span>
+            </button>
+
+            {/* Delete current project */}
+            {(trip.tripsList || []).length > 1 && (
+              <button
+                id="delete-trip-btn"
+                onClick={() => onDeleteTrip(trip.id)}
+                className="p-1.5 px-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/15 rounded-xl font-bold flex items-center gap-1 cursor-pointer transition text-[11px] text-rose-300"
+                title={lang === "zh" ? "刪除此行" : "Delete folder"}
+              >
+                <Trash size={11} />
+              </button>
+            )}
+
+            {/* Dynamic Traveler Avatars Stack with Highlight Invite Button */}
+            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl backdrop-blur-md">
+              <span className="text-[9.5px] font-extrabold text-slate-405 uppercase tracking-wide select-none leading-none pt-0.5">
+                👥 {lang === "zh" ? "協同成員" : "Team"}:
+              </span>
+              <div className="flex items-center -space-x-1.5 shrink-0 select-none">
+                {(trip.participants || []).map((p) => (
+                  <div
+                    key={p.id}
+                    style={{ backgroundColor: p.avatarColor }}
+                    className="w-5 h-5 rounded-full text-[8.5px] font-black text-white flex items-center justify-center border border-slate-900 shadow-sm shrink-0 uppercase"
+                    title={`${p.name} (${p.email})`}
+                  >
+                    {p.name ? p.name[0] : "?"}
+                  </div>
+                ))}
+              </div>
+
+              {/* Master Invite trigger for pulling/adding members directly from anywhere */}
+              <button
+                id="header-invite-member-btn"
+                onClick={onOpenInviteModal}
+                className="p-0.5 px-2 bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 hover:text-white border border-emerald-500/30 rounded-lg text-[10.5px] font-bold cursor-pointer transition flex items-center gap-1 outline-none ml-1 shadow-sm font-sans"
+                title={lang === "zh" ? "快速拉人加入專案" : "Pull collaborator into project"}
+              >
+                <span className="leading-none text-xs">+</span>
+                <span className="leading-none">{lang === "zh" ? "拉人/邀請" : "Invite"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Active profile controls, Light Mode Toggle & Language switcher in Glass form */}
+        <div className="flex items-stretch sm:items-center gap-2.5 w-full lg:w-auto shrink-0 justify-end">
+          
+          {/* Profile Display Box */}
+          {currentUser && (
+            <div className="flex items-center gap-1.5 animate-fadeIn">
+              <div className="flex items-center gap-2 bg-white/5 border border-white/10 p-1.5 px-3 rounded-xl text-xs backdrop-blur-md">
+                <div
+                  style={{ backgroundColor: currentUser.avatarColor }}
+                  className="w-5.5 h-5.5 rounded-full text-[9.5px] font-black text-white flex items-center justify-center border border-white/20 shadow-sm"
+                >
+                  {currentUser.name[0]}
+                </div>
+                <span id="user-profile-display" className="font-bold text-white text-[11.5px] leading-none select-none font-sans">
+                  {currentUser.name}
+                </span>
+              </div>
+              
+              {/* Logout Button */}
+              <button
+                onClick={onLogout}
+                className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 border border-rose-500/15 rounded-xl cursor-pointer transition-all flex items-center justify-center"
+                title={lang === "zh" ? "登出旅伴身分" : "Log out"}
+              >
+                <LogOut size={12} className="text-rose-400" />
+              </button>
+            </div>
+          )}
+
+          {/* Light vs Dark Theme Selection */}
+          <button
+            id="theme-switch-btn"
+            type="button"
+            onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
+            className="p-1.5 py-2 px-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl cursor-pointer transition-all flex items-center justify-center text-amber-300 backdrop-blur-md select-none text-xs"
+            title={lang === "zh" ? "日間/夜間主題切換" : "Toggle theme mode"}
+          >
+            {theme === "light" ? (
+              <Moon size={13} className="text-indigo-500 animate-pulse" />
+            ) : (
+              <Sun size={13} className="text-amber-400 animate-spin-slow" />
+            )}
+          </button>
+
+          {/* Language Selector */}
+          <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 p-1.5 px-2 rounded-xl text-xs backdrop-blur-md">
+            <Languages size={12} className="text-blue-400" />
+            <select
+              id="language-selector"
+              value={lang}
+              onChange={(e) => setLang(e.target.value as "en" | "zh")}
+              className="bg-transparent border-0 font-bold text-white text-[11.5px] focus:outline-none focus:ring-0 cursor-pointer p-0"
+            >
+              <option value="zh" className="bg-slate-900 text-slate-100">繁中 (ZH)</option>
+              <option value="en" className="bg-slate-900 text-slate-100">EN</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
