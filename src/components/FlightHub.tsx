@@ -58,7 +58,8 @@ export default function FlightHub({
           carrier: fl.carrier,
           stops: fl.stops,
           duration: fl.duration,
-          isDirect: fl.stops === 0
+          isDirect: fl.stops === 0,
+          currency: fl.currency || "USD"
         })
       });
       if (res.ok) {
@@ -120,17 +121,36 @@ export default function FlightHub({
 
   const t = translations[lang];
 
+  const getPriceInUSD = (price: number, currency?: string): number => {
+    const cur = (currency || "USD").toUpperCase();
+    if (cur === "TWD") return price / 32.0;
+    if (cur === "JPY") return price / 155.0;
+    if (cur === "HKD") return price / 7.8;
+    if (cur === "EUR") return price / 0.92;
+    return price;
+  };
+
   const getCheapestFlightId = () => {
     if (flightEstimates.length === 0) return null;
     let cheapest = flightEstimates[0];
+    let cheapestUSD = getPriceInUSD(cheapest.price, cheapest.currency);
+    
     flightEstimates.forEach(f => {
-      if (f.price < cheapest.price) cheapest = f;
+      const fUSD = getPriceInUSD(f.price, f.currency);
+      if (fUSD < cheapestUSD) {
+        cheapest = f;
+        cheapestUSD = fUSD;
+      }
     });
     return cheapest.id;
   };
 
   const sortedEstimates = [...flightEstimates].sort((a, b) => {
-    if (sortBy === "price") return a.price - b.price;
+    if (sortBy === "price") {
+      const aUSD = getPriceInUSD(a.price, a.currency);
+      const bUSD = getPriceInUSD(b.price, b.currency);
+      return aUSD - bUSD;
+    }
     if (sortBy === "rating") return b.rating - a.rating;
     if (sortBy === "duration") return a.duration.localeCompare(b.duration);
     return 0;
@@ -313,12 +333,12 @@ export default function FlightHub({
             </div>
             <div className="space-y-0.5">
               <span className="block text-[10px] text-slate-400 uppercase tracking-widest">{lang === "zh" ? "最初基準價" : "Baseline Rate"}</span>
-              <span className="font-extrabold text-blue-300 text-[13px]">${flightSubscription.baselinePrice}</span>
+              <span className="font-extrabold text-blue-300 text-[13px]">{flightSubscription.currency || "USD"} ${flightSubscription.baselinePrice}</span>
             </div>
             <div className="space-y-0.5">
               <span className="block text-[10px] text-slate-400 uppercase tracking-widest">{lang === "zh" ? "當前報價" : "Current Checked"}</span>
               <span className="font-extrabold text-white text-[13px] flex items-center gap-1.5 flex-wrap">
-                ${flightSubscription.currentPrice}
+                {flightSubscription.currency || "USD"} ${flightSubscription.currentPrice}
                 {flightSubscription.currentPrice < flightSubscription.baselinePrice ? (
                   <span className="text-[10px] text-emerald-300 font-black flex items-center gap-0.5 px-1 py-0.5 bg-emerald-500/10 rounded">
                     <TrendingDown size={11} />
@@ -505,8 +525,13 @@ export default function FlightHub({
                       )}
                     </div>
                     <p className="text-[11px] text-slate-400 font-mono mt-1">
-                      {lang === "zh" ? "起飛時間：" : "Departs: "} {fl.departureTime} • {fl.from} → {fl.to}
+                      {lang === "zh" ? "去程起飛：" : "Outbound: "} {fl.departureTime} • {fl.from} → {fl.to}
                     </p>
+                    {fl.returnDepartureTime && (
+                      <p className="text-[11px] text-amber-300 font-bold font-mono mt-0.5 whitespace-nowrap">
+                        🔄 {lang === "zh" ? "回程起飛：" : "Return Departs: "} {fl.returnDepartureTime} • {fl.to} → {fl.from}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -528,7 +553,9 @@ export default function FlightHub({
                 {/* Comparative Pricing */}
                 <div className="flex flex-col md:items-end">
                   <span className="text-[10.5px] text-slate-400">{lang === "zh" ? "預估全包價" : "Estimated Rate"}</span>
-                  <span className="text-lg font-black text-white font-mono tracking-tight">${fl.price}</span>
+                  <span className="text-lg font-black text-white font-mono tracking-tight">
+                    {fl.currency || "USD"} ${fl.price.toLocaleString()}
+                  </span>
                   <div className="flex items-center gap-1 mt-0.5 text-amber-400">
                     <Star size={11} fill="currentColor" />
                     <span className="text-[11px] font-bold text-slate-200 font-mono">{fl.rating}</span>
@@ -550,6 +577,37 @@ export default function FlightHub({
                     <ThumbsUp size={11} />
                     <span>{userVoted ? t.preferred : t.voteBest}</span>
                   </button>
+
+                  {(() => {
+                    const queryParts = [
+                      "flights",
+                      "from",
+                      fromCode,
+                      "to",
+                      toCode,
+                      "on",
+                      dateStr,
+                    ];
+                    if (tripType === "roundtrip" && returnDateStr) {
+                      queryParts.push("returning");
+                      queryParts.push(returnDateStr);
+                    }
+                    if (fl.carrier) {
+                      queryParts.push(fl.carrier);
+                    }
+                    const query = encodeURIComponent(queryParts.join(" "));
+                    const finalUrl = `https://www.google.com/flights?q=${query}`;
+                    return (
+                      <a
+                        href={finalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold border border-amber-500/20 rounded-xl transition-all text-[10px] text-center flex items-center justify-center gap-1 hover:text-white"
+                      >
+                        <span>ℹ️ {lang === "zh" ? "線上比價預訂" : "Compare & Book online"}</span>
+                      </a>
+                    );
+                  })()}
 
                   {/* On-Demand Subscribe Monitoring toggle */}
                   {flightSubscription && flightSubscription.isActive && flightSubscription.carrier === fl.carrier ? (

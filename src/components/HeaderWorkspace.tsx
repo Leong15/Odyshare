@@ -34,8 +34,55 @@ export default function HeaderWorkspace({
 }: HeaderWorkspaceProps) {
   const isLight = theme === "light";
 
+  const [showChangePwdModal, setShowChangePwdModal] = useState(false);
+  const [currentPwd, setCurrentPwd] = useState("");
+  const [newPwd, setNewPwd] = useState("");
+  const [pwdError, setPwdError] = useState("");
+  const [pwdSuccess, setPwdSuccess] = useState("");
+  const [pwdLoading, setPwdLoading] = useState(false);
+
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdError("");
+    setPwdSuccess("");
+    if (!currentPwd.trim() || !newPwd.trim()) {
+      setPwdError(lang === "zh" ? "請填寫所有欄位" : "Please fill in all fields");
+      return;
+    }
+
+    setPwdLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: currentUser?.username || localStorage.getItem("loggedInUserUsername") || "",
+          currentPassword: currentPwd,
+          newPassword: newPwd
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPwdError(data.error || (lang === "zh" ? "目前密碼錯誤或新密碼不符強度限制" : "Incorrect current password or strength invalid"));
+        return;
+      }
+      setPwdSuccess(lang === "zh" ? "密碼更新成功！" : "Password updated successfully!");
+      setCurrentPwd("");
+      setNewPwd("");
+      setTimeout(() => {
+        setShowChangePwdModal(false);
+        setPwdSuccess("");
+      }, 1500);
+    } catch (err) {
+      setPwdError(lang === "zh" ? "連線失敗，請稍後重試" : "Network error, please retry.");
+    } finally {
+      setPwdLoading(false);
+    }
+  };
+
   return (
-    <header className="glass-container border-b border-white/15 py-4 px-4 sm:px-6 sticky top-0 z-40 shadow-xl backdrop-blur-md font-sans">
+    <>
+      <header className="glass-container border-b border-white/15 py-4 px-4 sm:px-6 sticky top-0 z-40 shadow-xl backdrop-blur-md font-sans">
       <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
         
         {/* Brand Block & Project Switcher List */}
@@ -155,6 +202,23 @@ export default function HeaderWorkspace({
                   {currentUser.name}
                 </span>
               </div>
+
+              {/* Change Password Button */}
+              <button
+                id="header-change-password-btn"
+                type="button"
+                onClick={() => {
+                  setPwdError("");
+                  setPwdSuccess("");
+                  setCurrentPwd("");
+                  setNewPwd("");
+                  setShowChangePwdModal(true);
+                }}
+                className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/15 rounded-xl cursor-pointer transition-all flex items-center justify-center"
+                title={lang === "zh" ? "修改密碼" : "Change password"}
+              >
+                <span>🔑</span>
+              </button>
               
               {/* Logout Button */}
               <button
@@ -198,5 +262,84 @@ export default function HeaderWorkspace({
         </div>
       </div>
     </header>
+
+    {/* Change Password Backdrop Closable Dialog Modal */}
+    {showChangePwdModal && (
+      <div
+        id="change-password-backdrop"
+        onClick={() => setShowChangePwdModal(false)}
+        className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fadeIn"
+      >
+        <div
+          onClick={(e) => e.stopPropagation()} // Satisfies non-dialog click ignore
+          className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl border ${
+            isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-white/10 text-white"
+          } relative animate-scaleUp`}
+        >
+          {/* Close Button Button */}
+          <button
+            type="button"
+            onClick={() => setShowChangePwdModal(false)}
+            className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-xs font-black"
+          >
+            ✕
+          </button>
+
+          <h3 className="text-sm font-black mb-1.5 flex items-center gap-1.5">
+            🔑 {lang === "zh" ? "變更協作密碼" : "Change Account Password"}
+          </h3>
+          <p className="text-[10px] text-slate-400 mb-4">
+            {lang === "zh" ? "請輸入原本密碼及符合高強度的安全新密碼" : "Input your legacy credentials and robust new key."}
+          </p>
+
+          <form onSubmit={handleChangePasswordSubmit} className="space-y-3">
+            <div className="space-y-1">
+              <span className="block text-[10px] font-bold text-slate-405 uppercase font-mono">{lang === "zh" ? "當前安全密碼" : "Current Password"}</span>
+              <input
+                type="password"
+                required
+                placeholder="••••••••"
+                value={currentPwd}
+                onChange={(e) => setCurrentPwd(e.target.value)}
+                className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
+                  isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
+                }`}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <span className="block text-[10px] font-bold text-slate-450 uppercase font-mono">
+                {lang === "zh" ? "高強度新密碼" : "New Secure Password"}
+              </span>
+              <input
+                type="password"
+                required
+                placeholder={lang === "zh" ? "包含大、小寫及符號" : "Upper, lower & symbols required"}
+                value={newPwd}
+                onChange={(e) => setNewPwd(e.target.value)}
+                className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
+                  isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
+                }`}
+              />
+              <p className="text-[9px] text-slate-450 leading-tight">
+                {lang === "zh" ? "（必備: 1個大寫字母, 1個小寫字母, 1個特殊符號）" : "(Constraint: 1 uppercase, 1 lowercase, 1 symbol)"}
+              </p>
+            </div>
+
+            {pwdError && <p className="text-[10px] text-rose-400 font-bold leading-relaxed">⚠️ {pwdError}</p>}
+            {pwdSuccess && <p className="text-[10px] text-emerald-400 font-bold leading-relaxed">✓ {pwdSuccess}</p>}
+
+            <button
+              type="submit"
+              disabled={pwdLoading}
+              className="w-full mt-2 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.01] text-white font-extrabold text-xs rounded-xl shadow transition duration-200 cursor-pointer disabled:opacity-50"
+            >
+              {pwdLoading ? (lang === "zh" ? "更新中..." : "Updating password...") : (lang === "zh" ? "儲存新密碼" : "Save New Password")}
+            </button>
+          </form>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

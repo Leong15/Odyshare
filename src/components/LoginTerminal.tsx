@@ -37,6 +37,63 @@ export default function LoginTerminal({
 }: LoginTerminalProps) {
   const isLight = theme === "light";
 
+  const [showForgotModal, setShowForgotModal] = React.useState(false);
+  const [forgotStep, setForgotStep] = React.useState(1);
+  const [recoveryUsername, setRecoveryUsername] = React.useState("");
+  const [recoveryAnswer, setRecoveryAnswer] = React.useState("");
+  const [recoveryError, setRecoveryError] = React.useState("");
+  const [recoverySuccess, setRecoverySuccess] = React.useState("");
+
+  const handleStartRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecoveryError("");
+    setRecoverySuccess("");
+    if (!recoveryUsername.trim()) {
+      setRecoveryError(lang === "zh" ? "請輸入帳號" : "Please input account ID");
+      return;
+    }
+    try {
+      const res = await fetch(`/api/auth/reset-question?username=${encodeURIComponent(recoveryUsername)}`);
+      if (!res.ok) {
+        const errData = await res.json();
+        setRecoveryError(errData.message || (lang === "zh" ? "帳號不存在" : "Account not found"));
+        return;
+      }
+      const data = await res.json();
+      setForgotStep(2);
+    } catch (err) {
+      setRecoveryError(lang === "zh" ? "連線連線錯誤，請稍後重試" : "Network error, please retry.");
+    }
+  };
+
+  const handleConfirmRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRecoveryError("");
+    setRecoverySuccess("");
+    try {
+      const res = await fetch(`/api/auth/reset-confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: recoveryUsername,
+          answer: recoveryAnswer
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRecoveryError(data.message || (lang === "zh" ? "答案不正確" : "Answer incorrect"));
+        return;
+      }
+      setRecoverySuccess(lang === "zh" 
+        ? `驗證成功！您的原密碼為：[ ${data.password} ]。請複製並妥善保管。` 
+        : `Success! Your password is: [ ${data.password} ]. Please save it safely.`
+      );
+      setForgotStep(3);
+    } catch (err) {
+      setRecoveryError(lang === "zh" ? "更新密碼錯誤，請稍後重試" : "Error resetting, please retry.");
+    }
+  };
+
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center font-sans tracking-tight transition-colors duration-350 p-6 relative ${
       isLight ? "bg-slate-50 text-slate-900" : "bg-[#0b0e14] text-slate-100"
@@ -137,9 +194,25 @@ export default function LoginTerminal({
 
           {/* Password */}
           <div className="space-y-1">
-            <label className={`block text-[10.5px] font-black uppercase tracking-wider font-mono ${isLight ? "text-slate-600" : "text-slate-400"}`}>
-              {lang === "zh" ? "安全密碼 *" : "Security Password *"}
-            </label>
+            <div className="flex justify-between items-center">
+              <label className={`block text-[10.5px] font-black uppercase tracking-wider font-mono ${isLight ? "text-slate-600" : "text-slate-400"}`}>
+                {lang === "zh" ? "安全密碼 *" : "Security Password *"}
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowForgotModal(true);
+                  setForgotStep(1);
+                  setRecoveryUsername("");
+                  setRecoveryAnswer("");
+                  setRecoveryError("");
+                  setRecoverySuccess("");
+                }}
+                className="text-[10px] text-blue-500 hover:text-blue-600 font-bold hover:underline cursor-pointer"
+              >
+                {lang === "zh" ? "忘記密碼？" : "Forgot Password?"}
+              </button>
+            </div>
             <input
               type="password"
               required
@@ -200,6 +273,112 @@ export default function LoginTerminal({
           </button>
         </div>
       </div>
+
+      {/* Forgot Password Backdrop Closable Dialog Modal */}
+      {showForgotModal && (
+        <div
+          id="forgot-password-backdrop"
+          onClick={() => setShowForgotModal(false)}
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fadeIn"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()} // Satisfies outer click ignore
+            className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl border ${
+              isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-white/10 text-white"
+            } relative animate-scaleUp`}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setShowForgotModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-xs font-black"
+            >
+              ✕
+            </button>
+
+            <h3 className="text-sm font-black mb-3">
+              🔑 {lang === "zh" ? "密碼安全找回與重置" : "Password Security Recovery"}
+            </h3>
+
+            {forgotStep === 1 && (
+              <form onSubmit={handleStartRecovery} className="space-y-3.5">
+                <p className="text-[11px] text-slate-400 leading-normal">
+                  {lang === "zh" 
+                    ? "請輸入您註冊的帳號 (Login ID)，系統將為您調取密碼找回安全核驗問題：" 
+                    : "Please enter your Login ID / Username to fetch the backup recovery validation question:"}
+                </p>
+                <div className="space-y-1">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">{lang === "zh" ? "帳號 (Login ID)" : "Login ID"}</span>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. leochau"
+                    value={recoveryUsername}
+                    onChange={(e) => setRecoveryUsername(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
+                      isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
+                    }`}
+                  />
+                </div>
+                {recoveryError && <p className="text-[10px] text-rose-400 font-bold">⚠️ {recoveryError}</p>}
+                <button
+                  type="submit"
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
+                >
+                  {lang === "zh" ? "下一步：驗證安全問題" : "Next: Verify Security Question"}
+                </button>
+              </form>
+            )}
+
+            {forgotStep === 2 && (
+              <form onSubmit={handleConfirmRecovery} className="space-y-3.5">
+                <p className="text-[11px] text-slate-400 leading-normal">
+                  {lang === "zh"
+                    ? "【安全問題核驗】為了安全，所有協作客體重置默認安全問題答案為您的『登記顯示名字』。請輸入對應的登記顯示名字來解鎖密碼："
+                    : "【Security Check】To verify ownership, type your 'Display Name' to reveal your security password:"}
+                </p>
+                <div className="space-y-1">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">
+                    {lang === "zh" ? "安全驗證答案 (登記名字)" : "Verification Answer (Display Name)"}
+                  </span>
+                  <input
+                    type="text"
+                    required
+                    placeholder={lang === "zh" ? "請輸入您的登記顯示名字" : "Enter your Display Name"}
+                    value={recoveryAnswer}
+                    onChange={(e) => setRecoveryAnswer(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
+                      isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
+                    }`}
+                  />
+                </div>
+                {recoveryError && <p className="text-[10px] text-rose-400 font-bold">⚠️ {recoveryError}</p>}
+                <button
+                  type="submit"
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
+                >
+                  {lang === "zh" ? "驗證並找回密碼" : "Verify & Retrieve Password"}
+                </button>
+              </form>
+            )}
+
+            {forgotStep === 3 && (
+              <div className="space-y-4">
+                <div className="p-3 bg-emerald-500/10 border border-emerald-500/15 rounded-2xl text-[11px] text-emerald-400 font-medium leading-relaxed">
+                  ✓ {recoverySuccess}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(false)}
+                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
+                >
+                  {lang === "zh" ? "登入帳號" : "Login Now"}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

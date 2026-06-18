@@ -9,6 +9,7 @@ export interface Participant {
   avatarColor: string;
   publicKey: string; // Mock Encryption key
   budgetLimit?: number; // Personal budget limit
+  username?: string; // Persistent login username
 }
 
 export interface FlightEstimate {
@@ -21,9 +22,12 @@ export interface FlightEstimate {
   stops: number;
   duration: string; // e.g. "12h 45m"
   departureTime: string;
+  returnDepartureTime?: string;
   rating: number; // e.g. 8.4
   votes: string[]; // List of user IDs who voted
   isCheapest?: boolean;
+  bookingUrl?: string;
+  currency?: string;
 }
 
 export interface Comment {

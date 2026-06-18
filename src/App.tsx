@@ -98,6 +98,10 @@ export default function App() {
     try {
       const res = await fetchWithAuth("/api/trip/invitations");
       if (res.ok) {
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Server did not return JSON yet. It may be starting up.");
+        }
         const invs = await res.json();
         setPendingInvitations(invs);
       }
@@ -118,13 +122,22 @@ export default function App() {
     try {
       const res = await fetchWithAuth("/api/trip");
       if (!res.ok) throw new Error("Server responded with error status");
+      
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Backend server is booting up or returned HTML instead of JSON.");
+      }
+
       const data: Trip = await res.json();
       setTrip(data);
       setErrorState(null);
 
       const found = data.participants.find(p => p.id === uId);
       if (found) {
-        setCurrentUser(found);
+        setCurrentUser({
+          ...found,
+          username: localStorage.getItem("loggedInUserUsername") || found.username || ""
+        });
       } else {
         // Fallback or user was deleted from participants list
         setCurrentUser({
@@ -133,7 +146,8 @@ export default function App() {
           email: "traveler@example.com",
           avatarColor: localStorage.getItem("loggedInUserColor") || "#3b82f6",
           publicKey: "pub_key_sec_unresolved",
-          budgetLimit: 1500
+          budgetLimit: 1500,
+          username: localStorage.getItem("loggedInUserUsername") || ""
         });
       }
     } catch (err) {
@@ -214,6 +228,7 @@ export default function App() {
         localStorage.setItem("loggedInUserId", loggedUser.id);
         localStorage.setItem("loggedInUserName", loggedUser.name);
         localStorage.setItem("loggedInUserColor", loggedUser.avatarColor || "#3b82f6");
+        localStorage.setItem("loggedInUserUsername", loggedUser.username || "");
         setLoggedInUserId(loggedUser.id);
         setCurrentUser(loggedUser);
         
@@ -294,6 +309,38 @@ export default function App() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(item)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrip(data.trip);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateItineraryItem = async (item: ItineraryItem) => {
+    try {
+      const res = await fetchWithAuth("/api/trip/itinerary/edit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrip(data.trip);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteItineraryItem = async (itemId: string) => {
+    try {
+      const res = await fetchWithAuth("/api/trip/itinerary/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: itemId })
       });
       if (res.ok) {
         const data = await res.json();
@@ -469,6 +516,8 @@ export default function App() {
             duration: f.duration,
             departureTime: f.departureTime,
             rating: f.rating,
+            bookingUrl: f.bookingUrl,
+            currency: f.currency,
             votes: []
           });
         });
@@ -520,6 +569,30 @@ export default function App() {
       setInviteError(lang === "zh" ? "連線失敗" : "Server error");
     } finally {
       setIsInviting(false);
+    }
+  };
+
+  const handleKickParticipant = async (userIdToKick: string) => {
+    try {
+      const res = await fetchWithAuth("/api/trip/kick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIdToKick })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.trip) {
+          setTrip(data.trip);
+        }
+        setInviteSuccess(lang === "zh" ? "✔️ 成員已成功踢除/移除。" : "✔️ Member kicked successfully.");
+        setTimeout(() => setInviteSuccess(null), 2500);
+      } else {
+        setInviteError(data.error || "Failed to kick participant");
+        setTimeout(() => setInviteError(null), 3500);
+      }
+    } catch (err) {
+      console.error(err);
+      setInviteError("Connection failure");
     }
   };
 
@@ -621,7 +694,14 @@ export default function App() {
 
         {/* 2.5. Root-level Invitation Modal Dialog for perfect screen-centering */}
         {showInviteModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
+          <div 
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setShowInviteModal(false);
+              }
+            }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn"
+          >
             <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl relative">
               
               {/* Close button */}
@@ -685,6 +765,39 @@ export default function App() {
                   <p className="text-[9.5px] text-slate-450 mt-1 leading-normal italic">
                     {lang === "zh" ? "* 點擊上方帳號快速填寫！你也可以在登出後註冊新帳號來邀請對帳。" : "* Click to select! You can also log out, register new users, and invite them."}
                   </p>
+                </div>
+
+                {/* 👥 Current Team / Kick Members Section */}
+                <div className="border-t border-white/5 pt-4 mt-2">
+                  <label className="block text-[11px] font-extrabold text-slate-450 uppercase tracking-wider mb-2">
+                    {lang === "zh" ? "📋 管理組員 / 踢除組員" : "📋 Current Team Members (Kick / Remove)"}
+                  </label>
+                  <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 select-none">
+                    {(trip.participants || []).map((p) => {
+                      const isSelf = currentUser && p.id === currentUser.id;
+                      return (
+                        <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/3 border border-white/5 text-xs">
+                          <div className="flex items-center gap-2">
+                            <div style={{ backgroundColor: p.avatarColor }} className="w-5 h-5 rounded-full text-[9px] font-black text-white flex items-center justify-center uppercase">
+                              {p.name ? p.name[0] : "?"}
+                            </div>
+                            <span className="font-bold text-white">
+                              {p.name} {isSelf && <span className="text-[9px] text-slate-400 font-mono">(You)</span>}
+                            </span>
+                          </div>
+                          {!isSelf && (
+                            <button
+                              type="button"
+                              onClick={() => handleKickParticipant(p.id)}
+                              className="text-[10.5px] text-rose-400 hover:text-rose-200 font-bold underline cursor-pointer"
+                            >
+                              {lang === "zh" ? "踢除" : "Kick"}
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {inviteError && (
@@ -874,16 +987,22 @@ export default function App() {
 
               {activeTab === "map" && (
                 <OfflineMapSimulator
+                  destination={trip.destination}
                   itineraries={trip.itineraries}
-                  onSelectLocation={() => {
-                    setActiveTab("itinerary");
+                  onSelectLocation={(item) => {
+                    // Stay inside map tab! Let user explore landmarks smoothly without bouncing out.
+                    console.log("Selected map checkpoint:", item);
                   }}
+                  onAddItineraryItem={handleAddItineraryItem}
+                  onUpdateItineraryItem={handleUpdateItineraryItem}
+                  onDeleteItineraryItem={handleDeleteItineraryItem}
                   lang={lang}
                 />
               )}
 
               {activeTab === "flights" && (
                 <FlightHub
+                  tripId={trip.id}
                   flightEstimates={trip.flightEstimates}
                   participants={trip.participants}
                   currentUser={currentUser.id}

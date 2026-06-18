@@ -24,7 +24,14 @@ export default function CreateTripModal({
   onClose,
 }: CreateTripModalProps) {
   return (
-    <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn">
+    <div 
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      className="fixed inset-0 bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn"
+    >
       <form 
         onSubmit={onSubmit}
         className="glass-container w-full max-w-md rounded-2xl p-6 border border-white/20 shadow-2xl relative space-y-4"

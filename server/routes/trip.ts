@@ -5,8 +5,13 @@ const router = Router();
 
 // 1. Get current active trip data
 router.get("/", (req: Request, res: Response) => {
-  const data = readTripsDB(req);
-  res.json(data);
+  try {
+    const data = readTripsDB(req);
+    res.json(data);
+  } catch (err: any) {
+    console.error("GET /api/trip error:", err);
+    res.status(500).json({ error: err.message || "Failed to read trip database" });
+  }
 });
 
 // 2. Add or update trip details
@@ -130,6 +135,65 @@ router.post("/itinerary/add", (req: Request, res: Response) => {
 
   writeTripsDB(current, req);
   res.json({ success: true, item: newItem, trip: current });
+});
+
+// 3b. Edit an existing Itinerary point
+router.post("/itinerary/edit", (req: Request, res: Response) => {
+  const { id, title, description, locationName, time, category, cost, coordinates } = req.body;
+  const current = readTripsDB(req);
+  const item = current.itineraries.find((i: any) => i.id === id);
+  if (item) {
+    if (title !== undefined) item.title = title;
+    if (description !== undefined) item.description = description;
+    if (locationName !== undefined) item.locationName = locationName;
+    if (time !== undefined) item.time = time;
+    if (category !== undefined) item.category = category;
+    if (cost !== undefined) item.cost = Number(cost) || 0;
+    if (coordinates !== undefined) item.coordinates = coordinates;
+    
+    // Post system message log
+    const systemMsg = {
+      id: "msg-" + Date.now(),
+      senderId: "system",
+      senderName: "System",
+      avatarColor: "#64748b",
+      messageEncrypted: "",
+      messageDecrypted: `✏️ 行程更新：'${item.title}' (${item.locationName})`,
+      timestamp: new Date().toISOString(),
+      isTripUpdate: true
+    };
+    current.chats.push(systemMsg);
+    
+    writeTripsDB(current, req);
+    res.json({ success: true, item, trip: current });
+  } else {
+    res.status(404).json({ error: "Item not found" });
+  }
+});
+
+// 3c. Delete an existing Itinerary point
+router.post("/itinerary/delete", (req: Request, res: Response) => {
+  const { id } = req.body;
+  const current = readTripsDB(req);
+  const initialLen = current.itineraries.length;
+  current.itineraries = current.itineraries.filter((i: any) => i.id !== id);
+  if (current.itineraries.length < initialLen) {
+    const systemMsg = {
+      id: "msg-" + Date.now(),
+      senderId: "system",
+      senderName: "System",
+      avatarColor: "#64748b",
+      messageEncrypted: "",
+      messageDecrypted: `🗑️ 行程已刪除 (ID: ${id})`,
+      timestamp: new Date().toISOString(),
+      isTripUpdate: true
+    };
+    current.chats.push(systemMsg);
+    writeTripsDB(current, req);
+    res.json({ success: true, trip: current });
+  } else {
+    res.status(404).json({ error: "Item not found" });
+  }
 });
 
 // 4. Vote on Itinerary Item or Flight Recommendation
@@ -327,20 +391,71 @@ router.post("/invite", (req: Request, res: Response) => {
   res.json({ success: true, invitation: newInvitation });
 });
 
+// 10.5. Kick user/participant out of the trip group
+router.post("/kick", (req: Request, res: Response) => {
+  const { userIdToKick } = req.body;
+  const requestUserId = req.headers["x-user-id"] as string;
+
+  if (!userIdToKick) {
+    return res.status(400).json({ error: "userIdToKick is required to remove someone." });
+  }
+
+  const current = readTripsDB(req);
+  const db = getDB();
+
+  // Find the user to kick to log their name
+  const foundUser = db.users.find(u => u.id === userIdToKick);
+  if (!foundUser) {
+    return res.status(404).json({ error: "User to kick not found in registered accounts." });
+  }
+
+  // Verify they are a participant
+  const partIndex = current.participants.findIndex((p: any) => p.id === userIdToKick);
+  if (partIndex === -1) {
+    return res.status(400).json({ error: "User is not a participant in this group project." });
+  }
+
+  // Remove user from the participants list
+  current.participants.splice(partIndex, 1);
+
+  // System log notification in trip chat
+  const sender = db.users.find(u => u.id === requestUserId);
+  const senderName = sender ? sender.name : "A Group Member";
+
+  current.chats.push({
+    id: "msg-kick-" + Date.now(),
+    senderId: "system",
+    senderName: "System",
+    avatarColor: "#ef4444",
+    messageEncrypted: "",
+    messageDecrypted: `❌ ${foundUser.name} was removed from the travel project by ${senderName}.`,
+    timestamp: new Date().toISOString(),
+    isTripUpdate: true
+  });
+
+  writeTripsDB(current, req);
+  res.json({ success: true, trip: current });
+});
+
 // 11. Retrieve all pending invitations for currently logged in user
 router.get("/invitations", (req: Request, res: Response) => {
-  const userId = req.headers["x-user-id"] as string;
-  if (!userId) {
-    return res.status(401).json({ error: "Missing x-user-id header" });
+  try {
+    const userId = req.headers["x-user-id"] as string;
+    if (!userId) {
+      return res.status(401).json({ error: "Missing x-user-id header" });
+    }
+    const db = getDB();
+    if (!db.invitations) {
+      db.invitations = [];
+    }
+    const userPending = db.invitations.filter(
+      (inv: any) => inv.inviteeId === userId && inv.status === "pending"
+    );
+    res.json(userPending);
+  } catch (err: any) {
+    console.error("GET /api/trip/invitations error:", err);
+    res.status(500).json({ error: err.message || "Failed to fetch invitations" });
   }
-  const db = getDB();
-  if (!db.invitations) {
-    db.invitations = [];
-  }
-  const userPending = db.invitations.filter(
-    (inv: any) => inv.inviteeId === userId && inv.status === "pending"
-  );
-  res.json(userPending);
 });
 
 // 12. Accept or Decline an invitation
@@ -415,7 +530,7 @@ router.post("/invitations/respond", (req: Request, res: Response) => {
 // D. Subscribe to On-Demand Flight Route monitoring with baseline pricing
 router.post("/:id/flight-subscription", (req: Request, res: Response) => {
   const tripId = req.params.id;
-  const { from, to, date, price, carrier, stops, duration, isDirect } = req.body;
+  const { from, to, date, price, carrier, stops, duration, isDirect, currency } = req.body;
 
   const db = getDB();
   const trip = db.trips.find((t: any) => t.id === tripId);
@@ -424,6 +539,7 @@ router.post("/:id/flight-subscription", (req: Request, res: Response) => {
   }
 
   const initialPrice = price || 15000;
+  const subCurrency = currency || "USD";
   
   trip.flightSubscription = {
     isActive: true,
@@ -433,13 +549,14 @@ router.post("/:id/flight-subscription", (req: Request, res: Response) => {
     baselinePrice: initialPrice,
     currentPrice: initialPrice,
     lastCheckedPrice: initialPrice,
+    currency: subCurrency,
     score: 60, // Starting baseline score
     history: [
       {
         price: initialPrice,
         score: 60,
         checkedAt: new Date().toISOString(),
-        message: `訂閱成功，已建立價格基準線（Baseline）： $${initialPrice}`
+        message: `訂閱成功，已建立價格基準線（Baseline）： ${subCurrency} $${initialPrice}`
       }
     ],
     carrier: carrier || "ANA Airways",
@@ -456,7 +573,7 @@ router.post("/:id/flight-subscription", (req: Request, res: Response) => {
     senderName: "WanderSmart AI",
     avatarColor: "#8b5cf6",
     messageEncrypted: "",
-    messageDecrypted: `🔔 線路監控啟動！WanderSmart 已將 ${from || "TPE"} 往 ${to || "NRT"} (出發: ${date || "2026-07-20"}) 之基準線價格（Baseline）鎖定在 $${initialPrice}。每日中午 12:00 及晚上 18:00 將進行主動航班剖析與低價追焦推送。`,
+    messageDecrypted: `🔔 線路監控啟動！WanderSmart 已將 ${from || "TPE"} 往 ${to || "NRT"} (出發: ${date || "2026-07-20"}) 之基準線價格（Baseline）鎖定在 ${subCurrency} $${initialPrice}。每日中午 12:00 及晚上 18:00 將進行主動航班剖析與低價追焦推送。`,
     timestamp: new Date().toISOString(),
     isTripUpdate: true
   });
@@ -536,14 +653,16 @@ router.post("/:id/simulate-price-check", (req: Request, res: Response) => {
   let pushMsg = "";
   let isMegaDrop = pctDiff >= 10; // 10% or more drop
 
+  const cur = sub.currency || "USD";
+
   if (isMegaDrop && newStops <= sub.stops) {
-    pushMsg = `🔥 降價通知！您監控的${sub.from}機票在${checkHour}降了 $${baseline - newPrice}，且直飛不變，創下近期 C/P 值新高（性價比得分從 60 躍升至 ${checkScore}！），建議立即入手！`;
+    pushMsg = `🔥 降價通知！您監控的${sub.from}機票在${checkHour}降了 ${cur} $${baseline - newPrice}，且直飛不變，創下近期 C/P 值新高（性價比得分從 60 躍升至 ${checkScore}！），建議立即入手！`;
   } else if (newStops > sub.stops) {
-    pushMsg = `⚠️ 航班警報（${checkHour}）：雖然當前有航班報價 $${newPrice}，但航程變成了轉機${newStops}次的爛地獄航班！航程時間大幅拉長，AI 判定性價比極低（得分跌至 ${checkScore}分），不建議購買此變更。`;
+    pushMsg = `⚠️ 航班警報（${checkHour}）：雖然當前有航班報價 ${cur} $${newPrice}，但航程變成了轉機${newStops}次的爛地獄航班！航程時間大幅拉長，AI 判定性價比極低（得分跌至 ${checkScore}分），不建議購買此變更。`;
   } else if (newPrice < baseline) {
-    pushMsg = `✈️ 航班動態更新（${checkHour}）：票價微幅調降至 $${newPrice}。直飛不變，性價比略微上揚（得分為 ${checkScore}），您可以考慮在近期購入。`;
+    pushMsg = `✈️ 航班動態更新（${checkHour}）：票價微幅調降至 ${cur} $${newPrice}。直飛不變，性價比略微上揚（得分為 ${checkScore}），您可以考慮在近期購入。`;
   } else {
-    pushMsg = `✈️ 航班動態更新（${checkHour}）：當前報價為 $${newPrice}。相較於起初訂閱的 $${baseline} 基準線表現持平，性價比評估為中等（得分為 ${checkScore}）。`;
+    pushMsg = `✈️ 航班動態更新（${checkHour}）：當前報價為 ${cur} $${newPrice}。相較於起初訂閱的 ${cur} $${baseline} 基準線表現持平，性價比評估為中等（得分為 ${checkScore}）。`;
   }
 
   // Record history
@@ -551,7 +670,7 @@ router.post("/:id/simulate-price-check", (req: Request, res: Response) => {
     price: newPrice,
     score: checkScore,
     checkedAt: new Date().toISOString(),
-    message: `${checkHour} 機票安全監控：系統抓取到報價 $${newPrice}, 轉機次數 (${newStops}次)。AI 判定得分為: ${checkScore}/100。`
+    message: `${checkHour} 機票安全監控：系統抓取到報價 ${cur} $${newPrice}, 轉機次數 (${newStops}次)。AI 判定得分為: ${checkScore}/100。`
   });
 
   // Push notification container setup (so client-side react can pick it up via SSE or poll)

@@ -30,6 +30,7 @@ export const DEFAULT_TRIP = {
       stops: 0,
       duration: "11h 30m",
       departureTime: "11:45 AM",
+      returnDepartureTime: "15:20 PM",
       rating: 8.9,
       votes: ["u1", "u2", "u4"],
       isCheapest: false
@@ -44,6 +45,7 @@ export const DEFAULT_TRIP = {
       stops: 1,
       duration: "14h 20m",
       departureTime: "08:15 AM",
+      returnDepartureTime: "17:15 PM",
       rating: 9.1,
       votes: ["u3", "u4"],
       isCheapest: true
@@ -58,6 +60,7 @@ export const DEFAULT_TRIP = {
       stops: 0,
       duration: "11h 50m",
       departureTime: "13:20 PM",
+      returnDepartureTime: "19:30 PM",
       rating: 7.2,
       votes: [],
       isCheapest: false
@@ -362,6 +365,20 @@ export function getTripForRequest(req: Request) {
     trip = db.trips.find(t => t.id === db.activeTripId) || db.trips[0];
   }
 
+  // Enrich participants with their actual database username if match is found
+  if (trip && trip.participants) {
+    trip = {
+      ...trip,
+      participants: trip.participants.map((p: any) => {
+        const mu = db.users.find(u => u.id === p.id || u.email === p.email);
+        return {
+          ...p,
+          username: mu ? mu.username : (p.username || "")
+        };
+      })
+    };
+  }
+
   // Filter visible trips scoped strictly to user
   const visibleTrips = userId 
     ? db.trips.filter(t => t.participants.some((p: any) => p.id === userId))
@@ -409,6 +426,18 @@ export function readTripsDB(req?: Request) {
     db.activeTripId = active.id;
     db.trips = [active];
     writeDB(db);
+  }
+  if (active && active.participants) {
+    active = {
+      ...active,
+      participants: active.participants.map((p: any) => {
+        const mu = db.users.find(u => u.id === p.id || u.email === p.email);
+        return {
+          ...p,
+          username: mu ? mu.username : (p.username || "")
+        };
+      })
+    };
   }
   return {
     ...active,

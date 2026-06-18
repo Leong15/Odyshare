@@ -1,16 +1,95 @@
-import React, { useState, useEffect } from "react";
-import { MapPin, Navigation, Download, CloudOff, RefreshCw, Signal, Search, CheckCircle } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { MapPin, Navigation, Download, CloudOff, RefreshCw, Signal, Search, CheckCircle, PlusCircle, Flag, Info, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import L from "leaflet";
 import { ItineraryItem } from "../types";
 import { translations } from "../lib/translations";
 
+// Resolve Lat/Lng standard coords for itinerary names in various cities
+const resolveLatLng = (name: string, dest: string, x: number, y: number): { lat: number; lng: number } => {
+  const d = dest.toLowerCase();
+  const n = (name || "").toLowerCase();
+
+  // 1. Establish center coordinates based on destination
+  let center = { lat: 35.6762, lng: 139.6503 }; // Tokyo default
+  if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
+    center = { lat: 22.3193, lng: 114.1694 };
+  } else if (d.includes("paris") || d.includes("巴黎")) {
+    center = { lat: 48.8566, lng: 2.3522 };
+  } else if (d.includes("london") || d.includes("倫敦")) {
+    center = { lat: 51.5074, lng: -0.1278 };
+  } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
+    center = { lat: 25.0330, lng: 121.5654 };
+  } else if (d.includes("new york") || d.includes("nyc")) {
+    center = { lat: 40.7128, lng: -74.0060 };
+  }
+
+  // 2. Specific matching of hot locations
+  // Tokyo
+  if (n.includes("gyoen") || n.includes("御苑")) return { lat: 35.6852, lng: 139.7101 };
+  if (n.includes("crossing") || n.includes("澀谷") || n.includes("shibuya")) return { lat: 35.6580, lng: 139.7016 };
+  if (n.includes("tsukiji") || n.includes("築地")) return { lat: 35.6658, lng: 139.7701 };
+  if (n.includes("sensoji") || n.includes("淺草") || n.includes("asakusa")) return { lat: 35.7148, lng: 139.7967 };
+  if (n.includes("akihabara") || n.includes("秋葉")) return { lat: 35.6997, lng: 139.7715 };
+  
+  // Hong Kong
+  if (n.includes("victoria") || n.includes("peak") || n.includes("太平山")) return { lat: 22.2759, lng: 114.1455 };
+  if (n.includes("tsim sha tsui") || n.includes("tst") || n.includes("尖沙咀")) return { lat: 22.2988, lng: 114.1722 };
+  if (n.includes("ocean park") || n.includes("海洋公園")) return { lat: 22.2475, lng: 114.1744 };
+  if (n.includes("disneyland") || n.includes("迪士尼")) return { lat: 22.3130, lng: 114.0413 };
+  if (n.includes("lan kwai fong") || n.includes("蘭桂坊")) return { lat: 22.2808, lng: 114.1557 };
+
+  // Paris
+  if (n.includes("eiffel") || n.includes("鐵塔")) return { lat: 48.8584, lng: 2.2945 };
+  if (n.includes("louvre") || n.includes("羅浮宮")) return { lat: 48.8606, lng: 2.3376 };
+  if (n.includes("arc") || n.includes("凱旋門")) return { lat: 48.8738, lng: 2.2950 };
+
+  // London
+  if (n.includes("ben") || n.includes("笨鐘")) return { lat: 51.5007, lng: -0.1246 };
+  if (n.includes("eye") || n.includes("眼")) return { lat: 51.5033, lng: -0.1195 };
+
+  // 3. Fallback: map the custom coordinate space [x, y] onto offset relative to center
+  const latOffset = (50 - y) * 0.0015;
+  const lngOffset = (x - 50) * 0.0018;
+  return {
+    lat: center.lat + latOffset,
+    lng: center.lng + lngOffset
+  };
+};
+
 interface OfflineMapSimulatorProps {
+  destination?: string;
   itineraries: ItineraryItem[];
   onSelectLocation?: (item: ItineraryItem) => void;
+  onAddItineraryItem?: (item: Omit<ItineraryItem, "id" | "votes" | "comments" | "coordinates" | "trafficStatus"> & { coordinates?: { x: number; y: number } }) => Promise<void>;
+  onUpdateItineraryItem?: (item: ItineraryItem) => Promise<void>;
+  onDeleteItineraryItem?: (itemId: string) => Promise<void>;
   lang?: "en" | "zh";
 }
 
-export default function OfflineMapSimulator({ itineraries, onSelectLocation, lang = "en" }: OfflineMapSimulatorProps) {
+interface MapTarget {
+  name: string;
+  x: number;
+  y: number;
+  lat?: number;
+  lng?: number;
+  type: string;
+  traffic: "smooth" | "moderate" | "congested";
+  isCustom?: boolean;
+  isItinerary?: boolean;
+  originalItem?: ItineraryItem;
+}
+
+export default function OfflineMapSimulator({
+  destination = "Tokyo",
+  itineraries = [],
+  onSelectLocation,
+  onAddItineraryItem,
+  onUpdateItineraryItem,
+  onDeleteItineraryItem,
+  lang = "en"
+}: OfflineMapSimulatorProps) {
+  const [viewMode, setViewMode] = useState<"simulator" | "leaflet">("leaflet");
   const [offlineMode, setOfflineMode] = useState<boolean>(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isDownloaded, setIsDownloaded] = useState<boolean>(true);
@@ -19,21 +98,139 @@ export default function OfflineMapSimulator({ itineraries, onSelectLocation, lan
   const [isNavigating, setIsNavigating] = useState<boolean>(false);
   const [navStep, setNavStep] = useState<number>(0);
 
+  // Leaflet references
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersGroupRef = useRef<L.LayerGroup | null>(null);
+
+  // Geolocation and navigation
+  const [currentGeoLocation, setCurrentGeoLocation] = useState<{ lat: number; lng: number }>(() => {
+    return resolveLatLng(destination, destination, 34, 65);
+  });
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [isSimulatedMoving, setIsSimulatedMoving] = useState<boolean>(true); // Walking loop simulation starts active by default
+
+  // Form states for adding or editing itinerary plans
+  const [isEditingActiveItem, setIsEditingActiveItem] = useState<boolean>(false);
+  const [editTitle, setEditTitle] = useState<string>("");
+  const [editLocation, setEditLocation] = useState<string>("");
+  const [editDesc, setEditDesc] = useState<string>("");
+  const [editTime, setEditTime] = useState<string>("12:00");
+  const [editDay, setEditDay] = useState<number>(0);
+  const [editCategory, setEditCategory] = useState<"sight" | "food" | "hotel">("sight");
+  const [editCost, setEditCost] = useState<number>(0);
+
+  // Custom user-dropped landmarks/pins
+  const [customHotspots, setCustomHotspots] = useState<MapTarget[]>([]);
+
   const t = translations[lang];
 
-  // Default key pins for map decoration
-  const hotspots = [
-    { name: lang === "zh" ? "新宿黃金街" : "Shinjuku Golden Gai", x: 25, y: 35, type: "food", traffic: "congested" },
-    { name: lang === "zh" ? "澀谷展望台" : "Shibuya Sky", x: 40, y: 72, type: "sight", traffic: "moderate" },
-    { name: lang === "zh" ? "明治神宮" : "Meiji Jingu Shrine", x: 42, y: 48, type: "sight", traffic: "smooth" },
-    { name: lang === "zh" ? "淺草寺" : "Asakusa Sensoji", x: 72, y: 22, type: "sight", traffic: "congested" },
-    { name: lang === "zh" ? "目黑川星巴克旗艦店" : "Meguro Starbucks Reserve", x: 34, y: 65, type: "food", traffic: "smooth" },
-    { name: lang === "zh" ? "秋葉原電器街" : "Akihabara Electric Town", x: 62, y: 38, type: "shopping", traffic: "moderate" }
-  ];
+  // Helper to convert real Lat/Lng standard coordinates to pseudo canvas X/Y
+  const getSvgCoordsFromLatLng = (lat: number, lng: number): { x: number; y: number } => {
+    const d = destination.toLowerCase();
+    let center = { lat: 35.6762, lng: 139.6503 }; // Tokyo default
+    if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
+      center = { lat: 22.3193, lng: 114.1694 };
+    } else if (d.includes("paris") || d.includes("巴黎")) {
+      center = { lat: 48.8566, lng: 2.3522 };
+    } else if (d.includes("london") || d.includes("倫敦")) {
+      center = { lat: 51.5074, lng: -0.1278 };
+    } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
+      center = { lat: 25.0330, lng: 121.5654 };
+    } else if (d.includes("new york") || d.includes("nyc")) {
+      center = { lat: 40.7128, lng: -74.0060 };
+    }
 
-  // Map searches
-  const filteredHotspots = hotspots.filter(h =>
-    h.name.toLowerCase().includes(searchQuery.toLowerCase())
+    const y = 50 - (lat - center.lat) / 0.0015;
+    const x = 50 + (lng - center.lng) / 0.0018;
+
+    return {
+      x: Math.round(Math.min(Math.max(5, x), 95)),
+      y: Math.round(Math.min(Math.max(5, y), 95))
+    };
+  };
+
+  // Synchronise edit form values whenever the active node focuses
+  useEffect(() => {
+    if (activeItem) {
+      setEditTitle(activeItem.title || "");
+      setEditLocation(activeItem.locationName || "");
+      setEditDesc(activeItem.description || "");
+      setEditTime(activeItem.time || "12:00");
+      setEditDay(activeItem.dayIndex || 0);
+      setEditCategory(activeItem.category === "restaurant" ? "food" : activeItem.category === "hotel" ? "hotel" : "sight");
+      setEditCost(activeItem.cost || 0);
+      setIsEditingActiveItem(false);
+    } else {
+      setIsEditingActiveItem(false);
+    }
+  }, [activeItem]);
+
+  // Automated simulated walking movement loop updates
+  useEffect(() => {
+    if (!isSimulatedMoving || !currentGeoLocation) return;
+
+    let angle = Math.random() * 2 * Math.PI;
+    const interval = setInterval(() => {
+      const stepSize = 0.00015; // smooth increment step
+      angle += (Math.random() - 0.5) * 0.4; // random wandering course drift
+      
+      setCurrentGeoLocation(prev => {
+        if (!prev) return prev;
+        const nextLat = prev.lat + Math.sin(angle) * stepSize;
+        const nextLng = prev.lng + Math.cos(angle) * stepSize;
+        return { lat: nextLat, lng: nextLng };
+      });
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [isSimulatedMoving]);
+
+  // Actual Browser GPS watcher
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        setCurrentGeoLocation(coords);
+        setGeoError(null);
+      },
+      (err) => {
+        console.warn("watchPosition telemetry warning:", err);
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
+
+  // Combine dynamic local itinerary plans so they display on map!
+  const itineraryPins: MapTarget[] = (itineraries || []).map((item, index) => {
+    return {
+      name: item.title,
+      // Distribute pseudo-coordinates around the quadrant nicely
+      x: item.coordinates?.x || (18 + (index * 19) % 65),
+      y: item.coordinates?.y || (22 + (index * 23) % 55),
+      type: item.category === "hotel" ? "hotel" : item.category === "restaurant" ? "food" : "sight",
+      traffic: (index % 3 === 0 ? "congested" : index % 3 === 1 ? "moderate" : "smooth") as any,
+      isItinerary: true,
+      originalItem: item
+    };
+  });
+
+  // Master merged map objects - NO HARDCODED LANDMARKS (AS REQUESTED: "hard code data不要了")
+  const allMapObjects = [...itineraryPins, ...customHotspots];
+
+  // Filter map list based on search query
+  const filteredObjects = allMapObjects.filter(item =>
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const startDownload = () => {
@@ -53,15 +250,69 @@ export default function OfflineMapSimulator({ itineraries, onSelectLocation, lan
     }, 200);
   };
 
-  const handleSelectHotspot = (spot: typeof hotspots[0]) => {
-    const mockItem: ItineraryItem = {
+  const handleSaveToItineraryPlan = async () => {
+    if (!editTitle.trim()) return;
+    if (onAddItineraryItem) {
+      await onAddItineraryItem({
+        title: editTitle,
+        locationName: editLocation || editTitle,
+        description: editDesc,
+        time: editTime,
+        dayIndex: Number(editDay) || 0,
+        category: editCategory === "food" ? "restaurant" : editCategory === "hotel" ? "hotel" : "sight",
+        cost: Number(editCost) || 0,
+        coordinates: activeItem?.coordinates || { x: 50, y: 50 }
+      });
+      if (activeItem) {
+        setCustomHotspots(prev => prev.filter(c => c.name !== activeItem.locationName));
+      }
+      setActiveItem(null);
+      setIsEditingActiveItem(false);
+    }
+  };
+
+  const handleUpdateExistingItineraryPlan = async () => {
+    if (!editTitle.trim() || !activeItem) return;
+    if (onUpdateItineraryItem) {
+      const updated = {
+        ...activeItem,
+        title: editTitle,
+        locationName: editLocation || editTitle,
+        description: editDesc,
+        time: editTime,
+        dayIndex: Number(editDay) || 0,
+        category: editCategory === "food" ? "restaurant" : editCategory === "hotel" ? "hotel" : "sight",
+        cost: Number(editCost) || 0
+      };
+      await onUpdateItineraryItem(updated);
+      setActiveItem(updated);
+      setIsEditingActiveItem(false);
+    }
+  };
+
+  const handleDeleteOrCreateNode = async () => {
+    if (!activeItem) return;
+    const isRealItinerary = activeItem.id && activeItem.id.startsWith("it-");
+    if (isRealItinerary) {
+      if (onDeleteItineraryItem) {
+        await onDeleteItineraryItem(activeItem.id);
+      }
+    } else {
+      setCustomHotspots(prev => prev.filter(c => c.name !== activeItem.locationName));
+    }
+    setActiveItem(null);
+    setIsEditingActiveItem(false);
+  };
+
+  const handleSelectObject = (spot: MapTarget) => {
+    const mockItem: ItineraryItem = spot.originalItem || {
       id: "spot-" + spot.name,
       dayIndex: 0,
-      time: "12:00",
+      time: "10:00",
       title: spot.name,
-      description: lang === "zh" 
-        ? `探測到本地推薦景点！當前路況指示：${spot.traffic}` 
-        : `Discovered local hotspot featuring ${spot.traffic} traffic indicators.`,
+      description: lang === "zh"
+        ? `偵測到該地區的熱門推荐！當前路況判定：${spot.traffic === "smooth" ? "暢通" : spot.traffic === "moderate" ? "多車" : "壅塞"}`
+        : `Explore local hotspot '${spot.name}' in active destination ${destination}. Traffic indicator: ${spot.traffic}`,
       locationName: spot.name,
       category: spot.type === "food" ? "restaurant" : "sight",
       cost: 0,
@@ -70,8 +321,53 @@ export default function OfflineMapSimulator({ itineraries, onSelectLocation, lan
       coordinates: { x: spot.x, y: spot.y },
       trafficStatus: spot.traffic as any
     };
+
     setActiveItem(mockItem);
     if (onSelectLocation) onSelectLocation(mockItem);
+  };
+
+  // Click directly on canvas map to drop a custom pinpoint pin
+  const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+
+    const newName = lang === "zh" ? `自訂地標 #${customHotspots.length + 1} (X:${x}, Y:${y})` : `Dropped Pin #${customHotspots.length + 1} (X:${x}, Y:${y})`;
+    const resolved = resolveLatLng(newName, destination, x, y);
+    const droppedTarget: MapTarget = {
+      name: newName,
+      x,
+      y,
+      lat: resolved.lat,
+      lng: resolved.lng,
+      type: "sight",
+      traffic: "smooth",
+      isCustom: true
+    };
+
+    setCustomHotspots(prev => [droppedTarget, ...prev]);
+    handleSelectObject(droppedTarget);
+  };
+
+  // Search input register as a custom pin onto the layout
+  const handleAddSearchLocation = () => {
+    if (!searchQuery.trim()) return;
+    const rx = Math.round(25 + Math.random() * 50);
+    const ry = Math.round(25 + Math.random() * 50);
+    const resolved = resolveLatLng(searchQuery.trim(), destination, rx, ry);
+    const newTarget: MapTarget = {
+      name: searchQuery.trim(),
+      x: rx,
+      y: ry,
+      lat: resolved.lat,
+      lng: resolved.lng,
+      type: "sight",
+      traffic: "smooth",
+      isCustom: true
+    };
+    setCustomHotspots(prev => [newTarget, ...prev]);
+    handleSelectObject(newTarget);
+    setSearchQuery("");
   };
 
   const startSimulatedNavigation = () => {
@@ -96,7 +392,200 @@ export default function OfflineMapSimulator({ itineraries, onSelectLocation, lan
     return () => clearInterval(timer);
   }, [isNavigating]);
 
-  // Translate specific terms dynamically helper
+  // Leaflet Map Initialization Effect
+  useEffect(() => {
+    if (viewMode !== "leaflet" || !mapContainerRef.current) {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+      return;
+    }
+
+    if (!mapRef.current) {
+      const center = resolveLatLng(destination, destination, 50, 50);
+      const mapInstance = L.map(mapContainerRef.current, {
+        center: [center.lat, center.lng],
+        zoom: 12,
+        attributionControl: false
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap'
+      }).addTo(mapInstance);
+
+      const group = L.layerGroup().addTo(mapInstance);
+      markersGroupRef.current = group;
+      mapRef.current = mapInstance;
+
+      // Drop pin on double-click or simple click
+      mapInstance.on("click", (e: L.LeafletMouseEvent) => {
+        const latlng = e.latlng;
+        const newName = lang === "zh"
+          ? `自訂標定 #${customHotspots.length + 1} (${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)})`
+          : `Dropped Pin #${customHotspots.length + 1} (${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)})`;
+
+        const droppedTarget: MapTarget = {
+          name: newName,
+          x: 50,
+          y: 50,
+          lat: latlng.lat,
+          lng: latlng.lng,
+          type: "sight",
+          traffic: "smooth",
+          isCustom: true
+        };
+
+        setCustomHotspots(prev => [droppedTarget, ...prev]);
+        handleSelectObject(droppedTarget);
+      });
+    }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [viewMode, destination]);
+
+  // Helper to resolve coordinates
+  const getSpotCoords = (spot: MapTarget) => {
+    if (spot.lat !== undefined && spot.lng !== undefined) {
+      return { lat: spot.lat, lng: spot.lng };
+    }
+    return resolveLatLng(spot.name, destination, spot.x, spot.y);
+  };
+
+  // Sync / Paint markers in Leaflet Group
+  useEffect(() => {
+    if (!mapRef.current || !markersGroupRef.current) return;
+
+    const group = markersGroupRef.current;
+    group.clearLayers();
+
+    // Paint current real GPS geolocation if available
+    if (currentGeoLocation) {
+      const geoIcon = L.divIcon({
+        className: "custom-leaflet-geo-pin",
+        html: `
+          <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center animate-pulse border border-blue-400">
+              <div class="w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white shadow-md"></div>
+            </div>
+            <div class="mt-0.5 px-2 py-0.5 rounded-md bg-blue-900 border border-blue-400 text-white text-[9.5px] font-black leading-none shadow-lg whitespace-nowrap">
+              ${lang === "zh" ? "我的位置 (HTTPS)" : "My Location (HTTPS)"}
+            </div>
+          </div>
+        `,
+        iconSize: [32, 48],
+        iconAnchor: [16, 24]
+      });
+
+      L.marker([currentGeoLocation.lat, currentGeoLocation.lng], { icon: geoIcon })
+        .addTo(group);
+    }
+
+    // Paint other targets
+    allMapObjects.forEach(spot => {
+      const pos = getSpotCoords(spot);
+      const isSpotActive = activeItem?.locationName === spot.name;
+
+      const markerColor = spot.isItinerary
+        ? "#fbbf24" // gold for active itineraries
+        : spot.isCustom
+        ? "#ec4899" // hot pink for custom pins
+        : spot.traffic === "smooth"
+        ? "#10b981"
+        : spot.traffic === "moderate"
+        ? "#f59e0b"
+        : "#ef4444";
+
+      const badgeIcon = spot.isItinerary ? "📅" : spot.type === "food" ? "🍴" : "📍";
+
+      const pinIcon = L.divIcon({
+        className: `custom-leaflet-pin-wrapper`,
+        html: `
+          <div class="flex flex-col items-center ${isSpotActive ? 'scale-115 z-50' : 'opacity-90'} transition-transform duration-200">
+            <div class="w-6.5 h-6.5 rounded-full border-2 border-white flex items-center justify-center shadow-md text-white text-[10px]" style="background-color: ${markerColor}; ${isSpotActive ? 'box-shadow: 0 0 10px #fbbf24; border-color: #fbbf24;' : ''}">
+              ${badgeIcon}
+            </div>
+            <div class="mt-1 px-1.5 py-0.5 rounded bg-slate-900 border border-white/10 text-white text-[9px] font-bold whitespace-nowrap leading-none shadow-sm ${isSpotActive ? 'text-amber-300 border-amber-400 font-extrabold bg-slate-950 scale-105' : ''}">
+              ${spot.name.split(" (")[0]}
+            </div>
+          </div>
+        `,
+        iconSize: [28, 44],
+        iconAnchor: [14, 44]
+      });
+
+      L.marker([pos.lat, pos.lng], { icon: pinIcon })
+        .addTo(group)
+        .on("click", () => {
+          handleSelectObject(spot);
+        });
+
+      if (isSpotActive) {
+        mapRef.current?.panTo([pos.lat, pos.lng], { animate: true });
+      }
+    });
+
+  }, [allMapObjects, activeItem, currentGeoLocation, viewMode]);
+
+  // Request actual Geolocation using navigator.geolocation
+  const requestUserLocation = () => {
+    setIsLocating(true);
+    setGeoError(null);
+
+    if (!navigator.geolocation) {
+      setGeoError(lang === "zh" ? "流覽器不支援 GPS 定位服務。" : "Geolocation is not supported by your browser.");
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const coords = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        setCurrentGeoLocation(coords);
+        setIsLocating(false);
+
+        if (mapRef.current) {
+          mapRef.current.setView([coords.lat, coords.lng], 14, { animate: true });
+        }
+
+        // Drop user position custom spot
+        const userSpot: MapTarget = {
+          name: lang === "zh" ? "實時定位 (My Location)" : "My GPS Location",
+          x: 50,
+          y: 50,
+          lat: coords.lat,
+          lng: coords.lng,
+          type: "sight",
+          traffic: "smooth",
+          isCustom: true
+        };
+        setCustomHotspots(prev => [userSpot, ...prev]);
+        handleSelectObject(userSpot);
+      },
+      (error) => {
+        console.warn("Geolocation failure:", error);
+        let errMsg = lang === "zh" ? "無法取得您的位置。請確認已開啟定位權限。" : "Unable to retrieve position. Check location permission.";
+        if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
+          errMsg = lang === "zh"
+            ? "安全限制：手機瀏覽器要求必須在加密安全連線 (HTTPS) 協定下，才允許呼叫 GPS 定位服務！請使用 HTTPS 連線。"
+            : "HTTPS Required: Mobile browsers strictly require HTTPS secure protocols to summon live GPS geolocation.";
+        }
+        setGeoError(errMsg);
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
   const getTrafficText = (traffic: string) => {
     if (traffic === "smooth") return t.trafficSmooth;
     if (traffic === "moderate") return t.trafficModerate;
@@ -104,22 +593,101 @@ export default function OfflineMapSimulator({ itineraries, onSelectLocation, lan
   };
 
   return (
-    <div className="glass-container rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col md:flex-row h-[550px] border border-white/10 animate-fadeIn">
-      {/* Left map controls */}
+    <div className="glass-container rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col md:flex-row h-[580px] border border-white/10 animate-fadeIn font-sans">
+      
+      {/* Left map controls panel */}
       <div className="w-full md:w-80 border-r border-white/5 p-5 flex flex-col h-full bg-slate-950/20 backdrop-blur-md shrink-0">
+        
+        {/* Map View Mode Switcher */}
+        <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 mb-3 shrink-0 text-xs font-bold leading-none">
+          <button
+            type="button"
+            onClick={() => setViewMode("leaflet")}
+            className={`flex-1 py-1.8 rounded-lg transition-all cursor-pointer text-center text-[11px] ${
+              viewMode === "leaflet"
+                ? "bg-blue-600 text-white font-black shadow"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            🗺️ {lang === "zh" ? "Leaflet 地圖" : "Leaflet Map"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("simulator")}
+            className={`flex-1 py-1.8 rounded-lg transition-all cursor-pointer text-center text-[11px] ${
+              viewMode === "simulator"
+                ? "bg-blue-600 text-white font-black shadow"
+                : "text-slate-400 hover:text-white"
+            }`}
+          >
+            👾 {lang === "zh" ? "GPS 模擬器" : "GPS Simulator"}
+          </button>
+        </div>
+
+        {/* Live GPS positioning control for HTTPS compliant environments */}
+        {viewMode === "leaflet" && (
+          <div className="mb-4 shrink-0 space-y-1.5">
+            <button
+              type="button"
+              onClick={requestUserLocation}
+              disabled={isLocating}
+              className="w-full py-2 bg-emerald-600/20 hover:bg-emerald-600/35 border border-emerald-500/30 text-emerald-300 hover:text-white font-bold rounded-xl text-[10.5px] tracking-tight cursor-pointer flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+            >
+              {isLocating ? (
+                <>
+                  <RefreshCw size={12} className="animate-spin" />
+                  <span>{lang === "zh" ? "取得定位中..." : "Locating..."}</span>
+                </>
+              ) : (
+                <>
+                  <span>📍</span>
+                  <span>{lang === "zh" ? "獲得實時 GPS 定位" : "Get Live GPS Location"}</span>
+                </>
+              )}
+            </button>
+            {geoError && (
+              <p className="text-[9px] text-rose-300 leading-tight bg-rose-500/10 border border-rose-500/15 p-2 rounded-lg">
+                ⚠️ {geoError}
+              </p>
+            )}
+            {currentGeoLocation && (
+              <div className="space-y-1.5">
+                <p className="text-[9px] text-emerald-400 text-center font-mono bg-emerald-500/5 p-1 rounded-md">
+                  ✅ Lat: {currentGeoLocation.lat.toFixed(4)}, Lng: {currentGeoLocation.lng.toFixed(4)}
+                </p>
+                <div className="flex items-center justify-between p-2 rounded-xl bg-blue-500/10 border border-blue-500/15 text-white">
+                  <span className="text-[9px] font-bold">🚶‍♂️ {lang === "zh" ? "實時移動模擬" : "Live Walk simulator"}</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsSimulatedMoving(!isSimulatedMoving)}
+                    className={`px-2.5 py-0.5 text-[9px] font-bold rounded cursor-pointer transition ${
+                      isSimulatedMoving ? "bg-emerald-600 text-white" : "bg-slate-700 text-slate-350"
+                    }`}
+                  >
+                    {isSimulatedMoving ? (lang === "zh" ? "開啟 (ON)" : "ON") : (lang === "zh" ? "關閉 (OFF)" : "OFF")}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className={`p-2 rounded-lg ${offlineMode ? 'bg-amber-500/15 text-amber-300 border border-amber-500/20' : 'bg-blue-500/15 text-blue-300 border border-blue-500/20'}`}>
               {offlineMode ? <CloudOff size={16} /> : <Signal size={16} />}
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-xs leading-none">{t.offlineMaps}</h3>
-              <p className="text-[10px] text-slate-400 mt-1">
+              <h3 className="font-extrabold text-white text-xs leading-none">
+                {lang === "zh" ? `${destination} 地理視窗` : `${destination} Map Space`}
+              </h3>
+              <p className="text-[10px] text-slate-400 mt-1 uppercase font-mono tracking-wider">
                 {offlineMode ? t.cachedLocal : t.realtimeGPS}
               </p>
             </div>
           </div>
           <button
+            type="button"
             id="toggle-offline-btn"
             onClick={() => setOfflineMode(!offlineMode)}
             className={`text-[10px] px-2.5 py-1.5 font-bold rounded-full cursor-pointer transition-all ${
@@ -132,11 +700,11 @@ export default function OfflineMapSimulator({ itineraries, onSelectLocation, lan
           </button>
         </div>
 
-        {/* Offline Cache Download Widget */}
-        <div className="p-3.5 bg-white/3 border border-white/5 rounded-xl shadow-xs mb-4">
-          <div className="flex justify-between items-center mb-1.5">
+        {/* Offline Cache Package Download Widget */}
+        <div className="p-3 bg-white/3 border border-white/5 rounded-xl shadow-xs mb-4">
+          <div className="flex justify-between items-center mb-1">
             <span className="text-[10.5px] font-bold text-slate-300">{t.offlinePackage}</span>
-            <span className="text-[10px] text-slate-400 font-mono">Tokyo-Ginza (24.5 MB)</span>
+            <span className="text-[9.5px] text-slate-400 font-mono capitalize">{destination} offline (18.4 MB)</span>
           </div>
           {isDownloaded ? (
             <div className="flex items-center gap-1.5 text-emerald-400 text-[10.5px] font-bold">
@@ -147,132 +715,351 @@ export default function OfflineMapSimulator({ itineraries, onSelectLocation, lan
               <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mb-1">
                 <div className="h-full bg-blue-500" style={{ width: `${downloadProgress}%` }}></div>
               </div>
-              <span className="text-[9.5px] text-slate-400 font-mono mt-0.5 block">Decrypting packet: {downloadProgress}%</span>
+              <span className="text-[9px] text-slate-400 font-mono mt-0.5 block">Syncing packet: {downloadProgress}%</span>
             </div>
           ) : (
             <button
+              type="button"
               id="download-offline-pack-btn"
               onClick={startDownload}
-              className="w-full mt-1 flex items-center justify-center gap-1.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 text-xs font-semibold rounded-lg transition-all cursor-pointer"
+              className="w-full mt-1 flex items-center justify-center gap-1.5 py-1.2 bg-white/5 hover:bg-white/10 border border-white/5 text-slate-300 text-xs font-semibold rounded-lg transition-all cursor-pointer"
             >
               <Download size={13} /> {t.downloadOfflinePack}
             </button>
           )}
         </div>
 
-        {/* Search Input Box */}
-        <div className="relative mb-4">
-          <span className="absolute inset-y-0 left-3 flex items-center text-slate-400 pointer-events-none">
-            <Search size={13} />
-          </span>
-          <input
-            id="map-search-input"
-            type="text"
-            placeholder={t.searchPlaceholder}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 glass-input rounded-xl text-xs"
-          />
+        {/* Search Input Box with Custom Location Register button */}
+        <div className="space-y-2 mb-4">
+          <div className="relative">
+            <span className="absolute inset-y-0 left-3 flex items-center text-slate-400 pointer-events-none">
+              <Search size={13} />
+            </span>
+            <input
+              id="map-search-input"
+              type="text"
+              placeholder={lang === "zh" ? "搜尋或自訂景點..." : "Search or add place..."}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-slate-950/70 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 transition-all font-sans"
+            />
+          </div>
+
+          {searchQuery.trim() && (
+            <button
+              type="button"
+              onClick={handleAddSearchLocation}
+              className="w-full py-1.5 bg-blue-500/20 hover:bg-blue-500/35 border border-blue-500/30 text-blue-300 rounded-lg text-[10.5px] font-bold flex items-center justify-center gap-1 transition"
+            >
+              <PlusCircle size={12} />
+              <span>{lang === "zh" ? `新增「${searchQuery}」至地圖上` : `Add "${searchQuery}" map node`}</span>
+            </button>
+          )}
         </div>
 
-        {/* List of hotspots with traffic tags */}
+        {/* List of elements in map viewport */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-1">
-            {t.locationsOnRoute}
-          </span>
-          {filteredHotspots.map((spot, i) => {
-            const isSpotActive = activeItem?.locationName === spot.name;
-            return (
-              <button
-                key={i}
-                id={`hotspot-btn-${i}`}
-                onClick={() => handleSelectHotspot(spot)}
-                className={`w-full text-left p-2.5 rounded-xl border transition-all duration-250 flex items-center justify-between cursor-pointer ${
-                  isSpotActive
-                    ? "bg-blue-550/15 border-blue-500 hover:bg-blue-550/20"
-                    : "bg-white/3 border-white/5 hover:bg-white/6"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <MapPin size={13} className={isSpotActive ? "text-blue-400" : "text-slate-400"} />
-                  <div>
-                    <h4 className="text-xs font-bold text-white leading-tight">{spot.name}</h4>
-                    <span className="text-[9.5px] text-slate-400 font-mono capitalize">{spot.type === "food" ? "Restaurant" : "Sightseeing"}</span>
+          <div className="flex items-center justify-between block mb-1">
+            <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">
+              {lang === "zh" ? "📌 規劃路線上的航點" : t.locationsOnRoute}
+            </span>
+            <span className="text-[9px] px-1.5 py-0.5 bg-slate-800 rounded text-slate-400 font-mono">
+              {filteredObjects.length} pts
+            </span>
+          </div>
+
+          {filteredObjects.length === 0 ? (
+            <div className="p-4 rounded-xl border border-dashed border-white/5 text-center text-[11px] text-slate-500">
+              {lang === "zh" ? "無符合地標。在地圖點擊可手動新增！" : "No nodes match query. Click anywhere on map canvas to plant one."}
+            </div>
+          ) : (
+            filteredObjects.map((spot, i) => {
+              const isSpotActive = activeItem?.locationName === spot.name;
+              return (
+                <button
+                  key={i}
+                  id={`hotspot-btn-${i}`}
+                  onClick={() => handleSelectObject(spot)}
+                  className={`w-full text-left p-2.5 rounded-xl border transition-all duration-200 flex items-center justify-between cursor-pointer ${
+                    isSpotActive
+                      ? "bg-blue-600/15 border-blue-500/80 hover:bg-blue-600/20"
+                      : "bg-white/3 border-white/5 hover:bg-white/6"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 max-w-[70%]">
+                    <MapPin size={13} className={spot.isItinerary ? "text-amber-400" : isSpotActive ? "text-blue-400" : "text-slate-400"} />
+                    <div className="truncate">
+                      <h4 className="text-xs font-bold text-white leading-tight truncate">{spot.name}</h4>
+                      <span className="text-[9px] text-slate-400 font-mono capitalize">
+                        {spot.isItinerary 
+                          ? (lang === "zh" ? "★ 自行规划之日程" : "★ Itinerary Plan") 
+                          : spot.isCustom 
+                          ? (lang === "zh" ? "自訂探查地標" : "User dropped pin") 
+                          : (lang === "zh" ? "本地精選推荐" : "WanderSmart spot")}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase leading-none ${
-                  spot.traffic === "smooth"
-                    ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20"
-                    : spot.traffic === "moderate"
-                    ? "bg-amber-500/15 text-amber-300 border border-amber-500/20"
-                    : "bg-rose-500/15 text-rose-300 border border-rose-500/20"
-                }`}>
-                  {spot.traffic === "smooth" ? (lang === "zh" ? "暢通" : "Smooth") : spot.traffic === "moderate" ? (lang === "zh" ? "多車" : "Moderate") : (lang === "zh" ? "壅塞" : "Congested")}
-                </span>
-              </button>
-            );
-          })}
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase leading-none shrink-0 ${
+                    spot.traffic === "smooth"
+                      ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/15"
+                      : spot.traffic === "moderate"
+                      ? "bg-amber-500/10 text-amber-300 border border-amber-500/15"
+                      : "bg-rose-500/10 text-rose-300 border border-rose-500/15"
+                  }`}>
+                    {spot.traffic === "smooth" ? (lang === "zh" ? "暢通" : "Smooth") : spot.traffic === "moderate" ? (lang === "zh" ? "多車" : "Moderate") : (lang === "zh" ? "壅塞" : "Congested")}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+        
+        {/* Instruction guide under left drawer */}
+        <div className="mt-2 text-[9.5px] leading-relaxed text-slate-500 italic border-t border-white/5 pt-2 select-none">
+          {lang === "zh" ? "💡 提示：您可直接點擊右側地圖的任何角落，手動標記新的 GPS 自訂探路點！" : "💡 Pro Tip: Click any area on the map to manually register a new custom landing point."}
         </div>
       </div>
 
-      {/* Right Canvas Map Area */}
-      <div className="flex-1 relative bg-slate-950 overflow-hidden min-h-[300px]">
-        {/* Sky styling details */}
-        <div className="absolute top-4 right-4 z-10 flex gap-1.5">
-          <div className="bg-slate-900/80 backdrop-blur-md border border-white/10 text-[9.5px] text-slate-300 px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md font-mono">
+      {/* Right Canvas Map Area with beautiful custom topographic styling background */}
+      <div className="flex-1 relative bg-[#0f111a] overflow-hidden min-h-[300px]">
+        
+        {/* Top HUD float info bar */}
+        <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center pointer-events-none">
+          <div className="bg-slate-900/95 backdrop-blur-md border border-white/10 text-[10px] text-slate-350 px-3 py-1.5 rounded-xl shadow-lg font-mono font-bold flex items-center gap-1.5">
+            <Flag size={11} className="text-blue-400" />
+            <span>GEO ID: {destination.toUpperCase()} TRANSIT GRID</span>
+          </div>
+          
+          <div className="bg-slate-900/95 backdrop-blur-md border border-white/10 text-[9.5px] text-slate-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-lg font-mono font-black">
             <div className={`w-1.5 h-1.5 rounded-full ${offlineMode ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 animate-pulse'}`} />
-            {offlineMode ? "OFFLINE VECTOR SYNC" : "GPS TRAFFIC LIVE"}
+            {offlineMode ? "OFFLINE CACHE ACTIVE" : "REAL-TIME GEO-ROUTING"}
           </div>
         </div>
 
-        {/* Dynamic Navigation HUD overlay */}
+        {/* Dynamic Navigation UI HUD Overlay with editable forms and deletions */}
         <AnimatePresence>
           {activeItem && (
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 15 }}
-              className="absolute bottom-4 left-4 right-4 z-10 bg-slate-900/90 border border-white/10 backdrop-blur-md rounded-2xl p-4 shadow-xl text-white max-w-lg mx-auto"
+              className="absolute bottom-4 left-4 right-4 z-10 bg-slate-900/95 border border-white/15 backdrop-blur-md rounded-2xl p-4 shadow-2xl text-white max-w-lg mx-auto overflow-y-auto max-h-[280px]"
             >
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full text-white uppercase ${
-                      activeItem.trafficStatus === "smooth"
-                        ? "bg-emerald-600"
-                        : activeItem.trafficStatus === "moderate"
-                        ? "bg-amber-600"
-                        : "bg-red-600"
-                    }`}>
-                      {getTrafficText(activeItem.trafficStatus || "smooth")}
-                    </span>
-                    <span className="text-[10px] text-slate-450 font-mono">Coord: [x: {activeItem.coordinates?.x}, y: {activeItem.coordinates?.y}]</span>
-                  </div>
-                  <h4 className="font-extrabold text-sm text-white">{activeItem.locationName}</h4>
-                  <p className="text-xs text-slate-400 leading-normal line-clamp-1">{activeItem.description || "Vector map simulation module"}</p>
-                </div>
-                <div className="shrink-0 pl-2">
-                  <button
-                    id="navigate-btn"
-                    onClick={startSimulatedNavigation}
-                    disabled={isNavigating}
-                    className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 px-3.5 rounded-xl transition-all cursor-pointer disabled:bg-blue-850/50"
-                  >
-                    <Navigation size={12} className={isNavigating ? "animate-spin" : ""} />
-                    {isNavigating ? (lang === "zh" ? "正導航中..." : "Driving...") : t.cooperativeDrive}
-                  </button>
-                </div>
-              </div>
+              {!isEditingActiveItem ? (
+                // VIEW INFO MODE
+                <div className="space-y-3.5">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1 max-w-[70%]">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full text-white uppercase ${
+                          activeItem.trafficStatus === "smooth"
+                            ? "bg-emerald-600"
+                            : activeItem.trafficStatus === "moderate"
+                            ? "bg-amber-600"
+                            : "bg-red-600"
+                        }`}>
+                          {getTrafficText(activeItem.trafficStatus || "smooth")}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          {activeItem.id && activeItem.id.startsWith("it-") 
+                            ? `📅 ${lang === "zh" ? "日程安排" : "Itinerary Plan"}` 
+                            : `📍 ${lang === "zh" ? "自訂探針" : "Custom Drop"}`}
+                        </span>
+                        {activeItem.time && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded font-bold text-amber-300 font-mono">
+                            🕒 {activeItem.time}
+                          </span>
+                        )}
+                        {activeItem.cost > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded font-bold text-emerald-400 font-mono font-bold">
+                            💰 ${activeItem.cost}
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-extrabold text-sm text-white truncate">{activeItem.title}</h4>
+                      {activeItem.locationName && activeItem.locationName !== activeItem.title && (
+                        <p className="text-[11px] text-slate-400 font-medium truncate">📍 {activeItem.locationName}</p>
+                      )}
+                      <p className="text-xs text-slate-400 leading-normal line-clamp-2">{activeItem.description || "Scenic location tracking pinpoint"}</p>
+                    </div>
+                    <div className="shrink-0 pl-2 space-y-2">
+                      <button
+                        type="button"
+                        onClick={startSimulatedNavigation}
+                        disabled={isNavigating}
+                        className="w-full flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs py-1.8 px-3 rounded-lg transition-all cursor-pointer disabled:bg-blue-900/50"
+                      >
+                        <Navigation size={11} className={isNavigating ? "animate-spin" : ""} />
+                        <span>{isNavigating ? (lang === "zh" ? "行駛..." : "Nav...") : t.cooperativeDrive}</span>
+                      </button>
 
-              {/* Progress HUD bar for navigation */}
-              {isNavigating && (
-                <div className="mt-3 pt-3 border-t border-white/5 animate-fadeIn">
-                  <div className="flex justify-between text-[10.5px] text-slate-400 mb-1 font-mono">
-                    <span>{t.gpsActive}</span>
-                    <span>Speed: {80 - Math.floor(navStep / 2.2)} km/h • {100 - navStep}% left</span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingActiveItem(true)}
+                        className="w-full block text-center bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs py-1.8 px-3 rounded-lg transition cursor-pointer"
+                      >
+                        ✏️ {lang === "zh" ? "編輯行程" : "Edit Node"}
+                      </button>
+                    </div>
                   </div>
-                  <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500" style={{ width: `${navStep}%` }}></div>
+
+                  {/* Actions Bar */}
+                  <div className="flex gap-2 pt-2 border-t border-white/5 text-xs font-bold justify-between">
+                    {activeItem.id && activeItem.id.startsWith("it-") ? (
+                      // Itinerary item deletion
+                      <button
+                        type="button"
+                        onClick={handleDeleteOrCreateNode}
+                        className="px-3 py-1.5 bg-rose-600/25 hover:bg-rose-600/40 text-rose-300 rounded-lg hover:text-white transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        🗑️ {lang === "zh" ? "自日程刪除" : "Delete Plan"}
+                      </button>
+                    ) : (
+                      // Custom dropped pin actions
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingActiveItem(true);
+                          }}
+                          className="px-3 py-1.5 bg-amber-600/25 hover:bg-amber-600/45 text-amber-300 rounded-lg transition cursor-pointer flex items-center gap-1"
+                        >
+                          💾 {lang === "zh" ? "儲存至行程" : "Save to Schedule"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleDeleteOrCreateNode}
+                          className="px-3 py-1.5 bg-rose-600/25 hover:bg-rose-600/40 text-rose-300 rounded-lg hover:text-white transition cursor-pointer flex items-center gap-1"
+                        >
+                          ❌ {lang === "zh" ? "移除自訂標記" : "Remove Pin"}
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setActiveItem(null)}
+                      className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-350 hover:text-white rounded-lg transition cursor-pointer"
+                    >
+                      {lang === "zh" ? "關閉" : "Close"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // EDIT & SAVE MODE FORM
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                    <h4 className="font-extrabold text-xs text-amber-400 font-mono tracking-wide uppercase">
+                      🔧 {lang === "zh" ? "編輯航點細節" : "Edit Landmark Parameters"}
+                    </h4>
+                    <span className="text-[10px] text-slate-500 font-mono">[{activeItem.coordinates?.x}, {activeItem.coordinates?.y}]</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-0.5">{lang === "zh" ? "航點標題 / 活動" : "Landmark Name"}</label>
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 p-1.5 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500"
+                        placeholder={lang === "zh" ? "輸入標題..." : "E.g., Tokyo Sea-Tac Plaza"}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-0.5">{lang === "zh" ? "詳細地址 / 位置" : "Map Address"}</label>
+                      <input
+                        type="text"
+                        value={editLocation}
+                        onChange={(e) => setEditLocation(e.target.value)}
+                        className="w-full bg-slate-950 border border-white/10 p-1.5 rounded-lg text-xs text-white focus:outline-none"
+                        placeholder={lang === "zh" ? "輸入位置..." : "Specific address"}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-slate-400 font-bold block mb-0.5">{lang === "zh" ? "航點說明" : "Description / Notes"}</label>
+                      <textarea
+                        value={editDesc}
+                        onChange={(e) => setEditDesc(e.target.value)}
+                        rows={2}
+                        className="w-full bg-slate-950 border border-white/10 p-1.5 rounded-lg text-xs text-white focus:outline-none leading-normal"
+                        placeholder={lang === "zh" ? "輸入備註與計畫..." : "E.g., taste fresh fish, walk to next terminal"}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-2">
+                      <div>
+                        <label className="text-[9px] text-slate-400 font-bold block mb-0.5">{lang === "zh" ? "出發時間" : "Time"}</label>
+                        <input
+                          type="time"
+                          value={editTime}
+                          onChange={(e) => setEditTime(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 p-1 rounded text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-400 font-bold block mb-0.5">{lang === "zh" ? "預算 ($USD)" : "Budget ($)"}</label>
+                        <input
+                          type="number"
+                          value={editCost}
+                          onChange={(e) => setEditCost(Number(e.target.value) || 0)}
+                          className="w-full bg-slate-950 border border-white/10 p-1 rounded text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-400 font-bold block mb-0.5">{lang === "zh" ? "哪一天" : "Day Number"}</label>
+                        <select
+                          value={editDay}
+                          onChange={(e) => setEditDay(Number(e.target.value))}
+                          className="w-full bg-slate-950 border border-white/10 p-1 rounded text-xs text-white"
+                        >
+                          <option value={0}>{lang === "zh" ? "第 1 天" : "Day 1"}</option>
+                          <option value={1}>{lang === "zh" ? "第 2 天" : "Day 2"}</option>
+                          <option value={2}>{lang === "zh" ? "第 3 天" : "Day 3"}</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-400 font-bold block mb-0.5">{lang === "zh" ? "活動分類" : "Category"}</label>
+                        <select
+                          value={editCategory}
+                          onChange={(e) => setEditCategory(e.target.value as any)}
+                          className="w-full bg-slate-950 border border-white/10 p-1 rounded text-xs text-white"
+                        >
+                          <option value="sight">🏞️ {lang === "zh" ? "景點" : "Sight"}</option>
+                          <option value="food">🍴 {lang === "zh" ? "美食" : "Food"}</option>
+                          <option value="hotel">🏨 {lang === "zh" ? "住宿" : "Hotel"}</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2 border-t border-white/5 justify-end font-bold text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingActiveItem(false)}
+                      className="px-3 py-1.5 bg-white/5 hover:bg-white/15 text-slate-300 rounded-lg transition cursor-pointer"
+                    >
+                      ↩️ {lang === "zh" ? "返回" : "Back"}
+                    </button>
+
+                    {activeItem.id && activeItem.id.startsWith("it-") ? (
+                      <button
+                        type="button"
+                        onClick={handleUpdateExistingItineraryPlan}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition cursor-pointer"
+                      >
+                        💾 {lang === "zh" ? "保存行程" : "Update Destination"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSaveToItineraryPlan}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition cursor-pointer"
+                      >
+                        💾 {lang === "zh" ? "加入行程" : "Insert to Itinerary"}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -280,119 +1067,226 @@ export default function OfflineMapSimulator({ itineraries, onSelectLocation, lan
           )}
         </AnimatePresence>
 
-        {/* Vector SVG representation for Offline / traffic Map */}
-        <svg viewBox="0 0 100 100" className="w-full h-full select-none" style={{ background: "#0a0c14" }}>
-          {/* Simulated Subway/Transit Grid Grids */}
-          <g opacity="0.08">
-            <path d="M 0 10 L 100 10" stroke="#fff" strokeWidth="0.08" />
-            <path d="M 0 30 L 100 30" stroke="#fff" strokeWidth="0.08" />
-            <path d="M 0 50 L 100 50" stroke="#fff" strokeWidth="0.08" />
-            <path d="M 0 70 L 100 70" stroke="#fff" strokeWidth="0.08" />
-            <path d="M 0 90 L 100 90" stroke="#fff" strokeWidth="0.08" />
-            <path d="M 10 0 L 10 100" stroke="#fff" strokeWidth="0.08" />
-            <path d="M 30 0 L 30 100" stroke="#fff" strokeWidth="0.08" />
-            <path d="M 50 0 L 50 100" stroke="#fff" strokeWidth="0.08" />
-            <path d="M 70 0 L 70 100" stroke="#fff" strokeWidth="0.08" />
-            <path d="M 90 0 L 90 100" stroke="#fff" strokeWidth="0.08" />
-          </g>
-
-          {/* Simulated Google Maps Traffic Link polylines */}
-          <path d="M 20 20 Q 50 10 80 20 T 90 80 T 20 80 Z" fill="none" stroke="#10b981" strokeWidth="0.4" strokeDasharray="1.5,1.5" opacity="0.3" />
-
-          {/* Connection Highway 1: (Red - Congested) */}
-          <path d="M 25 35 Q 30 50 34 65" fill="none" stroke="#f43f5e" strokeWidth="0.6" strokeLinecap="round" />
-          {/* Connection Highway 2: (Orange - Moderate) */}
-          <path d="M 25 35 L 40 72" fill="none" stroke="#f59e0b" strokeWidth="0.6" strokeLinecap="round" />
-          {/* Connection Highway 3: (Green - Smooth) */}
-          <path d="M 34 65 L 40 72" fill="none" stroke="#10b981" strokeWidth="0.6" strokeLinecap="round" />
-          {/* Connection Highway 4: (Orange - Moderate) */}
-          <path d="M 72 22 Q 45 25 25 35" fill="none" stroke="#f59e0b" strokeWidth="0.5" strokeLinecap="round" />
-          {/* Connection Highway 5: (Red - Congested) */}
-          <path d="M 40 72 Q 60 50 72 22" fill="none" stroke="#f43f5e" strokeWidth="0.6" strokeLinecap="round" />
-
-          {/* Navigation active route line drawing in neon blue */}
-          {isNavigating && activeItem?.coordinates && (
-            <motion.path
-              d={`M 34 65 L ${activeItem.coordinates.x} ${activeItem.coordinates.y}`}
-              fill="none"
-              stroke="#60a5fa"
-              strokeWidth="1.2"
-              strokeLinecap="round"
-              initial={{ pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 3, ease: "easeInOut" }}
+        {/* Beautiful interactive Leaflet OpenStreetMap view or Simulator view */}
+        {viewMode === "leaflet" ? (
+          <div className="w-full h-full relative" style={{ minHeight: "350px" }}>
+            <div
+              ref={mapContainerRef}
+              className="w-full h-full text-slate-900"
+              style={{ minHeight: "100%", background: "#0b0e14" }}
             />
-          )}
+          </div>
+        ) : (
+          <svg
+            viewBox="0 0 100 100"
+            className="w-full h-full cursor-crosshair select-none bg-slate-950/40"
+            onClick={handleMapClick}
+          >
+            {/* Aesthetic Water River flowing through the land (Neon cyan curving polyline) */}
+            <path
+              d="M -10 20 C 30 15, 40 45, 60 55 C 80 65, 90 90, 110 95"
+              fill="none"
+              stroke="#14b8a6"
+              strokeWidth="3.2"
+              strokeOpacity="0.15"
+              strokeLinecap="round"
+            />
+            <path
+              d="M -10 20 C 30 15, 40 45, 60 55 C 80 65, 90 90, 110 95"
+              fill="none"
+              stroke="#06b6d4"
+              strokeWidth="1.1"
+              strokeOpacity="0.4"
+              strokeLinecap="round"
+            />
 
-          {/* Hotspot Dots */}
-          {hotspots.map((spot, index) => {
-            const isSpotActive = activeItem?.locationName === spot.name;
-            return (
-              <g
-                key={index}
-                className="cursor-pointer group"
-                onClick={() => handleSelectHotspot(spot)}
-              >
-                {isSpotActive && (
+            {/* Park Boundaries / Forest Reserves (Translucent green shapes) */}
+            <path
+              d="M 12 10 Q 25 5, 32 18 T 16 35 Z"
+              fill="#10b981"
+              fillOpacity="0.06"
+              stroke="#10b981"
+              strokeWidth="0.2"
+              strokeOpacity="0.15"
+            />
+            <path
+              d="M 70 70 Q 85 75, 92 82 T 72 94 Z"
+              fill="#10b981"
+              fillOpacity="0.06"
+              stroke="#10b981"
+              strokeWidth="0.2"
+              strokeOpacity="0.15"
+            />
+
+            {/* Grid coordinates grid overlay lines */}
+            <g opacity="0.05">
+              {[10, 20, 30, 40, 50, 60, 70, 80, 90].map(coord => (
+                <React.Fragment key={coord}>
+                  <line x1={coord} y1="0" x2={coord} y2="100" stroke="#fff" strokeWidth="0.08" />
+                  <line x1="0" y1={coord} x2="100" y2={coord} stroke="#fff" strokeWidth="0.08" />
+                </React.Fragment>
+              ))}
+            </g>
+
+            {/* Secondary Arterial Road networks */}
+            <path d="M 0 35 L 100 35" stroke="#ffffff" strokeWidth="0.15" strokeOpacity="0.1" />
+            <path d="M 45 0 L 45 100" stroke="#ffffff" strokeWidth="0.15" strokeOpacity="0.1" />
+            <path d="M 0 75 Q 50 60 100 75" fill="none" stroke="#ffffff" strokeWidth="0.15" strokeOpacity="0.08" />
+
+            {/* Primary simulated highways showing traffic condition colors (Red / Orange / Green) */}
+            <path d="M 10 10 L 90 90" fill="none" stroke="#22c55e" strokeWidth="0.3" strokeOpacity="0.25" strokeLinecap="round" />
+            <path d="M 15 85 L 85 15" fill="none" stroke="#f59e0b" strokeWidth="0.3" strokeOpacity="0.25" strokeLinecap="round" strokeDasharray="1,1" />
+
+            {/* Connection Lines between selected Active Item and GPS Point */}
+            {activeItem?.coordinates && (
+              <line
+                x1="34"
+                y1="65"
+                x2={activeItem.coordinates.x}
+                y2={activeItem.coordinates.y}
+                stroke="#ef4444"
+                strokeWidth="0.3"
+                strokeDasharray="1.5,1.5"
+                opacity="0.3"
+              />
+            )}
+
+            {isNavigating && activeItem?.coordinates && (
+              <motion.path
+                d={`M 34 65 L ${activeItem.coordinates.x} ${activeItem.coordinates.y}`}
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 3, ease: "easeInOut" }}
+              />
+            )}
+
+            {allMapObjects.map((spot, index) => {
+              const isSpotActive = activeItem?.locationName === spot.name;
+              return (
+                <g
+                  key={index}
+                  className="cursor-pointer group"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Avoid triggering backdrop handleMapClick
+                    handleSelectObject(spot);
+                  }}
+                >
+                  {/* Active selection pulsing radar */}
+                  {isSpotActive && (
+                    <circle
+                      cx={spot.x}
+                      cy={spot.y}
+                      r="4.5"
+                      fill={spot.isItinerary ? "#f59e0b" : "#3b82f6"}
+                      opacity="0.25"
+                      className="animate-ping"
+                    />
+                  )}
+
+                  {/* Main pin circle */}
                   <circle
                     cx={spot.x}
                     cy={spot.y}
-                    r="4.2"
-                    fill="#3b82f6"
-                    opacity="0.3"
-                    className="animate-ping"
+                    r={isSpotActive ? (spot.isItinerary ? "2.6" : "2.2") : "1.4"}
+                    fill={
+                      isSpotActive
+                        ? spot.isItinerary ? "#f59e0b" : "#3b82f6"
+                        : spot.isItinerary
+                        ? "#fbbf24" // gold for active schedules
+                        : spot.isCustom
+                        ? "#ec4899" // hot pink for user custom-added coordinates
+                        : spot.traffic === "smooth"
+                        ? "#10b981"
+                        : spot.traffic === "moderate"
+                        ? "#f59e0b"
+                        : "#ef4444"
+                    }
+                    stroke="#ffffff"
+                    strokeWidth="0.3"
                   />
-                )}
-                <circle
-                  cx={spot.x}
-                  cy={spot.y}
-                  r={isSpotActive ? "2.2" : "1.4"}
-                  fill={
-                    isSpotActive
-                      ? "#3b82f6"
-                      : spot.traffic === "smooth"
-                      ? "#10b981"
-                      : spot.traffic === "moderate"
-                      ? "#f59e0b"
-                      : "#ef4444"
-                  }
-                  stroke="#ffffff"
-                  strokeWidth="0.3"
-                />
-                <text
-                  x={spot.x}
-                  y={spot.y - 3}
-                  textAnchor="middle"
-                  fill={isSpotActive ? "#3b82f6" : "#94a3b8"}
-                  fontSize="2"
-                  fontWeight={isSpotActive ? "bold" : "500"}
-                  className="pointer-events-none text-[2.2px] font-sans"
-                >
-                  {spot.name.split(" ")[0]}
-                </text>
-              </g>
-            );
-          })}
 
-          {/* Custom user active location GPS pinpoint icon indicator */}
-          <g>
-            <circle cx="34" cy="65" r="3.2" fill="#3b82f6" opacity="0.15" />
-            <circle cx="34" cy="65" r="1.1" fill="#2563eb" stroke="#fff" strokeWidth="0.3" />
-            <path d="M 34 61 L 34 69 M 30 65 L 38 65" stroke="#2563eb" strokeWidth="0.15" opacity="0.6" />
-          </g>
+                  {/* Tiny star glyph inside gold itinerary node pins */}
+                  {spot.isItinerary && (
+                    <circle
+                      cx={spot.x}
+                      cy={spot.y}
+                      r="0.5"
+                      fill="#451a03"
+                    />
+                  )}
 
-          {/* Driving route marker visual car */}
-          {isNavigating && activeItem?.coordinates && (
-            <circle
-              cx={34 + ((activeItem.coordinates.x - 34) * navStep) / 100}
-              cy={65 + ((activeItem.coordinates.y - 65) * navStep) / 100}
-              r="1.7"
-              fill="#ec4899"
-              stroke="#ffffff"
-              strokeWidth="0.4"
-            />
-          )}
-        </svg>
+                  {/* Labeled text underneath point */}
+                  <text
+                    x={spot.x}
+                    y={spot.y - 3}
+                    textAnchor="middle"
+                    fill={spot.isItinerary ? "#fbbf24" : isSpotActive ? "#3b82f6" : "#cbd5e1"}
+                    fontSize="2.2"
+                    fontWeight="bold"
+                    className="pointer-events-none drop-shadow-md font-sans text-[2.2px] uppercase select-none font-sans"
+                  >
+                    {spot.name.split(" ")[0]}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Main Simulated User current starting location placeholder */}
+            <g>
+              <circle cx="34" cy="65" r="3.2" fill="#3b82f6" opacity="0.12" />
+              <circle cx="34" cy="65" r="1.1" fill="#2563eb" stroke="#ffffff" strokeWidth="0.3" />
+              <path d="M 34 61 L 34 69 M 30 65 L 38 65" stroke="#2563eb" strokeWidth="0.15" opacity="0.5" />
+              <text
+                x="34"
+                y="61"
+                textAnchor="middle"
+                fill="#3b82f6"
+                fontSize="2.4"
+                fontWeight="black"
+                className="pointer-events-none drop-shadow-md select-none font-sans font-extrabold animate-pulse"
+              >
+                {lang === "zh" ? "📍 您在此處" : "📍 You're Here"}
+              </text>
+            </g>
+
+            {/* Visual navigation avatar driving on track */}
+            {isNavigating && activeItem?.coordinates && (
+              <circle
+                cx={34 + ((activeItem.coordinates.x - 34) * navStep) / 100}
+                cy={65 + ((activeItem.coordinates.y - 65) * navStep) / 100}
+                r="1.6"
+                fill="#ec4899"
+                stroke="#ffffff"
+                strokeWidth="0.4"
+              />
+            )}
+          </svg>
+        )}
+
+        {/* Map legend bottom sidebar container */}
+        <div className="absolute top-[82px] left-4 bg-slate-900/90 border border-white/10 p-2.5 rounded-xl text-[9px] font-mono text-slate-400 space-y-1.5 shadow-lg max-w-[170px] select-none">
+          <div className="font-bold text-slate-350 uppercase tracking-widest leading-none pb-1 border-b border-white/5">{lang === "zh" ? "圖例說明" : "MAP LEGEND"}</div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#fbbf24]" />
+            <span>{lang === "zh" ? "日程規劃景點" : "Itinerary Spot"}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#ec4899]" />
+            <span>{lang === "zh" ? "自訂點擊打點" : "Interactive Dropped"}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
+            <span>{lang === "zh" ? "WSmart 畅通航點" : "WS Smooth Traffic"}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
+            <span>{lang === "zh" ? "WSmart 壅塞航點" : "WS Congested Area"}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

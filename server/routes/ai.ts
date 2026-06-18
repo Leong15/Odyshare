@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { GoogleGenAI, Type } from "@google/genai";
-import { searchAmadeusFlights } from "../amadeus.js";
+import { searchSerpApiFlights } from "../serpapi.js";
 
 const router = Router();
 
@@ -159,13 +159,13 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
   const { from, to, date, type, returnDate } = req.body;
 
   try {
-    const amadeusFlights = await searchAmadeusFlights(from, to, date, type !== "oneway", returnDate);
-    if (amadeusFlights !== null) {
-      console.log("Success! Returning live flight results from Amadeus self-service API.");
-      return res.json({ flights: amadeusFlights });
+    const serpapiFlights = await searchSerpApiFlights(from, to, date, type !== "oneway", returnDate);
+    if (serpapiFlights !== null) {
+      console.log("Success! Returning live flight results from SerpApi Google Flights API.");
+      return res.json({ flights: serpapiFlights });
     }
   } catch (err) {
-    console.error("Amadeus API call had a network or format error, shifting to backup routes:", err);
+    console.error("SerpApi API call had a network or format error, shifting to backup routes:", err);
   }
 
   const ai = getGenAI();
@@ -176,16 +176,25 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
   const prompt = `Recommend 3 realistic cheap airline flight estimations for a ${typeLabel} journey from "${from || 'LAX'}" to "${to || 'Tokyo'}" around travel departure date "${date || 'October 2026'}".
   ${isRoundTrip ? `Since this is a ROUND-TRIP, please specify return flight schedule or indicators, with return date around "${returnDate || 'October 2026'}". Make sure the pricing represents the combined total cost of both outbound and return tickets, and append " (Round-trip)" or similar marker to the carrier name.` : 'This is a ONE-WAY journey.'}
   
+  For each flight, include:
+  1. A realistic 'bookingUrl' (Google Flights search queries constructed precisely like: "https://www.google.com/flights?q=flights+from+${from || 'LAX'}+to+${to || 'Tokyo'}+on+${date || '2026-10-15'}${isRoundTrip ? `+return+${returnDate || '2026-10-22'}` : ''}").
+  2. A 3-letter capital ISO 'currency' code (such as HKD, TWD, JPY, or USD) that aligns with the route. For example, if departure or arrival involves Hong Kong/HKG, use "HKD". If Taiwan, use "TWD". If Japan, use "JPY". Otherwise, default to "USD".
+  3. Ensure the price value matches the chosen currency (e.g. standard ticket rates for HKD are around 1500 to 4000, JPY is around 30000 to 90000, etc. - do not output low USD prices in HKD/JPY).
+  4. "returnDepartureTime": If this is a ROUND-TRIP, specify a return flight departure time (e.g., "03:45 PM" or "18:20 PM"). If single-way, omit or leave empty.
+
   Format output as JSON:
   {
     "flights": [
       {
         "carrier": "Airline Name",
-        "price": number_price_USD,
-        "stops": number_of_stops,
+        "price": number,
+        "stops": number,
         "duration": "e.g., 11h 20m",
         "departureTime": "e.g., 10:30 AM",
-        "rating": decimal_out_of_10
+        "returnDepartureTime": "e.g., 03:45 PM (or empty for one-way)",
+        "rating": decimal_number,
+        "currency": "USD or HKD",
+        "bookingUrl": "https://www.google.com/flights?q=..."
       }
     ]
   }
@@ -194,30 +203,105 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
   const getFallbackFlights = () => {
     const multiplier = isRoundTrip ? 1.82 : 1.0;
     const suffix = isRoundTrip ? " (Round-Trip)" : "";
+    const fCode = (from || "LAX").trim().toUpperCase();
+    const tCode = (to || "TYO").trim().toUpperCase();
+    
+    // Determine currency
+    let currencyCode = "USD";
+    if (fCode === "HKG" || fCode.includes("HONG") || tCode === "HKG" || tCode.includes("HONG")) {
+      currencyCode = "HKD";
+    } else if (fCode === "TPE" || fCode.includes("TAI") || tCode === "TPE" || tCode.includes("TAI")) {
+      currencyCode = "TWD";
+    } else if (fCode === "TYO" || fCode === "NRT" || fCode === "HND" || tCode === "TYO" || tCode === "NRT" || tCode === "HND") {
+      currencyCode = "JPY";
+    }
+
+    // Set prices accordingly based on currency scale relative to USD
+    const priceScale = currencyCode === "HKD" ? 7.82 : currencyCode === "TWD" ? 32.5 : currencyCode === "JPY" ? 155.0 : 1.0;
+    
+    // Construct robust Google Flights search URL including precise travel dates
+    let bUrl = `https://www.google.com/flights?q=flights+from+${encodeURIComponent(fCode)}+to+${encodeURIComponent(tCode)}`;
+    if (date) {
+      if (isRoundTrip && returnDate) {
+        bUrl = `https://www.google.com/flights?q=flights+from+${encodeURIComponent(fCode)}+to+${encodeURIComponent(tCode)}+on+${encodeURIComponent(date)}+return+${encodeURIComponent(returnDate)}`;
+      } else {
+        bUrl = `https://www.google.com/flights?q=flights+from+${encodeURIComponent(fCode)}+to+${encodeURIComponent(tCode)}+on+${encodeURIComponent(date)}`;
+      }
+    }
+
+    if (fCode === "HKG" || tCode === "HKG" || fCode.includes("HONG") || tCode.includes("HONG")) {
+      // Return beautiful Hong Kong related airlines
+      return [
+        {
+          carrier: "Cathay Pacific" + suffix,
+          price: Math.round(480 * multiplier * priceScale),
+          stops: 0,
+          duration: isRoundTrip ? "4h 15m outbound + 4h 30m return" : "4h 15m",
+          departureTime: "09:15 AM",
+          returnDepartureTime: isRoundTrip ? "16:20 PM" : undefined,
+          rating: 9.0,
+          currency: currencyCode,
+          bookingUrl: bUrl
+        },
+        {
+          carrier: "HK Express" + suffix,
+          price: Math.round(230 * multiplier * priceScale),
+          stops: 0,
+          duration: isRoundTrip ? "4h 30m outbound + 4h 45m return" : "4h 30m",
+          departureTime: "11:40 AM",
+          returnDepartureTime: isRoundTrip ? "18:45 PM" : undefined,
+          rating: 7.5,
+          currency: currencyCode,
+          bookingUrl: bUrl
+        },
+        {
+          carrier: "Greater Bay Airlines" + suffix,
+          price: Math.round(210 * multiplier * priceScale),
+          stops: 0,
+          duration: isRoundTrip ? "4h 25m outbound + 4h 35m return" : "4h 25m",
+          departureTime: "14:10 PM",
+          returnDepartureTime: isRoundTrip ? "20:30 PM" : undefined,
+          rating: 7.2,
+          currency: currencyCode,
+          bookingUrl: bUrl
+        }
+      ];
+    }
+
+    // Default ANA / ZIPAIR / Korean Air with dynamic currency/url
     return [
       {
         carrier: "ANA Airways" + suffix,
-        price: Math.round(620 * multiplier),
+        price: Math.round(620 * multiplier * priceScale),
         stops: 0,
         duration: isRoundTrip ? "11h 15m outbound + 12h return" : "11h 15m",
         departureTime: "10:15 AM",
-        rating: 9.2
+        returnDepartureTime: isRoundTrip ? "15:45 PM" : undefined,
+        rating: 9.2,
+        currency: currencyCode,
+        bookingUrl: bUrl
       },
       {
         carrier: "Zipair Cost Saver" + suffix,
-        price: Math.round(410 * multiplier),
+        price: Math.round(410 * multiplier * priceScale),
         stops: 0,
         duration: isRoundTrip ? "11h 45m outbound + 12h 10m return" : "11h 45m",
         departureTime: "09:40 AM",
-        rating: 7.8
+        returnDepartureTime: isRoundTrip ? "14:20 PM" : undefined,
+        rating: 7.8,
+        currency: currencyCode,
+        bookingUrl: bUrl
       },
       {
         carrier: "Korean Air" + suffix,
-        price: Math.round(530 * multiplier),
+        price: Math.round(530 * multiplier * priceScale),
         stops: 1,
         duration: isRoundTrip ? "14h 50m outbound + 15h return" : "14h 50m",
         departureTime: "12:10 PM",
-        rating: 8.5
+        returnDepartureTime: isRoundTrip ? "19:15 PM" : undefined,
+        rating: 8.5,
+        currency: currencyCode,
+        bookingUrl: bUrl
       }
     ];
   };
@@ -245,9 +329,11 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
                   stops: { type: Type.NUMBER },
                   duration: { type: Type.STRING },
                   departureTime: { type: Type.STRING },
-                  rating: { type: Type.NUMBER }
+                  rating: { type: Type.NUMBER },
+                  currency: { type: Type.STRING },
+                  bookingUrl: { type: Type.STRING }
                 },
-                required: ["carrier", "price", "stops", "duration", "departureTime", "rating"]
+                required: ["carrier", "price", "stops", "duration", "departureTime", "rating", "currency", "bookingUrl"]
               }
             }
           },
