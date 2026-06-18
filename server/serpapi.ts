@@ -80,6 +80,30 @@ export async function searchSerpApiFlights(
         }
       }
 
+      let returnDepartureTime = undefined;
+      if (isRoundTrip) {
+        const returnSegment = flightsSegments.find((f: any) => {
+          const deptId = f.departure_airport?.id || "";
+          return deptId && deptId.toUpperCase() === dest.toUpperCase();
+        }) || flightsSegments[flightsSegments.length - 1];
+        
+        if (returnSegment && returnSegment !== firstSegment) {
+          const rawRetTime = returnSegment.departure_airport?.time || "";
+          if (rawRetTime) {
+            const parts = rawRetTime.split(" ");
+            returnDepartureTime = parts.length > 1 ? parts[1] : rawRetTime;
+          }
+        }
+        if (!returnDepartureTime) {
+          returnDepartureTime = "18:45";
+        }
+      }
+
+      let bUrl = `https://www.google.com/travel/flights?q=flights+from+${encodeURIComponent(origin)}+to+${encodeURIComponent(dest)}+on+${encodeURIComponent(depDate)}`;
+      if (isRoundTrip && returnDate) {
+        bUrl = `https://www.google.com/travel/flights?q=flights+from+${encodeURIComponent(origin)}+to+${encodeURIComponent(dest)}+on+${encodeURIComponent(depDate)}+return+${encodeURIComponent(returnDate.trim().split("T")[0])}`;
+      }
+
       return {
         id: `serp-${index}-${Date.now()}`,
         carrier: `${carrier}${isRoundTrip ? " (Round-Trip)" : ""}`,
@@ -87,8 +111,11 @@ export async function searchSerpApiFlights(
         stops: stops,
         duration: durText,
         departureTime: departureTime,
+        returnDepartureTime: returnDepartureTime,
         rating: stops === 0 ? 9.5 : stops === 1 ? 8.2 : 6.0,
-        isDirect: stops === 0
+        isDirect: stops === 0,
+        currency: "TWD",
+        bookingUrl: bUrl
       };
     });
   } catch (err) {

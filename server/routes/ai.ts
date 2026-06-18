@@ -329,11 +329,12 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
                   stops: { type: Type.NUMBER },
                   duration: { type: Type.STRING },
                   departureTime: { type: Type.STRING },
+                  returnDepartureTime: { type: Type.STRING },
                   rating: { type: Type.NUMBER },
                   currency: { type: Type.STRING },
                   bookingUrl: { type: Type.STRING }
                 },
-                required: ["carrier", "price", "stops", "duration", "departureTime", "rating", "currency", "bookingUrl"]
+                required: ["carrier", "price", "stops", "duration", "departureTime", "returnDepartureTime", "rating", "currency", "bookingUrl"]
               }
             }
           },

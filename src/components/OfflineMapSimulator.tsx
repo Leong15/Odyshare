@@ -290,6 +290,32 @@ export default function OfflineMapSimulator({
     }
   };
 
+  const handleUpdateCustomPinOnly = () => {
+    if (!editTitle.trim() || !activeItem) return;
+    setCustomHotspots(prev => prev.map(c => {
+      if (c.name === activeItem.locationName) {
+        return {
+          ...c,
+          name: editTitle,
+          lat: activeItem.coordinates ? resolveLatLng(editTitle, destination, activeItem.coordinates.x, activeItem.coordinates.y).lat : c.lat,
+          lng: activeItem.coordinates ? resolveLatLng(editTitle, destination, activeItem.coordinates.x, activeItem.coordinates.y).lng : c.lng
+        };
+      }
+      return c;
+    }));
+    const updated = {
+      ...activeItem,
+      title: editTitle,
+      locationName: editTitle,
+      description: editDesc,
+      time: editTime,
+      cost: editCost,
+      category: editCategory === "food" ? "restaurant" as const : editCategory === "hotel" ? "hotel" as const : "sight" as const
+    };
+    setActiveItem(updated);
+    setIsEditingActiveItem(false);
+  };
+
   const handleDeleteOrCreateNode = async () => {
     if (!activeItem) return;
     const isRealItinerary = activeItem.id && activeItem.id.startsWith("it-");
@@ -332,21 +358,28 @@ export default function OfflineMapSimulator({
     const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
     const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
 
-    const newName = lang === "zh" ? `自訂地標 #${customHotspots.length + 1} (X:${x}, Y:${y})` : `Dropped Pin #${customHotspots.length + 1} (X:${x}, Y:${y})`;
-    const resolved = resolveLatLng(newName, destination, x, y);
-    const droppedTarget: MapTarget = {
-      name: newName,
-      x,
-      y,
-      lat: resolved.lat,
-      lng: resolved.lng,
-      type: "sight",
-      traffic: "smooth",
-      isCustom: true
-    };
+    setCustomHotspots(prev => {
+      const newName = lang === "zh"
+        ? `自訂地標 #${prev.length + 1}`
+        : `Dropped Pin #${prev.length + 1}`;
+      const resolved = resolveLatLng(newName, destination, x, y);
+      const droppedTarget: MapTarget = {
+        name: newName,
+        x,
+        y,
+        lat: resolved.lat,
+        lng: resolved.lng,
+        type: "sight",
+        traffic: "smooth",
+        isCustom: true
+      };
 
-    setCustomHotspots(prev => [droppedTarget, ...prev]);
-    handleSelectObject(droppedTarget);
+      setTimeout(() => {
+        handleSelectObject(droppedTarget);
+      }, 0);
+
+      return [droppedTarget, ...prev];
+    });
   };
 
   // Search input register as a custom pin onto the layout
@@ -422,23 +455,31 @@ export default function OfflineMapSimulator({
       // Drop pin on double-click or simple click
       mapInstance.on("click", (e: L.LeafletMouseEvent) => {
         const latlng = e.latlng;
-        const newName = lang === "zh"
-          ? `自訂標定 #${customHotspots.length + 1} (${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)})`
-          : `Dropped Pin #${customHotspots.length + 1} (${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)})`;
+        // Dynamically map standard Lat/Lng coords to grid x/y coords for perfect cross-view persistence
+        const pseudoCoords = getSvgCoordsFromLatLng(latlng.lat, latlng.lng);
 
-        const droppedTarget: MapTarget = {
-          name: newName,
-          x: 50,
-          y: 50,
-          lat: latlng.lat,
-          lng: latlng.lng,
-          type: "sight",
-          traffic: "smooth",
-          isCustom: true
-        };
+        setCustomHotspots(prev => {
+          const newName = lang === "zh"
+            ? `自訂標定 #${prev.length + 1}`
+            : `Dropped Pin #${prev.length + 1}`;
 
-        setCustomHotspots(prev => [droppedTarget, ...prev]);
-        handleSelectObject(droppedTarget);
+          const droppedTarget: MapTarget = {
+            name: newName,
+            x: pseudoCoords.x,
+            y: pseudoCoords.y,
+            lat: latlng.lat,
+            lng: latlng.lng,
+            type: "sight",
+            traffic: "smooth",
+            isCustom: true
+          };
+
+          setTimeout(() => {
+            handleSelectObject(droppedTarget);
+          }, 0);
+
+          return [droppedTarget, ...prev];
+        });
       });
     }
 
@@ -824,7 +865,7 @@ export default function OfflineMapSimulator({
       <div className="flex-1 relative bg-[#0f111a] overflow-hidden min-h-[300px]">
         
         {/* Top HUD float info bar */}
-        <div className="absolute top-4 left-4 right-4 z-10 flex justify-between items-center pointer-events-none">
+        <div className="absolute top-4 left-4 right-4 z-[4000] flex justify-between items-center pointer-events-none">
           <div className="bg-slate-900/95 backdrop-blur-md border border-white/10 text-[10px] text-slate-350 px-3 py-1.5 rounded-xl shadow-lg font-mono font-bold flex items-center gap-1.5">
             <Flag size={11} className="text-blue-400" />
             <span>GEO ID: {destination.toUpperCase()} TRANSIT GRID</span>
@@ -843,7 +884,7 @@ export default function OfflineMapSimulator({
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 15 }}
-              className="absolute bottom-4 left-4 right-4 z-10 bg-slate-900/95 border border-white/15 backdrop-blur-md rounded-2xl p-4 shadow-2xl text-white max-w-lg mx-auto overflow-y-auto max-h-[280px]"
+              className="absolute bottom-4 left-4 right-4 z-[4000] bg-slate-900/95 border border-white/15 backdrop-blur-md rounded-2xl p-4 shadow-2xl text-white max-w-lg mx-auto overflow-y-auto max-h-[280px]"
             >
               {!isEditingActiveItem ? (
                 // VIEW INFO MODE
@@ -1052,13 +1093,22 @@ export default function OfflineMapSimulator({
                         💾 {lang === "zh" ? "保存行程" : "Update Destination"}
                       </button>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={handleSaveToItineraryPlan}
-                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition cursor-pointer"
-                      >
-                        💾 {lang === "zh" ? "加入行程" : "Insert to Itinerary"}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleUpdateCustomPinOnly}
+                          className="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-350 border border-amber-500/25 rounded-lg transition cursor-pointer"
+                        >
+                          ✏️ {lang === "zh" ? "僅修改標記名字" : "Rename Pin Only"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveToItineraryPlan}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition cursor-pointer"
+                        >
+                          💾 {lang === "zh" ? "加入行程" : "Insert to Itinerary"}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
