@@ -3,6 +3,62 @@ import { readTripsDB, writeTripsDB, getDB, writeDB } from "../db";
 
 const router = Router();
 
+// Google Routes API Proxy
+router.post("/google-route", async (req: Request, res: Response) => {
+  try {
+    const { origin, destination, travelMode } = req.body;
+    if (!origin || !destination || !travelMode) {
+      return res.status(400).json({ error: "Missing origin, destination, or travelMode" });
+    }
+
+    const apiKey = process.env.GOOGLE_MAPS_PLATFORM_KEY || "";
+    if (!apiKey) {
+      return res.status(500).json({ error: "Google Maps Platform key not configured in backend Secrets." });
+    }
+
+    // Call google routes computeRoutes API
+    const response = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline"
+      },
+      body: JSON.stringify({
+        origin: {
+          location: {
+            latLng: {
+              latitude: Number(origin.lat),
+              longitude: Number(origin.lng)
+            }
+          }
+        },
+        destination: {
+          location: {
+            latLng: {
+              latitude: Number(destination.lat),
+              longitude: Number(destination.lng)
+            }
+          }
+        },
+        travelMode: travelMode === "WALKING" ? "WALKING" : "DRIVE"
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Google Routes API returned error:", errText);
+      return res.status(response.status).json({ error: "Google Routes API error", details: errText });
+    }
+
+    const data = await response.json();
+    return res.json(data);
+  } catch (error: any) {
+    console.error("Error in /google-route proxy route:", error);
+    return res.status(500).json({ error: error.message || "Internal server error" });
+  }
+});
+
 // 1. Get current active trip data
 router.get("/", (req: Request, res: Response) => {
   try {

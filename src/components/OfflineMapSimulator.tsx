@@ -57,6 +57,37 @@ const resolveLatLng = (name: string, dest: string, x: number, y: number): { lat:
   };
 };
 
+// Polyline decoder to convert Google Maps Encoded Polyline algorithm format to latlng arrays
+const decodePolyline = (encoded: string): [number, number][] => {
+  const points: [number, number][] = [];
+  let index = 0, len = encoded.length;
+  let lat = 0, lng = 0;
+
+  while (index < len) {
+    let b, shift = 0, result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lng += dlng;
+
+    points.push([lat / 1e5, lng / 1e5]);
+  }
+  return points;
+};
+
 interface OfflineMapSimulatorProps {
   destination?: string;
   itineraries: ItineraryItem[];
@@ -123,6 +154,18 @@ export default function OfflineMapSimulator({
 
   // Custom user-dropped landmarks/pins
   const [customHotspots, setCustomHotspots] = useState<MapTarget[]>([]);
+
+  // Google Routes API States
+  const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
+  const [routeMeta, setRouteMeta] = useState<{ distanceMsg: string; durationMsg: string; mode: "WALKING" | "DRIVE" | null } | null>(null);
+  const [routeLoading, setRouteLoading] = useState<boolean>(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+
+  const clearRouteState = () => {
+    setRoutePoints([]);
+    setRouteMeta(null);
+    setRouteError(null);
+  };
 
   const t = translations[lang];
 
@@ -233,6 +276,83 @@ export default function OfflineMapSimulator({
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Fetch route parameters and decode polyline from our secure Google Routes API proxy
+  const fetchGoogleRoute = async (mode: "WALKING" | "DRIVE") => {
+    if (!currentGeoLocation || !activeItem) return;
+    setRouteLoading(true);
+    setRouteError(null);
+    setRoutePoints([]);
+    setRouteMeta(null);
+
+    // Resolve lat/lng for activeItem
+    const activeCoords = activeItem.coordinates 
+      ? resolveLatLng(activeItem.locationName || activeItem.title, destination, activeItem.coordinates.x, activeItem.coordinates.y)
+      : null;
+
+    if (!activeCoords) {
+      setRouteError(lang === "zh" ? "無法解析目的地座標。" : "Unable to resolve target coordinates.");
+      setRouteLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/trip/google-route", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          origin: currentGeoLocation,
+          destination: activeCoords,
+          travelMode: mode
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || (lang === "zh" ? "獲取路線規劃失敗" : "Failed to retrieve route."));
+      }
+
+      const backendData = await res.json();
+      if (backendData.routes && backendData.routes[0]) {
+        const route = backendData.routes[0];
+        const encoded = route.polyline?.encodedPolyline;
+        if (encoded) {
+          const decoded = decodePolyline(encoded);
+          setRoutePoints(decoded);
+          
+          const distKm = (route.distanceMeters / 1000).toFixed(2);
+          const durationSec = parseInt(route.duration.replace("s", ""), 10);
+          const durationMin = Math.round(durationSec / 60);
+          
+          setRouteMeta({
+            distanceMsg: lang === "zh" ? `${distKm} 公里` : `${distKm} km`,
+            durationMsg: lang === "zh" ? `${durationMin} 分鐘` : `${durationMin} mins`,
+            mode: mode
+          });
+        } else {
+          throw new Error(lang === "zh" ? "無效的二進位路徑資料。" : "No polyline data found in the response.");
+        }
+      } else {
+        throw new Error(lang === "zh" ? "本區域兩起終點間暫無可用路線規劃。" : "No routes found between these locations.");
+      }
+    } catch (err: any) {
+      console.error("fetchGoogleRoute error:", err);
+      setRouteError(err.message || "Route calculation failed");
+    } finally {
+      setRouteLoading(false);
+    }
+  };
+
+  const getPublicTransitUrl = () => {
+    if (!currentGeoLocation || !activeItem) return "";
+    const activeCoords = activeItem.coordinates 
+      ? resolveLatLng(activeItem.locationName || activeItem.title, destination, activeItem.coordinates.x, activeItem.coordinates.y)
+      : null;
+    if (!activeCoords) return "";
+    return `https://www.google.com/maps/dir/?api=1&origin=${currentGeoLocation.lat},${currentGeoLocation.lng}&destination=${activeCoords.lat},${activeCoords.lng}&travelmode=transit`;
+  };
+
   const startDownload = () => {
     setDownloadProgress(0);
     setIsDownloaded(false);
@@ -331,6 +451,7 @@ export default function OfflineMapSimulator({
   };
 
   const handleSelectObject = (spot: MapTarget) => {
+    clearRouteState();
     const mockItem: ItineraryItem = spot.originalItem || {
       id: "spot-" + spot.name,
       dayIndex: 0,
@@ -572,7 +693,28 @@ export default function OfflineMapSimulator({
       }
     });
 
-  }, [allMapObjects, activeItem, currentGeoLocation, viewMode]);
+    // Draw calculated Google-Routes-API polyline path on Leaflet
+    if (routePoints && routePoints.length > 0) {
+      const routePolyline = L.polyline(routePoints, {
+        color: routeMeta?.mode === "WALKING" ? "#3b82f6" : "#10b981",
+        weight: 6,
+        opacity: 0.85,
+        lineCap: "round",
+        lineJoin: "round",
+        dashArray: routeMeta?.mode === "WALKING" ? "5, 10" : undefined
+      }).addTo(group);
+
+      try {
+        const bounds = routePolyline.getBounds();
+        if (bounds.isValid()) {
+          mapRef.current?.fitBounds(bounds, { padding: [40, 40] });
+        }
+      } catch (err) {
+        console.warn("Leaflet fitBounds error:", err);
+      }
+    }
+
+  }, [allMapObjects, activeItem, currentGeoLocation, viewMode, routePoints, routeMeta]);
 
   // Request actual Geolocation using navigator.geolocation
   const requestUserLocation = () => {
@@ -884,7 +1026,7 @@ export default function OfflineMapSimulator({
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 15 }}
-              className="absolute bottom-4 left-4 right-4 z-[4000] bg-slate-900/95 border border-white/15 backdrop-blur-md rounded-2xl p-4 shadow-2xl text-white max-w-lg mx-auto overflow-y-auto max-h-[280px]"
+              className="absolute bottom-4 left-4 right-4 z-[4000] bg-slate-900/95 border border-white/15 backdrop-blur-md rounded-2xl p-4 shadow-2xl text-white max-w-lg mx-auto overflow-y-auto max-h-[310px]"
             >
               {!isEditingActiveItem ? (
                 // VIEW INFO MODE
@@ -942,6 +1084,93 @@ export default function OfflineMapSimulator({
                         ✏️ {lang === "zh" ? "編輯行程" : "Edit Node"}
                       </button>
                     </div>
+                  </div>
+
+                  {/* Google Routes API Live Routing Panel */}
+                  <div className="bg-slate-950/60 rounded-xl p-3 border border-white/5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9.5px] text-slate-400 font-extrabold tracking-wider uppercase flex items-center gap-1">
+                        🗺️ {lang === "zh" ? "地圖實時路徑規劃 (Routes API)" : "Google Live Route Planning"}
+                      </span>
+                      {routeLoading && (
+                        <span className="text-[10px] text-blue-400 animate-pulse font-mono">
+                          {lang === "zh" ? "計算中..." : "Calculating..."}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {/* Shortest Walk Button */}
+                      <button
+                        type="button"
+                        onClick={() => fetchGoogleRoute("WALKING")}
+                        disabled={routeLoading || !currentGeoLocation}
+                        className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer border ${
+                          routeMeta?.mode === "WALKING"
+                            ? "bg-blue-600 text-white border-blue-450"
+                            : "bg-slate-900 hover:bg-slate-800 text-slate-300 border-white/5 disabled:opacity-50"
+                        }`}
+                      >
+                        <span>🚶‍♂️</span>
+                        <span>{lang === "zh" ? "步行最短" : "Shortest Walk"}</span>
+                      </button>
+
+                      {/* Drive Button */}
+                      <button
+                        type="button"
+                        onClick={() => fetchGoogleRoute("DRIVE")}
+                        disabled={routeLoading || !currentGeoLocation}
+                        className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer border ${
+                          routeMeta?.mode === "DRIVE"
+                            ? "bg-emerald-600 text-white border-emerald-450"
+                            : "bg-slate-900 hover:bg-slate-800 text-slate-300 border-white/5 disabled:opacity-50"
+                        }`}
+                      >
+                        <span>🚗</span>
+                        <span>{lang === "zh" ? "自駕路線" : "Driving Route"}</span>
+                      </button>
+
+                      {/* Public Transit Button */}
+                      <a
+                        href={currentGeoLocation ? getPublicTransitUrl() : "#"}
+                        target={currentGeoLocation ? "_blank" : undefined}
+                        rel="noreferrer"
+                        className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex flex-col items-center justify-center gap-1 border text-center ${
+                          currentGeoLocation
+                            ? "bg-amber-600/20 hover:bg-amber-600/35 border-amber-500/30 text-amber-300 cursor-pointer"
+                            : "bg-slate-900 text-slate-500 border-white/5 cursor-not-allowed pointer-events-none"
+                        }`}
+                      >
+                        <span>🚌</span>
+                        <span>{lang === "zh" ? "公眾交通" : "Public Transit"}</span>
+                      </a>
+                    </div>
+
+                    {/* Display route duration & distance */}
+                    {routeMeta && (
+                      <div className="flex justify-between items-center bg-blue-500/10 border border-blue-500/15 rounded-lg px-2.5 py-1.5 text-[10.5px]">
+                        <span className="text-blue-300 font-bold flex items-center gap-1">
+                          {routeMeta.mode === "WALKING" ? "🚶‍♂️ " : "🚗 "}
+                          {routeMeta.mode === "WALKING" ? (lang === "zh" ? "步行路徑" : "Walk Path") : (lang === "zh" ? "自駕路徑" : "Drive Path")}
+                        </span>
+                        <div className="font-mono text-white font-black space-x-1.5 text-right">
+                          <span>📍 {routeMeta.distanceMsg}</span>
+                          <span className="text-amber-300">⏱️ {routeMeta.durationMsg}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {routeError && (
+                      <p className="text-[10px] font-medium text-rose-300 leading-normal bg-rose-500/10 border border-rose-500/15 p-2 rounded-lg">
+                        ⚠️ {routeError}
+                      </p>
+                    )}
+
+                    {!currentGeoLocation && (
+                      <p className="text-[9.5px] text-slate-400 text-center italic">
+                        {lang === "zh" ? "💡 請先點選左上角「獲得實時 GPS 定位」解鎖導航路徑" : "💡 Click 'Get Live GPS Location' on left to unlock dynamic pathing"}
+                      </p>
+                    )}
                   </div>
 
                   {/* Actions Bar */}
