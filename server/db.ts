@@ -13,6 +13,9 @@ export const DEFAULT_TRIP = {
   startDate: "2026-10-12",
   endDate: "2026-10-18",
   totalBudget: 4200,
+  status: "active",
+  lat: 35.6762,
+  lng: 139.6503,
   participants: [
     { id: "u1", name: "Leo (You)", email: "leochau46@gmail.com", avatarColor: "#3b82f6", publicKey: "pub_key_sec_leo_908f" },
     { id: "u2", name: "Chloe", email: "chloe.tan@example.com", avatarColor: "#ec4899", publicKey: "pub_key_sec_chloe_324a" },
@@ -392,7 +395,13 @@ export function getTripForRequest(req: Request) {
       destination: t.destination,
       startDate: t.startDate,
       endDate: t.endDate,
-      totalBudget: t.totalBudget
+      totalBudget: t.totalBudget,
+      status: t.status || "active",
+      lat: t.lat,
+      lng: t.lng,
+      participants: t.participants || [],
+      expenses: t.expenses || [],
+      itineraries: t.itineraries || []
     }))
   };
 }
@@ -447,7 +456,13 @@ export function readTripsDB(req?: Request) {
       destination: t.destination,
       startDate: t.startDate,
       endDate: t.endDate,
-      totalBudget: t.totalBudget
+      totalBudget: t.totalBudget,
+      status: t.status || "active",
+      lat: t.lat,
+      lng: t.lng,
+      participants: t.participants || [],
+      expenses: t.expenses || [],
+      itineraries: t.itineraries || []
     }))
   };
 }

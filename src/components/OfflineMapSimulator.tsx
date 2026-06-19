@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { MapPin, Navigation, Download, CloudOff, RefreshCw, Signal, Search, CheckCircle, PlusCircle, Flag, Info, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import L from "leaflet";
-import { ItineraryItem } from "../types";
+import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 
 // Resolve Lat/Lng standard coords for itinerary names in various cities
@@ -96,6 +96,8 @@ interface OfflineMapSimulatorProps {
   onUpdateItineraryItem?: (item: ItineraryItem) => Promise<void>;
   onDeleteItineraryItem?: (itemId: string) => Promise<void>;
   lang?: "en" | "zh";
+  participants?: Participant[];
+  currentUserId?: string;
 }
 
 interface MapTarget {
@@ -118,7 +120,9 @@ export default function OfflineMapSimulator({
   onAddItineraryItem,
   onUpdateItineraryItem,
   onDeleteItineraryItem,
-  lang = "en"
+  lang = "en",
+  participants = [],
+  currentUserId
 }: OfflineMapSimulatorProps) {
   const [viewMode, setViewMode] = useState<"simulator" | "leaflet">("leaflet");
   const [offlineMode, setOfflineMode] = useState<boolean>(false);
@@ -198,7 +202,14 @@ export default function OfflineMapSimulator({
   useEffect(() => {
     if (activeItem) {
       setEditTitle(activeItem.title || "");
-      setEditLocation(activeItem.locationName || "");
+      
+      const isPlaceholderName = activeItem.title?.startsWith("自訂") || activeItem.title?.startsWith("Dropped Pin") || !activeItem.locationName;
+      if (isPlaceholderName && activeItem.lat && activeItem.lng) {
+        setEditLocation(`${activeItem.lat.toFixed(6)}, ${activeItem.lng.toFixed(6)}`);
+      } else {
+        setEditLocation(activeItem.locationName || "");
+      }
+
       setEditDesc(activeItem.description || "");
       setEditTime(activeItem.time || "12:00");
       setEditDay(activeItem.dayIndex || 0);
@@ -254,22 +265,69 @@ export default function OfflineMapSimulator({
     };
   }, []);
 
+  // Debounce and report our live location telemetry to the server
+  useEffect(() => {
+    if (!currentGeoLocation) return;
+    
+    const targetUserId = currentUserId || localStorage.getItem("loggedInUserId");
+    if (!targetUserId) return;
+
+    const timer = setTimeout(() => {
+      fetch("/api/trip/update-location", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": targetUserId
+        },
+        body: JSON.stringify({
+          lat: currentGeoLocation.lat,
+          lng: currentGeoLocation.lng
+        })
+      }).catch(err => {
+        console.warn("Telemetry reporting error:", err);
+      });
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [currentGeoLocation, currentUserId]);
+
+  // Reset active node, routes and custom user landmarks when destination changes
+  useEffect(() => {
+    setActiveItem(null);
+    clearRouteState();
+    setCustomHotspots([]);
+    setCurrentGeoLocation(resolveLatLng(destination, destination, 34, 65));
+  }, [destination]);
+
   // Combine dynamic local itinerary plans so they display on map!
-  const itineraryPins: MapTarget[] = (itineraries || []).map((item, index) => {
-    return {
-      name: item.title,
-      // Distribute pseudo-coordinates around the quadrant nicely
-      x: item.coordinates?.x || (18 + (index * 19) % 65),
-      y: item.coordinates?.y || (22 + (index * 23) % 55),
-      type: item.category === "hotel" ? "hotel" : item.category === "restaurant" ? "food" : "sight",
-      traffic: (index % 3 === 0 ? "congested" : index % 3 === 1 ? "moderate" : "smooth") as any,
-      isItinerary: true,
-      originalItem: item
-    };
-  });
+  const itineraryPins = React.useMemo(() => {
+    return (itineraries || []).map((item, index) => {
+      return {
+        name: item.title,
+        // Distribute pseudo-coordinates around the quadrant nicely
+        x: item.coordinates?.x || (18 + (index * 19) % 65),
+        y: item.coordinates?.y || (22 + (index * 23) % 55),
+        lat: item.lat,
+        lng: item.lng,
+        type: item.category === "hotel" ? "hotel" : item.category === "restaurant" ? "food" : "sight",
+        traffic: (index % 3 === 0 ? "congested" : index % 3 === 1 ? "moderate" : "smooth") as any,
+        isItinerary: true,
+        originalItem: item
+      };
+    });
+  }, [itineraries, destination]);
 
   // Master merged map objects - NO HARDCODED LANDMARKS (AS REQUESTED: "hard code data不要了")
-  const allMapObjects = [...itineraryPins, ...customHotspots];
+  const allMapObjects = React.useMemo(() => {
+    return [...itineraryPins, ...customHotspots];
+  }, [itineraryPins, customHotspots]);
+
+  // Cache other active participants with broadcast geolocations
+  const otherParticipants = React.useMemo(() => {
+    return (participants || []).filter(
+      p => p.id !== currentUserId && p.lat !== undefined && p.lng !== undefined
+    );
+  }, [participants, currentUserId]);
 
   // Filter map list based on search query
   const filteredObjects = allMapObjects.filter(item =>
@@ -279,6 +337,13 @@ export default function OfflineMapSimulator({
   // Fetch route parameters and decode polyline from our secure Google Routes API proxy
   const fetchGoogleRoute = async (mode: "WALKING" | "DRIVE") => {
     if (!currentGeoLocation || !activeItem) return;
+
+    // Toggle off if clicking the already active route mode
+    if (routeMeta?.mode === mode) {
+      clearRouteState();
+      return;
+    }
+
     setRouteLoading(true);
     setRouteError(null);
     setRoutePoints([]);
@@ -381,7 +446,9 @@ export default function OfflineMapSimulator({
         dayIndex: Number(editDay) || 0,
         category: editCategory === "food" ? "restaurant" : editCategory === "hotel" ? "hotel" : "sight",
         cost: Number(editCost) || 0,
-        coordinates: activeItem?.coordinates || { x: 50, y: 50 }
+        coordinates: activeItem?.coordinates || { x: 50, y: 50 },
+        lat: activeItem?.lat,
+        lng: activeItem?.lng
       });
       if (activeItem) {
         setCustomHotspots(prev => prev.filter(c => c.name !== activeItem.locationName));
@@ -613,12 +680,65 @@ export default function OfflineMapSimulator({
   }, [viewMode, destination]);
 
   // Helper to resolve coordinates
-  const getSpotCoords = (spot: MapTarget) => {
-    if (spot.lat !== undefined && spot.lng !== undefined) {
-      return { lat: spot.lat, lng: spot.lng };
+  const getSpotCoords = (spot: any): { lat: number; lng: number } => {
+    if (!spot) {
+      return resolveLatLng("", destination || "", 50, 50);
     }
-    return resolveLatLng(spot.name, destination, spot.x, spot.y);
+
+    // Check direct lat/lng fields first
+    const latNum = Number(spot.lat);
+    const lngNum = Number(spot.lng);
+    if (spot.lat !== undefined && spot.lat !== null && !isNaN(latNum) &&
+        spot.lng !== undefined && spot.lng !== null && !isNaN(lngNum)) {
+      return { lat: latNum, lng: lngNum };
+    }
+
+    // Calculate x & y mapping onto the city canvas
+    let x = 50;
+    let y = 50;
+    if (spot.coordinates && typeof spot.coordinates === "object") {
+      const cx = Number(spot.coordinates.x);
+      const cy = Number(spot.coordinates.y);
+      if (!isNaN(cx)) x = cx;
+      if (!isNaN(cy)) y = cy;
+    } else {
+      const sx = Number(spot.x);
+      const sy = Number(spot.y);
+      if (spot.x !== undefined && !isNaN(sx)) x = sx;
+      if (spot.y !== undefined && !isNaN(sy)) y = sy;
+    }
+
+    const pinName = spot.locationName || spot.title || spot.name || "";
+    const resolved = resolveLatLng(pinName, destination || "", x, y);
+
+    if (isNaN(resolved.lat) || isNaN(resolved.lng)) {
+      return resolveLatLng("", destination || "", 50, 50);
+    }
+    return resolved;
   };
+
+  // Sync / Paint markers in Leaflet Group
+  // One-time pan to active landmark selection
+  useEffect(() => {
+    if (!activeItem) return;
+    if (!mapRef.current) return;
+    const pos = getSpotCoords(activeItem);
+    mapRef.current.panTo([pos.lat, pos.lng], { animate: true });
+  }, [activeItem?.id, activeItem?.title, activeItem?.coordinates?.x, activeItem?.coordinates?.y]);
+
+  // One-time fitBounds to loaded route so user can adjust camera zoom freely afterwards
+  useEffect(() => {
+    if (!mapRef.current || !routePoints || routePoints.length === 0) return;
+    const routePolyline = L.polyline(routePoints);
+    try {
+      const bounds = routePolyline.getBounds();
+      if (bounds.isValid()) {
+        mapRef.current.fitBounds(bounds, { padding: [40, 40] });
+      }
+    } catch (err) {
+      console.warn("Leaflet fitBounds error:", err);
+    }
+  }, [routePoints]);
 
   // Sync / Paint markers in Leaflet Group
   useEffect(() => {
@@ -648,6 +768,36 @@ export default function OfflineMapSimulator({
       L.marker([currentGeoLocation.lat, currentGeoLocation.lng], { icon: geoIcon })
         .addTo(group);
     }
+
+    // Paint other active participants' live positions in team project
+    otherParticipants.forEach(p => {
+      const pColor = p.avatarColor || "#10b981";
+      const initials = (p.name || "").substring(0, 2).toUpperCase() || "?";
+      
+      const pIcon = L.divIcon({
+        className: "custom-leaflet-participant-pin",
+        html: `
+          <div class="flex flex-col items-center select-none">
+            <div class="relative flex items-center justify-center">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-md transform hover:scale-110 active:scale-95 transition-all text-white text-[9.5px] font-black" style="background-color: ${pColor}">
+                ${initials}
+              </div>
+              <div class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-slate-900 animate-ping"></div>
+              <div class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-slate-900"></div>
+            </div>
+            <div class="mt-1 px-1.5 py-0.5 rounded bg-slate-950 border border-white/10 text-white text-[8px] font-extrabold whitespace-nowrap leading-none shadow-sm">
+              ${p.name}
+            </div>
+          </div>
+        `,
+        iconSize: [36, 52],
+        iconAnchor: [18, 26]
+      });
+
+      L.marker([p.lat!, p.lng!], { icon: pIcon })
+        .addTo(group)
+        .bindPopup(`<strong>${p.name}</strong><br/>${lang === "zh" ? "成員即時位置" : "Participant Live Location"}`);
+    });
 
     // Paint other targets
     allMapObjects.forEach(spot => {
@@ -687,15 +837,11 @@ export default function OfflineMapSimulator({
         .on("click", () => {
           handleSelectObject(spot);
         });
-
-      if (isSpotActive) {
-        mapRef.current?.panTo([pos.lat, pos.lng], { animate: true });
-      }
     });
 
     // Draw calculated Google-Routes-API polyline path on Leaflet
     if (routePoints && routePoints.length > 0) {
-      const routePolyline = L.polyline(routePoints, {
+      L.polyline(routePoints, {
         color: routeMeta?.mode === "WALKING" ? "#3b82f6" : "#10b981",
         weight: 6,
         opacity: 0.85,
@@ -703,18 +849,9 @@ export default function OfflineMapSimulator({
         lineJoin: "round",
         dashArray: routeMeta?.mode === "WALKING" ? "5, 10" : undefined
       }).addTo(group);
-
-      try {
-        const bounds = routePolyline.getBounds();
-        if (bounds.isValid()) {
-          mapRef.current?.fitBounds(bounds, { padding: [40, 40] });
-        }
-      } catch (err) {
-        console.warn("Leaflet fitBounds error:", err);
-      }
     }
 
-  }, [allMapObjects, activeItem, currentGeoLocation, viewMode, routePoints, routeMeta]);
+  }, [allMapObjects, activeItem, currentGeoLocation, viewMode, routePoints, routeMeta, otherParticipants]);
 
   // Request actual Geolocation using navigator.geolocation
   const requestUserLocation = () => {
@@ -1245,6 +1382,11 @@ export default function OfflineMapSimulator({
                         className="w-full bg-slate-950 border border-white/10 p-1.5 rounded-lg text-xs text-white focus:outline-none"
                         placeholder={lang === "zh" ? "輸入位置..." : "Specific address"}
                       />
+                      {activeItem?.lat !== undefined && activeItem?.lng !== undefined && (
+                        <p className="text-[10px] mt-1 text-slate-400 font-mono">
+                          📍 {lang === "zh" ? "點擊座標" : "Coordinates"}: {activeItem.lat.toFixed(6)}, {activeItem.lng.toFixed(6)}
+                        </p>
+                      )}
                     </div>
 
                     <div>

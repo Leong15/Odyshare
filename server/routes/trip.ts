@@ -41,7 +41,7 @@ router.post("/google-route", async (req: Request, res: Response) => {
             }
           }
         },
-        travelMode: travelMode === "WALKING" ? "WALKING" : "DRIVE"
+        travelMode: travelMode === "WALKING" ? "WALK" : "DRIVE"
       })
     });
 
@@ -59,10 +59,56 @@ router.post("/google-route", async (req: Request, res: Response) => {
   }
 });
 
+// Update current participant's live coordinate tracking
+router.post("/update-location", (req: Request, res: Response) => {
+  try {
+    const { lat, lng } = req.body;
+    const userId = req.headers["x-user-id"] as string;
+
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized. x-user-id header is required." });
+    }
+
+    if (lat === undefined || lng === undefined) {
+      return res.status(400).json({ error: "Missing required lat or lng coordinate values." });
+    }
+
+    const current = readTripsDB(req);
+    const p = current.participants.find((part: any) => part.id === userId);
+    if (p) {
+      p.lat = Number(lat);
+      p.lng = Number(lng);
+      // Persist coordinate change back to main database store
+      writeTripsDB(current, req);
+    }
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Error in /update-location route:", err);
+    return res.status(500).json({ error: err.message || "Internal server error" });
+  }
+});
+
 // 1. Get current active trip data
-router.get("/", (req: Request, res: Response) => {
+router.get("/", async (req: Request, res: Response) => {
   try {
     const data = readTripsDB(req);
+    // Lazy resolve coordinates using completely free, public OSM Nominatim if missing and destination is set
+    if (data && (data.lat === undefined || data.lng === undefined) && data.destination && data.destination !== "Unknown Destination") {
+      const coords = await getCoordsWithTimeout(data.destination);
+      if (coords) {
+        data.lat = coords.lat;
+        data.lng = coords.lng;
+        // save back to server db
+        const db = getDB();
+        const tIdx = db.trips.findIndex(t => t.id === data.id);
+        if (tIdx !== -1) {
+          db.trips[tIdx].lat = coords.lat;
+          db.trips[tIdx].lng = coords.lng;
+          writeDB(db);
+        }
+      }
+    }
     res.json(data);
   } catch (err: any) {
     console.error("GET /api/trip error:", err);
@@ -86,14 +132,46 @@ router.post("/select", (req: Request, res: Response) => {
   if (found) {
     db.activeTripId = tripId;
     writeDB(db);
+    req.headers["x-trip-id"] = tripId;
     res.json({ success: true, trip: readTripsDB(req) });
   } else {
     res.status(404).json({ error: "Trip not found" });
   }
 });
 
+// Helper functions for free, public geocoding using OpenStreetMap Nominatim
+async function fetchCoordinates(destination: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destination)}&format=json&limit=1`;
+    const res = await fetch(url, {
+      headers: {
+        "User-Agent": "WanderSyncCollaborator/1.0 (leochau46@gmail.com)"
+      }
+    });
+    if (!res.ok) return null;
+    const list: any = await res.json();
+    if (list && list.length > 0) {
+      return {
+        lat: Number(list[0].lat),
+        lng: Number(list[0].lon)
+      };
+    }
+  } catch (err) {
+    console.error("Geocoding failed for destination:", destination, err);
+  }
+  return null;
+}
+
+async function getCoordsWithTimeout(destination: string): Promise<{ lat: number; lng: number } | null> {
+  if (!destination || destination === "Unknown Destination") return null;
+  return Promise.race([
+    fetchCoordinates(destination),
+    new Promise<{ lat: number; lng: number } | null>((resolve) => setTimeout(() => resolve(null), 1500))
+  ]);
+}
+
 // 2c. Create a new trip
-router.post("/create", (req: Request, res: Response) => {
+router.post("/create", async (req: Request, res: Response) => {
   const { name, destination, startDate, endDate, totalBudget } = req.body;
   const userId = req.headers["x-user-id"] as string;
   const db = getDB();
@@ -113,13 +191,20 @@ router.post("/create", (req: Request, res: Response) => {
   ];
 
   const newTripId = "trip-" + Date.now();
-  const newTrip = {
+  const destString = destination || "Unknown Destination";
+  
+  // Resolve real coordinates using OSM Nominatim for accurate placement!
+  const coords = await getCoordsWithTimeout(destString);
+
+  const newTrip: any = {
     id: newTripId,
     name: name || "New Wander Trip",
-    destination: destination || "Unknown Destination",
+    destination: destString,
     startDate: startDate || new Date().toISOString().split("T")[0],
     endDate: endDate || new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split("T")[0],
     totalBudget: totalBudget ? Number(totalBudget) : 3000,
+    lat: coords ? coords.lat : undefined,
+    lng: coords ? coords.lng : undefined,
     participants: participants,
     flightEstimates: [],
     itineraries: [],
@@ -144,6 +229,45 @@ router.post("/create", (req: Request, res: Response) => {
 
   req.headers["x-trip-id"] = newTripId;
   res.json({ success: true, trip: readTripsDB(req) });
+});
+
+// 2cc. Update active trip metadata
+router.post("/update-meta", async (req: Request, res: Response) => {
+  const { name, destination, totalBudget, status } = req.body;
+  const currentTrip = readTripsDB(req);
+  if (!currentTrip) {
+    return res.status(404).json({ error: "No active trip found" });
+  }
+
+  if (name !== undefined) currentTrip.name = name.trim();
+  
+  if (destination !== undefined) {
+    const newDest = destination.trim();
+    if (currentTrip.destination !== newDest) {
+      currentTrip.destination = newDest;
+      // Get new coordinates using Geocoding if changed
+      const coords = await getCoordsWithTimeout(newDest);
+      if (coords) {
+        currentTrip.lat = coords.lat;
+        currentTrip.lng = coords.lng;
+      } else {
+        delete currentTrip.lat;
+        delete currentTrip.lng;
+      }
+    }
+  }
+  
+  if (totalBudget !== undefined) currentTrip.totalBudget = Number(totalBudget) || 3000;
+  if (status !== undefined) currentTrip.status = status;
+
+  const db = getDB();
+  const tripIdx = db.trips.findIndex(t => t.id === currentTrip.id);
+  if (tripIdx !== -1) {
+    db.trips[tripIdx] = currentTrip;
+    writeDB(db);
+  }
+
+  res.json({ success: true, trip: currentTrip });
 });
 
 // 2d. Delete a trip

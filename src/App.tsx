@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   Calendar, Map, Plane, DollarSign, Lock, Users, Sparkles, RefreshCw, UserPlus, X
 } from "lucide-react";
@@ -9,6 +9,7 @@ import { translations } from "./lib/translations";
 import LoginTerminal from "./components/LoginTerminal";
 import HeaderWorkspace from "./components/HeaderWorkspace";
 import CreateTripModal from "./components/CreateTripModal";
+import TripDashboard from "./components/TripDashboard";
 
 // Tab Subcomponents
 import ItineraryPlanner from "./components/ItineraryPlanner";
@@ -31,11 +32,14 @@ const safeBtoa = (str: string): string => {
 
 export default function App() {
   const [trip, setTrip] = useState<Trip | null>(null);
+  
+  const tripIdRef = useRef<string | undefined>(undefined);
+  tripIdRef.current = trip?.id;
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => {
     return localStorage.getItem("loggedInUserId") || null;
   });
   const [currentUser, setCurrentUser] = useState<Participant | null>(null);
-  const [activeTab, setActiveTab] = useState<"map" | "itinerary" | "flights" | "budget" | "vault" | "chat" | "ai">("itinerary");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "map" | "itinerary" | "flights" | "budget" | "vault" | "chat" | "ai">("dashboard");
   const [syncing, setSyncing] = useState<boolean>(false);
   const [errorState, setErrorState] = useState<string | null>(null);
   const [lang, setLang] = useState<"en" | "zh">("zh"); // Defaulting to zh (Traditional Chinese)
@@ -57,6 +61,8 @@ export default function App() {
   const [newTripName, setNewTripName] = useState<string>("");
   const [newTripDestination, setNewTripDestination] = useState<string>("");
   const [newTripBudget, setNewTripBudget] = useState<string>("");
+  const [isCreatingTrip, setIsCreatingTrip] = useState<boolean>(false);
+  const [createTripError, setCreateTripError] = useState<string | null>(null);
 
   // Invite member modal states at root level for perfect viewport centering
   const [showInviteModal, setShowInviteModal] = useState<boolean>(false);
@@ -80,10 +86,11 @@ export default function App() {
   // Request-scoper wrapper
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     const uId = localStorage.getItem("loggedInUserId") || loggedInUserId || "";
+    const activeId = localStorage.getItem("activeTripId") || trip?.id || "";
     const headers = {
+      "x-trip-id": activeId,
       ...options.headers,
-      "x-user-id": uId,
-      "x-trip-id": trip?.id || ""
+      "x-user-id": uId
     } as Record<string, string>;
 
     return fetch(url, {
@@ -111,16 +118,27 @@ export default function App() {
   };
 
   // 1. Initial State pull from server
-  const fetchTripData = async (showSyncIndicator = false) => {
+  const fetchTripData = async (showSyncIndicator = false, overrideTripId?: string) => {
     const uId = localStorage.getItem("loggedInUserId") || loggedInUserId;
     if (!uId) {
       setCurrentUser(null);
       return;
     }
     if (showSyncIndicator) setSyncing(true);
+    
+    if (overrideTripId) {
+      localStorage.setItem("activeTripId", overrideTripId);
+    }
+    
     fetchInvitations();
     try {
-      const res = await fetchWithAuth("/api/trip");
+      const activeId = overrideTripId || localStorage.getItem("activeTripId") || tripIdRef.current || "";
+      const res = await fetch("/api/trip", {
+        headers: {
+          "x-user-id": uId,
+          "x-trip-id": activeId
+        }
+      });
       if (!res.ok) throw new Error("Server responded with error status");
       
       const contentType = res.headers.get("content-type");
@@ -130,6 +148,9 @@ export default function App() {
 
       const data: Trip = await res.json();
       setTrip(data);
+      if (data?.id) {
+        localStorage.setItem("activeTripId", data.id);
+      }
       setErrorState(null);
 
       const found = data.participants.find(p => p.id === uId);
@@ -173,7 +194,7 @@ export default function App() {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [loggedInUserId, trip?.id]);
+  }, [loggedInUserId]);
 
   // Post changes helper
   const postTripUpdate = async (updatedFields: Partial<Trip>) => {
@@ -245,6 +266,7 @@ export default function App() {
   };
 
   const handleSelectTrip = async (id: string) => {
+    localStorage.setItem("activeTripId", id);
     try {
       const res = await fetch("/api/trip/select", {
         method: "POST",
@@ -254,6 +276,7 @@ export default function App() {
       if (res.ok) {
         const data = await res.json();
         setTrip(data.trip);
+        await fetchTripData(true, data.trip?.id);
       }
     } catch (err) {
       console.error(err);
@@ -263,6 +286,8 @@ export default function App() {
   const handleCreateTrip = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTripName.trim()) return;
+    setIsCreatingTrip(true);
+    setCreateTripError(null);
     try {
       const res = await fetchWithAuth("/api/trip/create", {
         method: "POST",
@@ -275,19 +300,28 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
+        if (data.trip?.id) {
+          localStorage.setItem("activeTripId", data.trip.id);
+        }
         setTrip(data.trip);
         setShowCreateTripModal(false);
         setNewTripName("");
         setNewTripDestination("");
         setNewTripBudget("");
+        await fetchTripData(true, data.trip?.id);
+      } else {
+        const data = await res.json();
+        setCreateTripError(data.error || (lang === "zh" ? "創立專案失敗，請重試" : "Failed to create trip, please retry."));
       }
     } catch (err) {
       console.error(err);
+      setCreateTripError(lang === "zh" ? "連線中斷或伺服器錯誤" : "Connection lost or server error.");
+    } finally {
+      setIsCreatingTrip(false);
     }
   };
 
   const handleDeleteTrip = async (id: string) => {
-    if (!window.confirm(lang === "zh" ? "確定要刪除此協作專案嗎？" : "Are you sure you want to delete this trip workspace?")) return;
     try {
       const res = await fetchWithAuth("/api/trip/delete", {
         method: "POST",
@@ -296,7 +330,30 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
+        if (data.trip?.id) {
+          localStorage.setItem("activeTripId", data.trip.id);
+        } else {
+          localStorage.removeItem("activeTripId");
+        }
         setTrip(data.trip);
+        await fetchTripData(true, data.trip?.id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditTripMeta = async (updatedData: { name: string; destination: string; totalBudget: number; status?: "active" | "inactive" }) => {
+    try {
+      const res = await fetchWithAuth("/api/trip/update-meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedData)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrip(data.trip);
+        await fetchTripData(true, data.trip?.id);
       }
     } catch (err) {
       console.error(err);
@@ -688,7 +745,12 @@ export default function App() {
             newTripBudget={newTripBudget}
             setNewTripBudget={setNewTripBudget}
             onSubmit={handleCreateTrip}
-            onClose={() => setShowCreateTripModal(false)}
+            onClose={() => {
+              setCreateTripError(null);
+              setShowCreateTripModal(false);
+            }}
+            isCreating={isCreatingTrip}
+            error={createTripError}
           />
         )}
 
@@ -897,6 +959,17 @@ export default function App() {
           <nav className="glass-container border-b border-white/10 py-2 sm:py-3 px-4 shadow sticky top-[73px] lg:top-[69px] z-30 backdrop-blur-md">
             <div className="max-w-7xl mx-auto flex overflow-x-auto gap-1.5 scrollbar-none pb-1 text-xs">
               <button
+                id="tab-btn-dashboard"
+                onClick={() => setActiveTab("dashboard")}
+                className={`px-4 py-2 rounded-xl font-extrabold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
+                  activeTab === "dashboard" ? "bg-white/10 text-white shadow-inner font-black" : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <span>📊</span>
+                <span>{lang === "zh" ? "首頁控制台" : "Dashboard"}</span>
+              </button>
+
+              <button
                 id="tab-btn-itinerary"
                 onClick={() => setActiveTab("itinerary")}
                 className={`px-4 py-2 rounded-xl font-extrabold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
@@ -969,6 +1042,18 @@ export default function App() {
         <main className="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 text-sm">
           {trip && currentUser && (
             <div className="space-y-6 animate-fadeIn">
+              {activeTab === "dashboard" && (
+                <TripDashboard
+                  trip={trip}
+                  trips={trip.tripsList || []}
+                  lang={lang}
+                  onSwitchTrip={handleSelectTrip}
+                  onCreateTrip={() => setShowCreateTripModal(true)}
+                  onEditTripMeta={handleEditTripMeta}
+                  onDeleteTrip={handleDeleteTrip}
+                />
+              )}
+
               {activeTab === "itinerary" && (
                 <ItineraryPlanner
                   itineraries={trip.itineraries}
@@ -989,6 +1074,8 @@ export default function App() {
                 <OfflineMapSimulator
                   destination={trip.destination}
                   itineraries={trip.itineraries}
+                  participants={trip.participants}
+                  currentUserId={currentUser.id}
                   onSelectLocation={(item) => {
                     // Stay inside map tab! Let user explore landmarks smoothly without bouncing out.
                     console.log("Selected map checkpoint:", item);

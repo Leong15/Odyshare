@@ -10,6 +10,8 @@ export interface Participant {
   publicKey: string; // Mock Encryption key
   budgetLimit?: number; // Personal budget limit
   username?: string; // Persistent login username
+  lat?: number;
+  lng?: number;
 }
 
 export interface FlightEstimate {
@@ -52,6 +54,8 @@ export interface ItineraryItem {
   comments: Comment[];
   coordinates?: { x: number; y: number }; // Relative position on the offline map canvas
   trafficStatus?: 'smooth' | 'moderate' | 'congested'; // real-time map traffic simulation
+  lat?: number;
+  lng?: number;
 }
 
 export interface ExpenseItem {
@@ -93,6 +97,9 @@ export interface Trip {
   startDate: string;
   endDate: string;
   totalBudget: number;
+  status?: "active" | "inactive";
+  lat?: number;
+  lng?: number;
   participants: Participant[];
   flightEstimates: FlightEstimate[];
   itineraries: ItineraryItem[];
@@ -109,5 +116,12 @@ export interface Trip {
     startDate: string;
     endDate: string;
     totalBudget: number;
+    status?: "active" | "inactive";
+    lat?: number;
+    lng?: number;
+    participants?: Participant[];
+    expenses?: ExpenseItem[];
+    itineraries?: ItineraryItem[];
   }>;
 }
+
