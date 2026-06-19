@@ -51,8 +51,8 @@ export default function ItineraryPlanner({
     { 
       sender: "ai", 
       text: lang === "zh"
-        ? "您好！我是 WanderSmart 智慧行程管家。您可以在此處輸入組員度假偏好，讓我為您升級日程；或者在下方詢問我關於東京地鐵乘車指引、當地小眾海鮮居酒屋推薦！"
-        : "Konnichiwa! I'm WanderSmart, your group's travel assistant. Enter preferences above to let me upgrade your schedule, or ask me anything about subway lines and hidden food corridors!" 
+        ? "您好！我是 OdyShareSmart 智慧行程管家。您可以在此處輸入組員度假偏好，讓我為您升級日程；或者在下方詢問我關於東京地鐵乘車指引、當地小眾海鮮居酒屋推薦！"
+        : "Konnichiwa! I'm OdyShareSmart, your group's travel assistant. Enter preferences above to let me upgrade your schedule, or ask me anything about subway lines and hidden food corridors!" 
     }
   ]);
   const [submittingChat, setSubmittingChat] = useState<boolean>(false);
@@ -69,8 +69,8 @@ export default function ItineraryPlanner({
       {
         sender: "ai",
         text: lang === "zh"
-          ? "您好！我是 WanderSmart 智慧行程管家。您可以在此處輸入組員度假偏好，讓我為您升級日程；或者在下方詢問我關於東京地鐵乘車指引、當地小眾海鮮居酒屋推薦！"
-          : "Konnichiwa! I'm WanderSmart, your group's travel assistant. Enter preferences above to let me upgrade your schedule, or ask me anything about subway lines and hidden food corridors!"
+          ? "您好！我是 OdyShareSmart 智慧行程管家。您可以在此處輸入組員度假偏好，讓我為您升級日程；或者在下方詢問我關於東京地鐵乘車指引、當地小眾海鮮居酒屋推薦！"
+          : "Konnichiwa! I'm OdyShareSmart, your group's travel assistant. Enter preferences above to let me upgrade your schedule, or ask me anything about subway lines and hidden food corridors!"
       }
     ]);
   }, [lang]);
@@ -105,8 +105,8 @@ export default function ItineraryPlanner({
         if (onPostAISystemMessage) {
           onPostAISystemMessage(
             lang === "zh"
-              ? `🤖 WanderSmart AI 行程智慧升級！套用偏好： "${prefInput}"`
-              : `🤖 WanderSmart AI optimized schedule for: "${prefInput}"`
+              ? `🤖 OdyShareSmart AI 行程智慧升級！套用偏好： "${prefInput}"`
+              : `🤖 OdyShareSmart AI optimized schedule for: "${prefInput}"`
           );
         }
       }
@@ -230,8 +230,8 @@ export default function ItineraryPlanner({
               </span>
               <span>
                 {lang === "zh"
-                  ? "🤖 WanderSmart AI 已成功進行網關日程智慧優化！如果您或其他組員不滿意，可隨時還原至優化前的項目配置。"
-                  : "🤖 WanderSmart AI has optimized details! If you or others dislike this setup, feel free to restore original elements."}
+                  ? "🤖 OdyShareSmart AI 已成功進行網關日程智慧優化！如果您或其他組員不滿意，可隨時還原至優化前的項目配置。"
+                  : "🤖 OdyShareSmart AI has optimized details! If you or others dislike this setup, feel free to restore original elements."}
               </span>
             </div>
             <button
@@ -525,7 +525,7 @@ export default function ItineraryPlanner({
                   }`}
                 >
                   <Sparkles size={12} className="text-blue-200" />
-                  <span>🤖 WanderSmart AI</span>
+                  <span>🤖 OdyShareSmart AI</span>
                 </button>
                 <button
                   type="button"
@@ -596,7 +596,7 @@ export default function ItineraryPlanner({
                     <div>
                       <h5 className="font-extrabold text-white text-[11px] mb-2 flex items-center gap-1">
                         <MessageSquare size={13} className="text-blue-400" />
-                        <span>{t.wanderSmartConc}</span>
+                        <span>{t.OdyShareSmartConc}</span>
                       </h5>
 
                       <div className="overflow-y-auto mb-2 space-y-2 p-2.5 bg-white/3 border border-white/5 rounded-xl h-[120px] scrollbar-thin text-xs">
@@ -608,7 +608,7 @@ export default function ItineraryPlanner({
                             }`}
                           >
                             <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5 font-mono">
-                              {log.sender === "user" ? (lang === "zh" ? "您" : "You") : "WanderSmart AI"}
+                              {log.sender === "user" ? (lang === "zh" ? "您" : "You") : "OdyShareSmart AI"}
                             </span>
                             <div
                               className={`p-2 rounded-xl text-[11px] ${
@@ -622,7 +622,7 @@ export default function ItineraryPlanner({
                           </div>
                         ))}
                         {submittingChat && (
-                          <span className="text-[9px] text-slate-400 font-mono italic animate-pulse">{lang === "zh" ? "WanderSmart 智慧響應中..." : "Assistant mapping..."}</span>
+                          <span className="text-[9px] text-slate-400 font-mono italic animate-pulse">{lang === "zh" ? "OdyShareSmart 智慧響應中..." : "Assistant mapping..."}</span>
                         )}
                       </div>
                     </div>

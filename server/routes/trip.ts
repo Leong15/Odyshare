@@ -145,7 +145,7 @@ async function fetchCoordinates(destination: string): Promise<{ lat: number; lng
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(destination)}&format=json&limit=1`;
     const res = await fetch(url, {
       headers: {
-        "User-Agent": "WanderSyncCollaborator/1.0 (leochau46@gmail.com)"
+        "User-Agent": "OdyShare/1.0 (leochau46@gmail.com)"
       }
     });
     if (!res.ok) return null;
@@ -198,7 +198,7 @@ router.post("/create", async (req: Request, res: Response) => {
 
   const newTrip: any = {
     id: newTripId,
-    name: name || "New Wander Trip",
+    name: name || "New Trip",
     destination: destString,
     startDate: startDate || new Date().toISOString().split("T")[0],
     endDate: endDate || new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split("T")[0],
@@ -750,10 +750,10 @@ router.post("/:id/flight-subscription", (req: Request, res: Response) => {
   trip.chats.push({
     id: "msg-sub-" + Date.now(),
     senderId: "system",
-    senderName: "WanderSmart AI",
+    senderName: "OdyShareSmart AI",
     avatarColor: "#8b5cf6",
     messageEncrypted: "",
-    messageDecrypted: `🔔 線路監控啟動！WanderSmart 已將 ${from || "TPE"} 往 ${to || "NRT"} (出發: ${date || "2026-07-20"}) 之基準線價格（Baseline）鎖定在 ${subCurrency} $${initialPrice}。每日中午 12:00 及晚上 18:00 將進行主動航班剖析與低價追焦推送。`,
+    messageDecrypted: `🔔 線路監控啟動！OdyShareSmart 已將 ${from || "TPE"} 往 ${to || "NRT"} (出發: ${date || "2026-07-20"}) 之基準線價格（Baseline）鎖定在 ${subCurrency} $${initialPrice}。每日中午 12:00 及晚上 18:00 將進行主動航班剖析與低價追焦推送。`,
     timestamp: new Date().toISOString(),
     isTripUpdate: true
   });
@@ -778,7 +778,7 @@ router.delete("/:id/flight-subscription", (req: Request, res: Response) => {
   trip.chats.push({
     id: "msg-unsub-" + Date.now(),
     senderId: "system",
-    senderName: "WanderSmart AI",
+    senderName: "OdyShareSmart AI",
     avatarColor: "#8b5cf6",
     messageEncrypted: "",
     messageDecrypted: `🔕 線路監控已關閉！已取消此旅遊項目的航班價格推播追蹤。`,
@@ -860,7 +860,7 @@ router.post("/:id/simulate-price-check", (req: Request, res: Response) => {
   
   const notificationItem = {
     id: "notif-" + Date.now(),
-    title: isMegaDrop && newStops <= sub.stops ? "🔥 降價警告！" : "✈️ WanderSmart 航班分析",
+    title: isMegaDrop && newStops <= sub.stops ? "🔥 降價警告！" : "✈️ OdyShareSmart 航班分析",
     message: pushMsg,
     createdAt: new Date().toISOString(),
     isRead: false
@@ -872,7 +872,7 @@ router.post("/:id/simulate-price-check", (req: Request, res: Response) => {
   trip.chats.push({
     id: "msg-pcheck-" + Date.now(),
     senderId: "system",
-    senderName: "WanderSmart AI",
+    senderName: "OdyShareSmart AI",
     avatarColor: "#8b5cf6",
     messageEncrypted: "",
     messageDecrypted: `📢 [飛安主動報 ${checkHour}] ${pushMsg}`,

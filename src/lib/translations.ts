@@ -10,13 +10,13 @@ export const translations = {
     tabAI: "AI Optimizer",
     
     // Header
-    brandTitle: "WanderSync Group Workspace",
+    brandTitle: "OdyShareSync Group Workspace",
     actingUser: "Acting User:",
     destination: "Trip Destination",
     syncing: "Syncing",
     syncOffline: "Synchronization connection offline. Re-routing through local gateway...",
     retryGateway: "Retry Gateway Now",
-    footerText: "WanderSync Vector Planner • ECDH secure tunnel active • local cache synced",
+    footerText: "OdyShareSync Vector Planner • ECDH secure tunnel active • local cache synced",
 
     // Itinerary
     day: "Day",
@@ -29,7 +29,7 @@ export const translations = {
     estimatedCost: "Estimated Cost",
     addScheduleCard: "Add Schedule Card",
     briefDesc: "Brief Description / Guide",
-    vacantMessage: "Your schedule is currently vacant. Click 'Add Daily Activity' or ask WanderSmart AI to optimize one!",
+    vacantMessage: "Your schedule is currently vacant. Click 'Add Daily Activity' or ask OdyShareSmart AI to optimize one!",
     landmark: "Landmark Sight",
     restaurant: "Restaurant / Food",
     shop: "Shop / Market",
@@ -133,7 +133,7 @@ export const translations = {
     upgradedSuccess: "Itinerary Upgraded Successfully!",
     upgradeTip: "3 premium coordinates have been injected with customized Google traffic alerts. Check your day calendars!",
     readyToCompile: "Ready to compile group preference parameters.",
-    wanderSmartConc: "WanderSmart Conversation Box",
+    OdyShareSmartConc: "OdyShareSmart Conversation Box",
     askAiPlaceholder: "Ask AI: 'suggest sashimi under ¥3000' or 'how do I greet in Tokyo?'..."
   },
   zh: {
@@ -147,13 +147,13 @@ export const translations = {
     tabAI: "AI 智能優化器",
     
     // Header
-    brandTitle: "WanderSync 團隊協作工作區",
+    brandTitle: "OdyShareSync 團隊協作工作區",
     actingUser: "模擬當前用戶：",
     destination: "旅程目的地",
     syncing: "同步中",
     syncOffline: "同步連線中斷。正在通過本地安全網關重新路由...",
     retryGateway: "立即重試連接",
-    footerText: "WanderSync Vector 規劃平台 • ECDH 安全通道已啟動 • 本地快取已同步",
+    footerText: "OdyShareSync Vector 規劃平台 • ECDH 安全通道已啟動 • 本地快取已同步",
 
     // Itinerary
     day: "第",
@@ -166,7 +166,7 @@ export const translations = {
     estimatedCost: "預估花費 (USD)",
     addScheduleCard: "添加到日程表",
     briefDesc: "活動簡介 / 附註說明",
-    vacantMessage: "您當天的日程還是空的。點擊‘新增行程活動’或讓 WanderSmart AI 為您量身定制優化一個！",
+    vacantMessage: "您當天的日程還是空的。點擊‘新增行程活動’或讓 OdyShareSmart AI 為您量身定制優化一個！",
     landmark: "🏛️ 歷史地標景點",
     restaurant: "🍱 餐廳 / 美食餐飲",
     shop: "🛍️ 商場 / 本地市場",
@@ -270,7 +270,7 @@ export const translations = {
     upgradedSuccess: "日程表優化升級成功！",
     upgradeTip: "3個具有熱門度與 Google 地圖交通預警的推薦景點已精準插入到你們的日程表，請至行程頁籤查看！",
     readyToCompile: "已準備好接收組員偏好參數，等待指令發送中。",
-    wanderSmartConc: "WanderSmart 隨身智慧問答箱",
+    OdyShareSmartConc: "OdyShareSmart 隨身智慧問答箱",
     askAiPlaceholder: "問問 AI：‘推薦日幣3000元以下的高檔壽司’ 或是 ‘基礎東京日常會話有哪些？’..."
   }
 };

@@ -323,7 +323,7 @@ export function getTripForRequest(req: Request) {
     const newTripId = "trip-" + Date.now();
     trip = {
       id: newTripId,
-      name: "My Wanderlust Journey",
+      name: "My OdyShare Journey",
       destination: "Paris, France",
       startDate: "2026-11-20",
       endDate: "2026-11-27",

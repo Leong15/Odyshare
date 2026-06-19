@@ -338,7 +338,7 @@ export default function FlightHub({
         </div>
       </div>
 
-      {/* WanderSmart On-Demand Flight Route Monitoring Section */}
+      {/* OdyShareSmart On-Demand Flight Route Monitoring Section */}
       {flightSubscription && flightSubscription.isActive ? (
         <div id="flight-monitoring-sandbox" className="p-4 rounded-xl border border-blue-500/30 bg-blue-500/5 shadow-md space-y-4 mb-5 animate-fadeIn">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-2.5 border-b border-white/5">
@@ -348,7 +348,7 @@ export default function FlightHub({
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
               <h4 className="font-extrabold text-white text-xs">
-                {lang === "zh" ? "✨ WanderSmart On-Demand 智能線路監控中" : "✨ WanderSmart On-Demand Flight Monitoring"}
+                {lang === "zh" ? "✨ OdyShareSmart On-Demand 智能線路監控中" : "✨ OdyShareSmart On-Demand Flight Monitoring"}
               </h4>
               <span className="text-[9.5px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 font-bold border border-blue-500/25 rounded-md font-mono">
                 {lang === "zh" ? "每天 2 次 (12:00 / 18:00)" : "Twice Daily (12:00 & 18:00)"}
@@ -405,7 +405,7 @@ export default function FlightHub({
             <div className="flex items-center gap-1.5">
               <ShieldCheck size={14} className="text-emerald-400" />
               <span className="font-bold text-white text-[11px] uppercase tracking-wide">
-                {lang === "zh" ? "⚡️ WanderSmart 測試沙盒：對時模擬與降價比對" : "⚡️ WanderSmart Sandbox: Time Matching & Drop Comparison Simulator"}
+                {lang === "zh" ? "⚡️ OdyShareSmart 測試沙盒：對時模擬與降價比對" : "⚡️ OdyShareSmart Sandbox: Time Matching & Drop Comparison Simulator"}
               </span>
             </div>
             

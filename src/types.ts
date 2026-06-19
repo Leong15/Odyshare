@@ -1,5 +1,5 @@
 /**
- * Shared Type Definitions for WanderSync Travel Planner & Group Workspace
+ * Shared Type Definitions for OdyShareSync Travel Planner & Group Workspace
  */
 
 export interface Participant {

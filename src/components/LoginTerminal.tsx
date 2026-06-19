@@ -111,7 +111,7 @@ export default function LoginTerminal({
             <span className="font-extrabold text-sm tracking-widest">W/S</span>
           </div>
           <h2 className={`text-lg sm:text-xl font-black ${isLight ? "text-slate-900" : "text-white"}`}>
-            {lang === "zh" ? "WanderSync 旅伴協作平台" : "WanderSync Travel System"}
+            {lang === "zh" ? "OdyShareSync 旅伴協作平台" : "OdyShareSync Travel System"}
           </h2>
           <p className={`text-[11px] font-medium ${isLight ? "text-slate-500" : "text-slate-450"}`}>
             {lang === "zh" ? "專屬獨立帳號加密登入管理 • 旅伴行程對帳終端" : "Secure independent accounts workspace term"}

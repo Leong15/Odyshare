@@ -38,7 +38,7 @@ async function start() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`WanderSync Server running on http://0.0.0.0:${PORT}`);
+    console.log(`OdyShareSync Server running on http://0.0.0.0:${PORT}`);
     // Start automated scheduler monitoring
     startScheduler();
   });

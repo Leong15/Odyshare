@@ -228,7 +228,7 @@ export default function OfflineMapSimulator({
     let angle = Math.random() * 2 * Math.PI;
     const interval = setInterval(() => {
       const stepSize = 0.00015; // smooth increment step
-      angle += (Math.random() - 0.5) * 0.4; // random wandering course drift
+      angle += (Math.random() - 0.5) * 0.4; // random OdyShareing course drift
       
       setCurrentGeoLocation(prev => {
         if (!prev) return prev;
@@ -1115,7 +1115,7 @@ export default function OfflineMapSimulator({
                           ? (lang === "zh" ? "★ 自行规划之日程" : "★ Itinerary Plan") 
                           : spot.isCustom 
                           ? (lang === "zh" ? "自訂探查地標" : "User dropped pin") 
-                          : (lang === "zh" ? "本地精選推荐" : "WanderSmart spot")}
+                          : (lang === "zh" ? "本地精選推荐" : "OdyShareSmart spot")}
                       </span>
                     </div>
                   </div>

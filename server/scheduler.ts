@@ -1,10 +1,10 @@
-// WanderSmart Scheduled Background Scheduler Module
+// OdyShareSmart Scheduled Background Scheduler Module
 import cron from "node-cron";
 import { getDB, writeDB } from "./db.js";
 import { searchSerpApiFlights } from "./serpapi.js";
 
 export function startScheduler() {
-  console.log("WanderSmart Custom Background scheduler loaded. Scheduled sequence: '0 12 * * 1,4' (Mondays and Thursdays at 12:00 PM)");
+  console.log("OdyShareSmart Custom Background scheduler loaded. Scheduled sequence: '0 12 * * 1,4' (Mondays and Thursdays at 12:00 PM)");
 
   // Schedule task for every Monday and Thursday at 12:00 PM (noon)
   cron.schedule("0 12 * * 1,4", async () => {
@@ -84,7 +84,7 @@ export function startScheduler() {
           }
           const notificationItem = {
             id: `notif-sched-${Date.now()}-${Math.random()}`,
-            title: isMegaDrop && newStops <= sub.stops ? "🔥 定時超低價警告" : "✈️ WanderSmart 定時航班動態",
+            title: isMegaDrop && newStops <= sub.stops ? "🔥 定時超低價警告" : "✈️ OdyShareSmart 定時航班動態",
             message: pushMsg,
             createdAt: new Date().toISOString(),
             isRead: false
@@ -95,7 +95,7 @@ export function startScheduler() {
           trip.chats.push({
             id: `msg-sched-${Date.now()}-${Math.random()}`,
             senderId: "system",
-            senderName: "WanderSmart AI",
+            senderName: "OdyShareSmart AI",
             avatarColor: "#8b5cf6",
             messageEncrypted: "",
             messageDecrypted: `📢 [週一/四 12:00 正式排程] ${pushMsg}`,

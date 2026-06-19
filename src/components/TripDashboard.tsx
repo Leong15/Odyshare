@@ -294,7 +294,7 @@ export default function TripDashboard({
           <div className="space-y-1.5 flex-1 w-full max-w-xl">
             <div className="flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
               <Shield size={11} />
-              <span>{lang === "zh" ? "WanderSync 全域特工控制台" : "WanderSync Travel Portfolio Cockpit"}</span>
+              <span>{lang === "zh" ? "OdyShareSync 全域特工控制台" : "OdyShareSync Travel Portfolio Cockpit"}</span>
             </div>
             
             {isEditing ? (
@@ -363,7 +363,7 @@ export default function TripDashboard({
             ) : (
               <>
                 <h2 className="text-lg md:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                  <span>{lang === "zh" ? "歡迎回到系統控制台" : "WanderSync Command Center"}</span>
+                  <span>{lang === "zh" ? "歡迎回到系統控制台" : "OdyShareSync Command Center"}</span>
                   <span className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-mono font-bold tracking-wider">
                     SECURE PORTFOLIO
                   </span>

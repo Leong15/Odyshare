@@ -248,7 +248,7 @@ router.post("/reset-confirm", async (req: Request, res: Response) => {
     finalPassword = user.password;
   } else {
     // If argon2 hashed, reset to default compliant passcode to let user lock back in securely
-    finalPassword = "WanderSyncPass123!";
+    finalPassword = "Pass123!";
     const hashedPassword = await argon2.hash(finalPassword, { type: argon2.argon2id });
     user.password = hashedPassword;
     writeDB(db);
