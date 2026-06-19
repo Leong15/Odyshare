@@ -6,7 +6,10 @@ import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 
 // Resolve Lat/Lng standard coords for itinerary names in various cities
-const resolveLatLng = (name: string, dest: string, x: number, y: number): { lat: number; lng: number } => {
+const resolveLatLng = (name: string, dest: string, x: number, y: number, itemLat?: number, itemLng?: number): { lat: number; lng: number } => {
+  if (itemLat !== undefined && itemLng !== undefined && itemLat !== null && itemLng !== null && !isNaN(Number(itemLat)) && !isNaN(Number(itemLng))) {
+    return { lat: Number(itemLat), lng: Number(itemLng) };
+  }
   const d = dest.toLowerCase();
   const n = (name || "").toLowerCase();
 
@@ -351,7 +354,7 @@ export default function OfflineMapSimulator({
 
     // Resolve lat/lng for activeItem
     const activeCoords = activeItem.coordinates 
-      ? resolveLatLng(activeItem.locationName || activeItem.title, destination, activeItem.coordinates.x, activeItem.coordinates.y)
+      ? resolveLatLng(activeItem.locationName || activeItem.title, destination, activeItem.coordinates.x, activeItem.coordinates.y, activeItem.lat, activeItem.lng)
       : null;
 
     if (!activeCoords) {
@@ -412,7 +415,7 @@ export default function OfflineMapSimulator({
   const getPublicTransitUrl = () => {
     if (!currentGeoLocation || !activeItem) return "";
     const activeCoords = activeItem.coordinates 
-      ? resolveLatLng(activeItem.locationName || activeItem.title, destination, activeItem.coordinates.x, activeItem.coordinates.y)
+      ? resolveLatLng(activeItem.locationName || activeItem.title, destination, activeItem.coordinates.x, activeItem.coordinates.y, activeItem.lat, activeItem.lng)
       : null;
     if (!activeCoords) return "";
     return `https://www.google.com/maps/dir/?api=1&origin=${currentGeoLocation.lat},${currentGeoLocation.lng}&destination=${activeCoords.lat},${activeCoords.lng}&travelmode=transit`;

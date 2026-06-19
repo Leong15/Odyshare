@@ -66,6 +66,10 @@ export interface ExpenseItem {
   splitAmongIds: string[]; // shared expenses
   category: 'flight' | 'lodging' | 'food' | 'activities' | 'transit' | 'shopping' | 'other';
   date: string;
+  splitType?: 'equal' | 'individual';
+  individualAmounts?: Record<string, number>;
+  taxRefundPercent?: number;
+  taxRefundTotalAmount?: number;
 }
 
 export interface DocumentItem {

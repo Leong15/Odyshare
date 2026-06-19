@@ -114,10 +114,83 @@ export default function ExpenseTracker({
 
   const t = translations[lang];
 
+  const [splitType, setSplitType] = useState<'equal' | 'individual'>('equal');
+  const [individualAmounts, setIndividualAmounts] = useState<Record<string, string>>({});
+  const [taxRefundPercent, setTaxRefundPercent] = useState<string>("");
+  const [taxRefundTotalAmount, setTaxRefundTotalAmount] = useState<string>("");
+
+  // Helper to compute actual paid total (post-refund) for an expense item
+  const getExpenseActualTotal = (exp: ExpenseItem): number => {
+    const parsedAmt = Number(exp.amount) || 0;
+    const sType = exp.splitType || 'equal';
+    const splitAmongIds = exp.splitAmongIds || [];
+    
+    let rawTotal = parsedAmt;
+    if (sType === 'individual') {
+      const indAmts = exp.individualAmounts || {};
+      let specifiedSum = 0;
+      splitAmongIds.forEach(id => {
+        specifiedSum += Number(indAmts[id]) || 0;
+      });
+      if (specifiedSum > 0) {
+        rawTotal = specifiedSum;
+      }
+    }
+
+    let refundAmt = 0;
+    if (exp.taxRefundTotalAmount !== undefined && Number(exp.taxRefundTotalAmount) > 0) {
+      refundAmt = Number(exp.taxRefundTotalAmount);
+    } else if (exp.taxRefundPercent !== undefined && Number(exp.taxRefundPercent) > 0) {
+      refundAmt = rawTotal * (Number(exp.taxRefundPercent) / 100);
+    }
+    
+    return Math.max(0, rawTotal - refundAmt);
+  };
+
+  // Helper to compute specific user's shared portion
+  const getExpenseShareForUser = (exp: ExpenseItem, uid: string): number => {
+    const parsedAmt = Number(exp.amount) || 0;
+    const splitAmongIds = exp.splitAmongIds || [];
+    if (!splitAmongIds.includes(uid)) return 0;
+
+    const sType = exp.splitType || 'equal';
+    let rawTotal = parsedAmt;
+    let individualRawAmt = 0;
+
+    if (sType === 'individual') {
+      const indAmts = exp.individualAmounts || {};
+      let specifiedSum = 0;
+      splitAmongIds.forEach(id => {
+        specifiedSum += Number(indAmts[id]) || 0;
+      });
+      
+      if (specifiedSum > 0) {
+        rawTotal = specifiedSum;
+        individualRawAmt = Number(indAmts[uid]) || 0;
+      } else {
+        individualRawAmt = parsedAmt / splitAmongIds.length;
+      }
+    } else {
+      individualRawAmt = parsedAmt / splitAmongIds.length;
+    }
+
+    let refundAmt = 0;
+    if (exp.taxRefundTotalAmount !== undefined && Number(exp.taxRefundTotalAmount) > 0) {
+      refundAmt = Number(exp.taxRefundTotalAmount);
+    } else if (exp.taxRefundPercent !== undefined && Number(exp.taxRefundPercent) > 0) {
+      refundAmt = rawTotal * (Number(exp.taxRefundPercent) / 100);
+    }
+
+    const actualTotal = Math.max(0, rawTotal - refundAmt);
+    if (rawTotal <= 0) return 0;
+
+    return individualRawAmt * (actualTotal / rawTotal);
+  };
+
   // Derive evaluated expenses list
   const activeExpenses = expenses.filter(exp => !uncheckedExpenseIds.includes(exp.id));
 
-  const totalSpent = activeExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+  const totalSpent = activeExpenses.reduce((sum, exp) => sum + getExpenseActualTotal(exp), 0);
   const remainingBudget = editableBudget - totalSpent;
   const percentageSpent = Math.min((totalSpent / editableBudget) * 100, 100);
 
@@ -129,13 +202,13 @@ export default function ExpenseTracker({
     });
 
     activeExpenses.forEach(exp => {
-      const parsedAmt = Number(exp.amount);
-      if (isNaN(parsedAmt) || parsedAmt <= 0) return;
+      const actualTotal = getExpenseActualTotal(exp);
+      if (actualTotal <= 0) return;
 
-      balances[exp.paidById] = (balances[exp.paidById] || 0) + parsedAmt;
+      balances[exp.paidById] = (balances[exp.paidById] || 0) + actualTotal;
 
-      const splitShare = parsedAmt / exp.splitAmongIds.length;
       exp.splitAmongIds.forEach(uid => {
+        const splitShare = getExpenseShareForUser(exp, uid);
         balances[uid] = (balances[uid] || 0) - splitShare;
       });
     });
@@ -191,15 +264,13 @@ export default function ExpenseTracker({
     let myOwedShare = 0;
 
     activeExpenses.forEach(exp => {
-      const parsedAmt = Number(exp.amount);
-      if (isNaN(parsedAmt) || parsedAmt <= 0) return;
+      const actualTotal = getExpenseActualTotal(exp);
+      const splitShare = getExpenseShareForUser(exp, activeUserId);
 
       if (exp.paidById === activeUserId) {
-        paidByMe += parsedAmt;
+        paidByMe += actualTotal;
       }
-      if (exp.splitAmongIds.includes(activeUserId)) {
-        myOwedShare += parsedAmt / exp.splitAmongIds.length;
-      }
+      myOwedShare += splitShare;
     });
 
     const netOwed = balances[activeUserId] || 0; // if positive, Leo gets back; if negative, Leo pays.
@@ -213,11 +284,7 @@ export default function ExpenseTracker({
   const getParticipantAdjustedSpent = (userId: string) => {
     let owedShare = 0;
     activeExpenses.forEach(exp => {
-      const parsedAmt = Number(exp.amount);
-      if (isNaN(parsedAmt) || parsedAmt <= 0) return;
-      if (exp.splitAmongIds.includes(userId)) {
-        owedShare += parsedAmt / exp.splitAmongIds.length;
-      }
+      owedShare += getExpenseShareForUser(exp, userId);
     });
     return owedShare;
   };
@@ -242,8 +309,22 @@ export default function ExpenseTracker({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const numAmt = parseFloat(amount);
-    if (!description || isNaN(numAmt) || numAmt <= 0) return;
+    let numAmt = parseFloat(amount) || 0;
+    const finalIndividualAmounts: Record<string, number> = {};
+    
+    if (splitType === 'individual') {
+      let sum = 0;
+      splitAmong.forEach(id => {
+        const val = parseFloat(individualAmounts[id]) || 0;
+        finalIndividualAmounts[id] = val;
+        sum += val;
+      });
+      numAmt = sum;
+    }
+
+    if (!description || numAmt <= 0) {
+      return;
+    }
 
     onAddExpense({
       amount: numAmt,
@@ -251,11 +332,19 @@ export default function ExpenseTracker({
       paidById: paidBy,
       splitAmongIds: splitAmong,
       category,
-      date: new Date().toISOString().split("T")[0]
+      date: new Date().toISOString().split("T")[0],
+      splitType,
+      individualAmounts: splitType === 'individual' ? finalIndividualAmounts : undefined,
+      taxRefundPercent: taxRefundPercent ? parseFloat(taxRefundPercent) : undefined,
+      taxRefundTotalAmount: taxRefundTotalAmount ? parseFloat(taxRefundTotalAmount) : undefined
     });
 
     setDescription("");
     setAmount("");
+    setIndividualAmounts({});
+    setTaxRefundPercent("");
+    setTaxRefundTotalAmount("");
+    setSplitType("equal");
     setShowAddForm(false);
   };
 
@@ -337,93 +426,291 @@ export default function ExpenseTracker({
                 </button>
               </h4>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.expenseDesc}</label>
-                  <input
-                    id="expense-desc-input"
-                    type="text"
-                    required
-                    placeholder="e.g., Shinjuku Ramen Lunch"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 rounded-xl px-3 py-2 text-white outline-none"
-                  />
-                </div>
+              {/* Calc values for preview */}
+              {(() => {
+                const rawTotalVal = splitType === 'equal' 
+                  ? (parseFloat(amount) || 0)
+                  : splitAmong.reduce((acc, id) => acc + (parseFloat(individualAmounts[id]) || 0), 0);
 
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.costAmount}</label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">$</span>
-                    <input
-                      id="expense-amount-input"
-                      type="number"
-                      step="0.01"
-                      required
-                      placeholder="e.g., 45.50"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 pl-7 pr-3 py-2 rounded-xl text-white font-mono outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
+                let refundVal = 0;
+                if (taxRefundTotalAmount) {
+                  refundVal = parseFloat(taxRefundTotalAmount) || 0;
+                } else if (taxRefundPercent) {
+                  refundVal = rawTotalVal * ((parseFloat(taxRefundPercent) || 0) / 100);
+                }
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.paidBy}</label>
-                  <select
-                    id="expense-payer-select"
-                    value={paidBy}
-                    onChange={(e) => setPaidBy(e.target.value)}
-                    className="w-full bg-slate-955 border border-white/10 rounded-xl px-3 py-2 text-white bg-slate-900 outline-none"
-                  >
-                    {participants.map(p => (
-                      <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>
-                    ))}
-                  </select>
-                </div>
+                const finalPriceVal = Math.max(0, rawTotalVal - refundVal);
+                const ratioVal = rawTotalVal > 0 ? (finalPriceVal / rawTotalVal) : 0;
 
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.category}</label>
-                  <select
-                    id="expense-category-select"
-                    value={category}
-                    onChange={(e: any) => setCategory(e.target.value)}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white bg-slate-900 outline-none"
-                  >
-                    <option value="food" className="bg-slate-900">🍱 {getLocalizedCategoryName("food")}</option>
-                    <option value="activities" className="bg-slate-900">🎡 {getLocalizedCategoryName("activities")}</option>
-                    <option value="lodging" className="bg-slate-900">🏨 {getLocalizedCategoryName("lodging")}</option>
-                    <option value="transit" className="bg-slate-900">🚇 {getLocalizedCategoryName("transit")}</option>
-                    <option value="flight" className="bg-slate-900">✈️ {getLocalizedCategoryName("flight")}</option>
-                    <option value="shopping" className="bg-slate-900">🛍️ {getLocalizedCategoryName("shopping")}</option>
-                  </select>
-                </div>
+                return (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">{t.expenseDesc}</label>
+                        <input
+                          id="expense-desc-input"
+                          type="text"
+                          required
+                          placeholder="e.g., Shinjuku Ramen Lunch"
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 rounded-xl px-3 py-2 text-white outline-none"
+                        />
+                      </div>
 
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.splitRatioControl}</label>
-                  <div className="p-2 border border-white/5 bg-white/5 rounded-xl flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400">{t.splittingWith} ({splitAmong.length})</span>
-                    <div className="flex gap-1.5 font-sans">
-                      {participants.map(p => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => handleToggleSplit(p.id)}
-                          style={{ backgroundColor: splitAmong.includes(p.id) ? p.avatarColor : "transparent" }}
-                          className={`w-5 h-5 rounded-full text-[9px] font-bold text-white flex items-center justify-center cursor-pointer transition-all border ${
-                            !splitAmong.includes(p.id) ? "text-slate-500 border-white/10 hover:border-white/30" : "border-white/20"
-                          }`}
-                          title={p.name}
-                        >
-                          {p.name[0]}
-                        </button>
-                      ))}
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">
+                          {lang === "zh" ? "拆分方式" : "Split Method"}
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSplitType('equal')}
+                            className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-bold transition-all ${
+                              splitType === 'equal'
+                                ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                                : 'bg-slate-950 border-white/5 hover:border-white/20 text-slate-400'
+                            }`}
+                          >
+                            {lang === "zh" ? "🍱 人頭等額平分" : "Equal Split"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSplitType('individual')}
+                            className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-bold transition-all ${
+                              splitType === 'individual'
+                                ? 'bg-blue-500/20 border-blue-500 text-blue-300'
+                                : 'bg-slate-950 border-white/5 hover:border-white/20 text-slate-400'
+                            }`}
+                          >
+                            {lang === "zh" ? "🏷️ 個別消費自付" : "Individual Split"}
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </div>
+
+                    {/* Amount or Individual Entry depending on Split Type */}
+                    {splitType === 'equal' ? (
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">{t.costAmount}</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">$</span>
+                          <input
+                            id="expense-amount-input"
+                            type="number"
+                            step="0.01"
+                            required={splitType === 'equal'}
+                            placeholder="e.g., 45.50"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 pl-7 pr-3 py-2 rounded-xl text-white font-mono outline-none"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-2">
+                        <div className="font-bold text-slate-300 border-b border-white/5 pb-1 mb-2">
+                          {lang === "zh" ? "✍️ 請輸入各成員個人原始消費額 (美金)" : "✍️ Input individual raw purchase amount for each:"}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {participants.map(p => {
+                            const isSelected = splitAmong.includes(p.id);
+                            if (!isSelected) {
+                              return (
+                                <div key={p.id} className="flex items-center gap-2 justify-between border-b border-white/5 pb-2 opacity-35">
+                                  <span className="text-slate-500 truncate">{p.name} ({lang === "zh" ? "未參與分攤" : "Not sharing"})</span>
+                                </div>
+                              );
+                            }
+                            return (
+                              <div key={p.id} className="flex items-center gap-2 justify-between border-b border-white/5 pb-2">
+                                <span className="text-slate-300 flex items-center gap-1.5 truncate">
+                                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.avatarColor }} />
+                                  {p.name}
+                                </span>
+                                <div className="relative w-28">
+                                  <span className="absolute inset-y-0 left-2 flex items-center text-slate-400 font-mono">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={individualAmounts[p.id] || ""}
+                                    onChange={(e) => {
+                                      setIndividualAmounts({
+                                        ...individualAmounts,
+                                        [p.id]: e.target.value
+                                      });
+                                    }}
+                                    className="w-full bg-slate-950 border border-white/10 rounded-lg pl-5 pr-2 py-1 text-white font-mono text-xs outline-none focus:border-slate-500"
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">{t.paidBy}</label>
+                        <select
+                          id="expense-payer-select"
+                          value={paidBy}
+                          onChange={(e) => setPaidBy(e.target.value)}
+                          className="w-full bg-slate-955 border border-white/10 rounded-xl px-3 py-2 text-white bg-slate-900 outline-none"
+                        >
+                          {participants.map(p => (
+                            <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">{t.category}</label>
+                        <select
+                          id="expense-category-select"
+                          value={category}
+                          onChange={(e: any) => setCategory(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white bg-slate-900 outline-none"
+                        >
+                          <option value="food" className="bg-slate-900">🍱 {getLocalizedCategoryName("food")}</option>
+                          <option value="activities" className="bg-slate-900">🎡 {getLocalizedCategoryName("activities")}</option>
+                          <option value="lodging" className="bg-slate-900">🏨 {getLocalizedCategoryName("lodging")}</option>
+                          <option value="transit" className="bg-slate-900">🚇 {getLocalizedCategoryName("transit")}</option>
+                          <option value="flight" className="bg-slate-900">✈️ {getLocalizedCategoryName("flight")}</option>
+                          <option value="shopping" className="bg-slate-900">🛍️ {getLocalizedCategoryName("shopping")}</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">{t.splitRatioControl}</label>
+                        <div className="p-2 border border-white/5 bg-white/5 rounded-xl flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400">{t.splittingWith} ({splitAmong.length})</span>
+                          <div className="flex gap-1.5 font-sans">
+                            {participants.map(p => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => handleToggleSplit(p.id)}
+                                style={{ backgroundColor: splitAmong.includes(p.id) ? p.avatarColor : "transparent" }}
+                                className={`w-5 h-5 rounded-full text-[9px] font-bold text-white flex items-center justify-center cursor-pointer transition-all border ${
+                                  !splitAmong.includes(p.id) ? "text-slate-500 border-white/10 hover:border-white/30" : "border-white/20"
+                                }`}
+                                title={p.name}
+                              >
+                                {p.name[0]}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Tax Refund & Discount input area */}
+                    <div className="p-3 bg-white/5 border border-white/5 rounded-xl space-y-3">
+                      <div className="font-bold text-slate-300 flex items-center gap-1.5">
+                        <span>🛍️ {lang === "zh" ? "免稅退稅 & 折扣比例調整 (可填單項或不填)" : "Tax Refund & Discount Adjustment (Optional)"}</span>
+                        <span className="bg-amber-500/10 text-amber-400 text-[9px] px-1.5 py-0.5 rounded border border-amber-500/10 font-mono">
+                          {lang === "zh" ? "後續自動等比扣減" : "Proportional adjustment"}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-normal">
+                        {lang === "zh" ? "收據往往只有一個退稅總額，在此輸入後，系統會自動在各個成員的自付款項中，按原始金額比例分減扣除，計算出極致精準的實際付款額！" 
+                                     : "Enter overall discount or tax back total; the ledger automatically distributes deductions according to individual raw ratios for precise splits!"}
+                      </p>
+                      <div className="grid grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <label className="block text-slate-400 mb-1">{lang === "zh" ? "折減退稅金額 $" : "Deduction/Refund ($ Amount)"}</label>
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-2.5 flex items-center text-slate-500">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g. 15.00"
+                              value={taxRefundTotalAmount}
+                              disabled={!!taxRefundPercent}
+                              onChange={(e) => setTaxRefundTotalAmount(e.target.value)}
+                              className="w-full bg-slate-950 border border-white/10 rounded-lg pl-6 pr-2 py-1.5 text-white font-mono outline-none focus:border-amber-500"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-slate-400 mb-1">{lang === "zh" ? "或是退稅比例 %" : "Or Refund Percent (%)"}</label>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              step="0.01"
+                              placeholder="e.g. 10"
+                              value={taxRefundPercent}
+                              disabled={!!taxRefundTotalAmount}
+                              onChange={(e) => setTaxRefundPercent(e.target.value)}
+                              className="w-full bg-slate-950 border border-white/10 rounded-lg pl-3 pr-6 py-1.5 text-white font-mono outline-none focus:border-amber-500"
+                            />
+                            <span className="absolute inset-y-0 right-2.5 flex items-center text-slate-500">%</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Dynamically calculated share preview box */}
+                      {rawTotalVal > 0 && (
+                        <div className="bg-slate-950 border border-white/5 rounded-lg p-3 space-y-2 mt-2">
+                          <div className="font-bold text-blue-300 border-b border-white/5 pb-1 text-[11px] flex items-center justify-between">
+                            <span>📊 {lang === "zh" ? "即時試算分攤預覽" : "Live Share Preview"}</span>
+                            <span className="font-mono text-slate-450 text-[10px]">
+                              {lang === "zh" ? `退稅比例: ${(ratioVal * 100).toFixed(1)}% 實付` : `Refund ratio: ${(ratioVal * 100).toFixed(1)}% act`}
+                            </span>
+                          </div>
+                          <div className="space-y-1 font-mono text-[10.5px]">
+                            <div className="flex justify-between text-slate-400">
+                              <span>{lang === "zh" ? "原始原價總金額：" : "Raw total sum:"}</span>
+                              <span>${rawTotalVal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-rose-400">
+                              <span>{lang === "zh" ? "免稅/退稅/折扣額：" : "Refund reduction:"}</span>
+                              <span>-${refundVal.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-emerald-400 font-bold border-b border-white/5 pb-1.5 mb-1.5">
+                              <span>{lang === "zh" ? "折實總付款額：" : "Actual total cost:"}</span>
+                              <span>${finalPriceVal.toFixed(2)}</span>
+                            </div>
+                            
+                            <div className="space-y-1 pt-1">
+                              {participants.map(p => {
+                                if (!splitAmong.includes(p.id)) return null;
+                                
+                                let pRaw = 0;
+                                if (splitType === 'equal') {
+                                  pRaw = rawTotalVal / splitAmong.length;
+                                } else {
+                                  pRaw = parseFloat(individualAmounts[p.id]) || 0;
+                                }
+                                const pFinal = pRaw * ratioVal;
+                                const pSaved = pRaw - pFinal;
+
+                                return (
+                                  <div key={p.id} className="flex justify-between text-slate-300 text-[10px]">
+                                    <span className="flex items-center gap-1.5 truncate">
+                                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: p.avatarColor }} />
+                                      {p.name}:
+                                    </span>
+                                    <span className="shrink-0">
+                                      <span className="text-slate-500 font-normal">${pRaw.toFixed(2)} {lang === "zh" ? "原價" : "raw"}</span>
+                                      <span className="text-slate-600 font-normal mx-1">→</span>
+                                      <span className="text-emerald-400 font-bold">${pFinal.toFixed(2)}</span>
+                                      {pSaved > 0 && <span className="text-amber-400 text-[9px] ml-1.5">({lang === "zh" ? `減$${pSaved.toFixed(1)}` : `-$${pSaved.toFixed(1)}`})</span>}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
 
               <button
                 id="submit-expense-btn"
@@ -474,9 +761,21 @@ export default function ExpenseTracker({
                       </span>
                       
                       <div className="min-w-0 flex-1">
-                        <h4 className={`font-extrabold truncate ${isChecked ? "text-white" : "text-slate-500 line-through"} text-[12.5px]`}>
-                          {expenseData.description}
-                        </h4>
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <h4 className={`font-extrabold truncate ${isChecked ? "text-white" : "text-slate-500 line-through"} text-[12.5px]`}>
+                            {expenseData.description}
+                          </h4>
+                          {expenseData.splitType === 'individual' && (
+                            <span className="bg-purple-500/15 text-purple-300 border border-purple-500/10 text-[9px] px-1 py-0.2 rounded shrink-0">
+                              {lang === "zh" ? "個別自付" : "Individual Split"}
+                            </span>
+                          )}
+                          {(expenseData.taxRefundTotalAmount || expenseData.taxRefundPercent) && (
+                            <span className="bg-amber-500/15 text-amber-300 border border-amber-500/10 text-[9px] px-1 py-0.2 rounded font-mono shrink-0">
+                              {lang === "zh" ? "已退稅" : "Tax Off"} {expenseData.taxRefundTotalAmount ? `$${expenseData.taxRefundTotalAmount}` : `${expenseData.taxRefundPercent}%`}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-slate-400 mt-0.5 truncate">
                           {t.paidBy}{" "}
                           <span className="font-bold text-slate-300">{getParticipantName(expenseData.paidById)}</span> • {t.dividedAmong} {expenseData.splitAmongIds.length}
@@ -486,9 +785,22 @@ export default function ExpenseTracker({
 
                     <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 border-t sm:border-t-0 border-white/5 pt-2 sm:pt-0">
                       <div className="text-left sm:text-right">
-                        <span className={`font-black font-mono text-xs sm:text-sm ${isChecked ? "text-white" : "text-slate-500 line-through"}`}>
-                          ${Number(expenseData.amount).toFixed(2)}
-                        </span>
+                        {(() => {
+                          const actTotal = getExpenseActualTotal(expenseData);
+                          const hasBonus = actTotal !== Number(expenseData.amount);
+                          return (
+                            <>
+                              <span className={`font-black font-mono text-xs sm:text-sm block ${isChecked ? "text-white" : "text-slate-500 line-through"}`}>
+                                ${actTotal.toFixed(2)}
+                              </span>
+                              {hasBonus && (
+                                <span className="block text-[10px] text-slate-500 line-through font-mono">
+                                  ${Number(expenseData.amount).toFixed(2)}
+                                </span>
+                              )}
+                            </>
+                          );
+                        })()}
                         <span className="block text-[9px] text-slate-500 font-mono mt-0.5">{expenseData.date}</span>
                       </div>
 

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 // @ts-ignore
 import worldMapImg from "../assets/images/world_map_dark_1781851264473.jpg";
 import { 
@@ -7,7 +7,6 @@ import {
   MapPin, 
   Compass, 
   Plus, 
-  Trash2, 
   Edit, 
   Shield,
   Layers,
@@ -16,7 +15,8 @@ import {
   DollarSign,
   Wallet,
   Activity,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Trip } from "../types";
@@ -46,15 +46,41 @@ interface TripDashboardProps {
   onDeleteTrip: (tripId: string) => Promise<void>;
 }
 
+// 地圖經緯度校正邊界常數 (由最小二乘法反推之真實有效經度與緯度邊界，完全對齊 1000x562.5 精緻深色世界地圖背景)
+export const MAP_LON_MIN = -151.7;
+export const MAP_LON_MAX = 193.2;
+export const MAP_LAT_MAX = 76.4;
+export const MAP_LAT_MIN = -59.8;
+
+/**
+ * 經緯度轉換為地圖容器內部的百分比座標位置 (gpsToPercent 譯自真實地圖幾何錨點)
+ * @param lat 緯度 (輸入經由 clamping 限制在 [-90, 90] 安全區間)
+ * @param lng 經度 (輸入經由 clamping 限制在 [-180, 180] 安全區間)
+ */
+export function gpsToPercent(lat: number, lng: number): { left: number; top: number } {
+  // 經度限制在 [-180, 180] 之間、緯度限制在 [-90, 90] 之間 (Clamping 座標安全邊界限制)
+  const clampedLat = Math.max(-90, Math.min(90, Number(lat)));
+  const clampedLng = Math.max(-180, Math.min(180, Number(lng)));
+
+  // X 軸經度線性投影公式 (Plate Carrée)
+  const left = ((clampedLng - MAP_LON_MIN) / (MAP_LON_MAX - MAP_LON_MIN)) * 100;
+
+  // Y 軸緯度線性投影公式 (Plate Carrée)，緯度愈高愈上方，故以 MAX 減之以反轉 Y 軸方向
+  const top = ((MAP_LAT_MAX - clampedLat) / (MAP_LAT_MAX - MAP_LAT_MIN)) * 100;
+
+  return { left, top };
+}
+
 // Deterministic high-fidelity hashing mapper for ANY translation or custom destination (Okinawa, Yilan, etc.)
 export function getCoordinatesForDestination(dest: string, lat?: number, lng?: number): { x: number; y: number } {
   // If we have explicit, real coordinate values from OpenStreetMap, project them perfectly onto our 1000x562.5 map
-  if (lat !== undefined && lng !== undefined) {
-    // Standard linear cylindrical equirectangular projection
-    const x = ((lng + 180) / 360) * 1000;
-    const y = ((90 - lat) / 180) * 562.5;
+  if (lat !== undefined && lat !== null && lng !== undefined && lng !== null && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
+    // 藉由精準 gpsToPercent 百分比定位函式得到對應的比例錨點位置於 map viewBox 中
+    const { left, top } = gpsToPercent(lat, lng);
+    const x = (left / 100) * 1000;
+    const y = (top / 100) * 562.5;
 
-    // Crop within canvas safely
+    // Crop within canvas safely with comfortable margin
     const safeX = Math.max(30, Math.min(970, x));
     const safeY = Math.max(30, Math.min(530, y));
     return { x: Math.round(safeX), y: Math.round(safeY) };
@@ -93,6 +119,7 @@ export function getCoordinatesForDestination(dest: string, lat?: number, lng?: n
     "新加坡": { x: 788, y: 277 },
     "sydney": { x: 920, y: 387 },
     "雪梨": { x: 920, y: 387 },
+    "悉尼": { x: 920, y: 387 },
     "iceland": { x: 439, y: 81 },
     "冰島": { x: 439, y: 81 },
     "hokkaido": { x: 898, y: 147 },
@@ -133,11 +160,54 @@ export default function TripDashboard({
   const [editBudget, setEditBudget] = useState(trip?.totalBudget || 3000);
   const [editStatus, setEditStatus] = useState<"active" | "inactive">(trip?.status || "active");
   const [hoveredTripId, setHoveredTripId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Mouse coordinate and boundaries tracking for dynamic follow-cursor Tooltip
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const cardContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardContainerRef.current) return;
+    const rect = cardContainerRef.current.getBoundingClientRect();
+    setMousePos({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    });
+  };
+
+  const getTooltipStyle = () => {
+    if (!cardContainerRef.current) return { left: "0px", top: "0px" };
+    const width = cardContainerRef.current.clientWidth;
+    const height = cardContainerRef.current.clientHeight;
+
+    const tooltipWidth = 240;  // Match our premium card styling dimensions
+    const tooltipHeight = 185; // Estimated height for the statistics/bars
+
+    let left = mousePos.x + 15;
+    let top = mousePos.y + 15;
+
+    // Flip horizontally if mouse is too close to the right edge
+    if (left + tooltipWidth > width) {
+      left = mousePos.x - tooltipWidth - 15;
+    }
+    // Flip vertically if mouse is too close to the bottom edge
+    if (top + tooltipHeight > height) {
+      top = mousePos.y - tooltipHeight - 15;
+    }
+
+    // Double guard limits to keep it perfectly within viewport padding boundaries
+    left = Math.max(8, Math.min(width - tooltipWidth - 8, left));
+    top = Math.max(8, Math.min(height - tooltipHeight - 8, top));
+
+    return {
+      left: `${left}px`,
+      top: `${top}px`,
+    };
+  };
 
   // Sync edit values when active trip updates
-  React.useEffect(() => {
+  useEffect(() => {
     if (trip) {
       setEditName(trip.name);
       setEditDestination(trip.destination);
@@ -213,20 +283,11 @@ export default function TripDashboard({
     });
   }, [trips]);
 
-  const handleSaveMeta = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await onEditTripMeta({
-        name: editName.trim(),
-        destination: editDestination.trim(),
-        totalBudget: Number(editBudget) || 3000,
-        status: editStatus
-      });
-      setIsEditing(false);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // Find which trip to display in the hover HUD panel (ONLY when hovering over a node)
+  const hudTrip = useMemo(() => {
+    if (!hoveredTripId) return null;
+    return mappedProjects.find(p => p.id === hoveredTripId) || null;
+  }, [hoveredTripId, mappedProjects]);
 
   const handleDeleteProject = async () => {
     const confirmMsg = lang === "zh" 
@@ -241,6 +302,21 @@ export default function TripDashboard({
       } finally {
         setIsDeleting(false);
       }
+    }
+  };
+
+  const handleSaveMeta = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await onEditTripMeta({
+        name: editName.trim(),
+        destination: editDestination.trim(),
+        totalBudget: Number(editBudget) || 3000,
+        status: editStatus
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -378,7 +454,7 @@ export default function TripDashboard({
           </div>
 
           {!isEditing && (
-            <div className="flex gap-2 flex-shrink-0 w-full md:w-auto mt-2 md:mt-0">
+            <div className="flex gap-2 flex-wrap md:flex-nowrap flex-shrink-0 w-full md:w-auto mt-2 md:mt-0">
               <button
                 onClick={() => setIsEditing(true)}
                 className="flex-1 md:flex-initial px-3.5 py-2 bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-white/5 transition flex items-center justify-center gap-1.5 text-xs font-black cursor-pointer"
@@ -386,6 +462,7 @@ export default function TripDashboard({
                 <Edit size={12} className="text-blue-400" />
                 <span>{lang === "zh" ? "快速修改此專案" : "Edit Active Trip"}</span>
               </button>
+
               <button
                 onClick={handleDeleteProject}
                 disabled={isDeleting || trips.length <= 1}
@@ -462,14 +539,18 @@ export default function TripDashboard({
             </span>
           </div>
 
-          {/* Dynamic high-contrast flat image world map visualizer */}
-          <div className="relative flex-1 w-full aspect-[16/9] min-h-[255px] select-none mt-4 rounded-xl border border-white/5 overflow-hidden bg-slate-950">
-            {/* Beautiful real generated world map JPG */}
+          {/* Dynamic high-contrast flat image world map visualizer (Zero overhead, High Performance) */}
+          <div 
+            ref={cardContainerRef}
+            onMouseMove={handleMouseMove}
+            className="relative flex-1 w-full aspect-[1000/562.5] select-none mt-4 rounded-xl border border-white/5 overflow-hidden bg-slate-950"
+          >
+            {/* Real generated world map JPG adjusted with object-fill to prevent any mathematical scaling drift */}
             <img 
               src={worldMapImg} 
               alt="World Map Grid Background" 
               referrerPolicy="no-referrer"
-              className="absolute inset-0 w-full h-full object-cover opacity-[0.55] select-none pointer-events-none"
+              className="absolute inset-0 w-full h-full object-fill opacity-[0.55] select-none pointer-events-none"
             />
             {/* Lat/Lng grid overlay lines */}
             <svg viewBox="0 0 1000 562.5" className="absolute inset-0 w-full h-full opacity-[0.25] select-none pointer-events-none">
@@ -498,10 +579,16 @@ export default function TripDashboard({
                 const topPct = (p.y / 562.5) * 100;
 
                 return (
+                  /* 
+                    1. 圖標基準點對齊 (HTML <div> 絕對定位):
+                    在此我們採用絕對定位的 HTML <div> 置於世界地圖背景（SVG 外部），
+                    因此必須加上 transform -translate-x-1/2 -translate-y-1/2
+                    以消除因元件左上角原點對齊所導致的基準點位移，使圖標幾何中心與經緯度落點完美一致。
+                  */
                   <div
                     key={p.id}
                     className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${leftPct}%`, top: `${topPct}%`, zIndex: isActive ? 15 : 10 }}
+                    style={{ left: `${leftPct}%`, top: `${topPct}%`, zIndex: isActive ? 50 : 30 }}
                     onMouseEnter={() => setHoveredTripId(p.id)}
                     onMouseLeave={() => setHoveredTripId(null)}
                   >
@@ -510,24 +597,24 @@ export default function TripDashboard({
                       {/* Pulsing Target Rings for the active project */}
                       {isActive && (
                         <>
-                          <div className="absolute w-10 h-10 rounded-full animate-ping border border-blue-500/30 bg-blue-500/5" />
-                          <div className="absolute w-6 h-6 rounded-full border border-blue-400/40" />
+                          <div className="absolute w-12 h-12 rounded-full animate-ping border border-blue-500/40 bg-blue-500/10" style={{ pointerEvents: 'none' }} />
+                          <div className="absolute w-7 h-7 rounded-full border border-blue-400/30" style={{ pointerEvents: 'none' }} />
                         </>
                       )}
 
-                      {/* Radar ring for non-active mapped pins */}
-                      {!isActive && (
-                        <div className="absolute w-5 h-5 rounded-full border border-zinc-500/10 hover:border-indigo-400/20" />
+                      {/* Radar ring for non-active mapped pins on hover */}
+                      {!isActive && isHovered && (
+                        <div className="absolute w-7 h-7 rounded-full border border-indigo-400/30 bg-indigo-500/5 animate-pulse" style={{ pointerEvents: 'none' }} />
                       )}
 
                       {/* Interactive Marker Pin Button */}
                       <button
                         type="button"
                         onClick={() => handleTriggerTripSwitch(p.id)}
-                        className={`w-3.5 h-3.5 rounded-full border border-1 transition-all shadow-lg flex items-center justify-center cursor-pointer ${
+                        className={`w-3.5 h-3.5 rounded-full border transition-all shadow-xl flex items-center justify-center cursor-pointer ${
                           isActive 
-                            ? "bg-blue-500 border-white scale-125 hover:bg-blue-400" 
-                            : "bg-indigo-600/90 border-slate-900 hover:scale-120 hover:bg-indigo-500 hover:border-white"
+                            ? "bg-blue-500 border-white scale-125 shadow-blue-500/50" 
+                            : "bg-indigo-600 border-slate-900 hover:scale-120 hover:bg-indigo-500 hover:border-white"
                         }`}
                         title={p.name}
                       >
@@ -535,66 +622,68 @@ export default function TripDashboard({
                         <div className={`w-1 h-1 rounded-full ${isActive ? 'bg-white' : 'bg-slate-200'}`} />
                       </button>
 
-                      {/* Interactive Tooltip Overlay */}
-                      <AnimatePresence>
-                        {isHovered && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 7, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 7, scale: 0.95 }}
-                            className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-950 border border-white/10 p-3 rounded-xl shadow-2xl text-[11px] whitespace-nowrap z-[100] text-slate-300 pointer-events-none min-w-[200px]"
-                          >
-                            <div className="flex justify-between items-center pb-1.5 border-b border-white/5">
-                              <span className="font-extrabold text-white leading-tight truncate max-w-[140px]">
-                                🌐 {p.name}
-                              </span>
-                              <span className={`text-[8px] px-1 py-0.2 rounded font-mono font-bold leading-none ${
-                                isActive ? 'bg-blue-600/15 border border-blue-500/20 text-blue-400' : 'bg-slate-900 border border-white/5 text-slate-400'
-                              }`}>
-                                {isActive ? (lang === "zh" ? '當前啟用' : 'Active') : (lang === "zh" ? '點擊切換' : 'Jump')}
-                              </span>
-                            </div>
 
-                            <div className="space-y-1 mt-2 text-[10px]">
-                              <p className="text-[10px] text-indigo-300 font-medium">
-                                📍 {lang === "zh" ? "漫遊站點：" : "Destination: "} <span className="font-extrabold text-white">{p.destination}</span>
-                              </p>
-                              
-                              <p className="text-slate-400 font-mono flex justify-between">
-                                <span>👥 {lang === "zh" ? "協作人數" : "Operators"}:</span>
-                                <span className="text-slate-300 font-bold">{p.membersCount} {lang === "zh" ? "員" : "Peers"}</span>
-                              </p>
 
-                              <p className="text-slate-400 font-mono flex justify-between">
-                                <span>📅 {lang === "zh" ? "旅行日期" : "Duration"}:</span>
-                                <span className="text-slate-300 font-bold">{p.startDate} ~ {p.endDate}</span>
-                              </p>
-
-                              {/* Progress spending bar spent/budget */}
-                              <div className="space-y-1 pt-1 border-t border-white/5">
-                                <div className="flex justify-between text-[9px] font-bold font-mono">
-                                  <span className="text-amber-400">💸 {lang === "zh" ? "累計花費:" : "Spent:"} ${p.spent}</span>
-                                  <span className="text-slate-400">/ ${p.totalBudget}</span>
-                                </div>
-                                <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-white/5">
-                                  <div 
-                                    className={`h-full rounded-full transition-all duration-500 ${
-                                      p.progressPercent > 80 ? 'bg-red-500' : p.progressPercent > 50 ? 'bg-amber-400' : 'bg-emerald-400'
-                                    }`}
-                                    style={{ width: `${p.progressPercent}%` }}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* Floating Dynamic HUD GPS Telemetry Panel (Follows mouse cursor and clamped inside map bounds) */}
+            {hudTrip && (
+              <div 
+                className="absolute w-[220px] md:w-[240px] bg-slate-950/95 backdrop-blur-[8px] border border-white/15 p-3.5 rounded-xl shadow-2xl z-50 text-[11px] text-slate-300 pointer-events-none select-none transition-transform duration-75 ease-out animate-in fade-in zoom-in-95"
+                style={{
+                  ...getTooltipStyle(),
+                }}
+              >
+                <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                  <span className="font-extrabold text-white text-[11px] leading-none truncate max-w-[130px] flex items-center gap-1">
+                    🌐 {hudTrip.name}
+                  </span>
+                  <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-mono font-bold leading-none ${
+                    trip?.id === hudTrip.id ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400' : 'bg-slate-900 border border-white/5 text-slate-400'
+                  }`}>
+                    {trip?.id === hudTrip.id ? (lang === "zh" ? '當前啟用' : 'Active') : (lang === "zh" ? '可點擊切換' : 'Jump')}
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 mt-2.5">
+                  <p className="text-[10px] text-indigo-300 font-medium">
+                    📍 {lang === "zh" ? "漫遊站點：" : "Destination: "} <span className="font-extrabold text-white">{hudTrip.destination}</span>
+                  </p>
+                  
+                  <p className="text-slate-400 font-mono flex justify-between">
+                    <span>👥 {lang === "zh" ? "協作人數" : "Operators"}:</span>
+                    <span className="text-slate-300 font-bold">{hudTrip.membersCount} {lang === "zh" ? "員" : "Peers"}</span>
+                  </p>
+
+                  <p className="text-slate-400 font-mono flex justify-between">
+                    <span>📅 {lang === "zh" ? "旅行日期" : "Duration"}:</span>
+                    <span className="text-slate-300 font-bold text-[9px]">{hudTrip.startDate} ~ {hudTrip.endDate}</span>
+                  </p>
+
+                  {/* Progress spending bar spent/budget */}
+                  <div className="space-y-1 pt-1.5 border-t border-white/5">
+                    <div className="flex justify-between text-[9px] font-bold font-mono">
+                      <span className="text-amber-400">💸 {lang === "zh" ? "累計花費:" : "Spent:"} ${hudTrip.spent}</span>
+                      <span className="text-slate-400">/ ${hudTrip.totalBudget}</span>
+                    </div>
+                    <div className="w-full bg-slate-900/80 h-1.5 rounded-full overflow-hidden border border-white/5">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          hudTrip.progressPercent > 80 ? 'bg-red-500' : hudTrip.progressPercent > 50 ? 'bg-amber-400' : 'bg-emerald-400'
+                        }`}
+                        style={{ width: `${hudTrip.progressPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+
         </div>
 
         {/* Project Selector List Quick Jump */}

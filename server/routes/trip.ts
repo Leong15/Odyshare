@@ -92,23 +92,51 @@ router.post("/update-location", (req: Request, res: Response) => {
 // 1. Get current active trip data
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const data = readTripsDB(req);
+    let data = readTripsDB(req);
+    let updatedDbNeeded = false;
+    const db = getDB();
+
     // Lazy resolve coordinates using completely free, public OSM Nominatim if missing and destination is set
-    if (data && (data.lat === undefined || data.lng === undefined) && data.destination && data.destination !== "Unknown Destination") {
+    if (data && (data.lat === undefined || data.lat === null || data.lng === undefined || data.lng === null) && data.destination && data.destination !== "Unknown Destination") {
       const coords = await getCoordsWithTimeout(data.destination);
       if (coords) {
         data.lat = coords.lat;
         data.lng = coords.lng;
         // save back to server db
-        const db = getDB();
         const tIdx = db.trips.findIndex(t => t.id === data.id);
         if (tIdx !== -1) {
           db.trips[tIdx].lat = coords.lat;
           db.trips[tIdx].lng = coords.lng;
-          writeDB(db);
+          updatedDbNeeded = true;
         }
       }
     }
+
+    // Also lazy resolve coordinates for ALL other trips in tripsList!
+    if (data && data.tripsList) {
+      for (const t of data.tripsList) {
+        if ((t.lat === undefined || t.lat === null || t.lng === undefined || t.lng === null) && t.destination && t.destination !== "Unknown Destination") {
+          const coords = await getCoordsWithTimeout(t.destination);
+          if (coords) {
+            t.lat = coords.lat;
+            t.lng = coords.lng;
+            const tIdx = db.trips.findIndex(tripItem => tripItem.id === t.id);
+            if (tIdx !== -1) {
+              db.trips[tIdx].lat = coords.lat;
+              db.trips[tIdx].lng = coords.lng;
+              updatedDbNeeded = true;
+            }
+          }
+        }
+      }
+    }
+
+    if (updatedDbNeeded) {
+      writeDB(db);
+      // reload data to include proper state
+      data = readTripsDB(req);
+    }
+
     res.json(data);
   } catch (err: any) {
     console.error("GET /api/trip error:", err);
@@ -164,6 +192,52 @@ async function fetchCoordinates(destination: string): Promise<{ lat: number; lng
 
 async function getCoordsWithTimeout(destination: string): Promise<{ lat: number; lng: number } | null> {
   if (!destination || destination === "Unknown Destination") return null;
+
+  const destClean = destination.toLowerCase().trim();
+  const fallbackCityCoords: Record<string, { lat: number; lng: number }> = {
+    tokyo: { lat: 35.6762, lng: 139.6503 },
+    東京: { lat: 35.6762, lng: 139.6503 },
+    okinawa: { lat: 26.2124, lng: 127.6809 },
+    沖繩: { lat: 26.2124, lng: 127.6809 },
+    taipei: { lat: 25.0330, lng: 121.5654 },
+    台北: { lat: 25.0330, lng: 121.5654 },
+    yilan: { lat: 24.7570, lng: 121.7530 },
+    宜蘭: { lat: 24.7570, lng: 121.7530 },
+    "hong kong": { lat: 22.3193, lng: 114.1694 },
+    香港: { lat: 22.3193, lng: 114.1694 },
+    kyoto: { lat: 35.0116, lng: 135.7681 },
+    京都: { lat: 35.0116, lng: 135.7681 },
+    osaka: { lat: 34.6937, lng: 135.5023 },
+    大阪: { lat: 34.6937, lng: 135.5023 },
+    paris: { lat: 48.8566, lng: 2.3522 },
+    巴黎: { lat: 48.8566, lng: 2.3522 },
+    london: { lat: 51.5074, lng: -0.1278 },
+    倫敦: { lat: 51.5074, lng: -0.1278 },
+    "new york": { lat: 40.7128, lng: -74.0060 },
+    紐約: { lat: 40.7128, lng: -74.0060 },
+    rome: { lat: 41.9028, lng: 12.4964 },
+    羅馬: { lat: 41.9028, lng: 12.4964 },
+    seoul: { lat: 37.5665, lng: 126.9780 },
+    首爾: { lat: 37.5665, lng: 126.9780 },
+    bangkok: { lat: 13.7563, lng: 100.5018 },
+    曼谷: { lat: 13.7563, lng: 100.5018 },
+    singapore: { lat: 1.3521, lng: 103.8198 },
+    新加坡: { lat: 1.3521, lng: 103.8198 },
+    sydney: { lat: -33.8688, lng: 151.2093 },
+    雪梨: { lat: -33.8688, lng: 151.2093 },
+    悉尼: { lat: -33.8688, lng: 151.2093 },
+    iceland: { lat: 64.9631, lng: -19.0208 },
+    冰島: { lat: 64.9631, lng: -19.0208 },
+    hokkaido: { lat: 43.0621, lng: 141.3544 },
+    北海道: { lat: 43.0621, lng: 141.3544 }
+  };
+
+  for (const key of Object.keys(fallbackCityCoords)) {
+    if (destClean.includes(key) || key.includes(destClean)) {
+      return fallbackCityCoords[key];
+    }
+  }
+
   return Promise.race([
     fetchCoordinates(destination),
     new Promise<{ lat: number; lng: number } | null>((resolve) => setTimeout(() => resolve(null), 1500))
@@ -288,16 +362,57 @@ router.post("/delete", (req: Request, res: Response) => {
 });
 
 // 3. Add custom Itinerary point (with comments & coords)
-router.post("/itinerary/add", (req: Request, res: Response) => {
+router.post("/itinerary/add", async (req: Request, res: Response) => {
   const current = readTripsDB(req);
+  const { title, locationName, coordinates } = req.body;
+  
+  const destString = locationName || title || "Unknown Location";
+  const coords = await getCoordsWithTimeout(destString);
+  let resolvedCoordinates = coordinates;
+  let lat = coords?.lat;
+  let lng = coords?.lng;
+  
+  if (coords) {
+    const destCenter = current.destination || "Tokyo";
+    let center = { lat: 35.6762, lng: 139.6503 };
+    const d = destCenter.toLowerCase();
+    if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
+      center = { lat: 22.3193, lng: 114.1694 };
+    } else if (d.includes("paris") || d.includes("巴黎")) {
+      center = { lat: 48.8566, lng: 2.3522 };
+    } else if (d.includes("london") || d.includes("倫敦")) {
+      center = { lat: 51.5074, lng: -0.1278 };
+    } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
+      center = { lat: 25.0330, lng: 121.5654 };
+    } else if (d.includes("new york") || d.includes("nyc")) {
+      center = { lat: 40.7128, lng: -74.0060 };
+    }
+    
+    const latOffset = coords.lat - center.lat;
+    const lngOffset = coords.lng - center.lng;
+    const y = 50 - (latOffset / 0.0015);
+    const x = 50 + (lngOffset / 0.0018);
+    resolvedCoordinates = {
+      x: Math.round(Math.max(5, Math.min(95, x))),
+      y: Math.round(Math.max(5, Math.min(95, y)))
+    };
+  }
+
   const newItem = {
     id: "it-" + Date.now(),
     votes: [],
     comments: [],
-    coordinates: req.body.coordinates || { x: Math.floor(Math.random() * 80) + 10, y: Math.floor(Math.random() * 80) + 10 },
+    coordinates: resolvedCoordinates || { x: Math.floor(Math.random() * 80) + 10, y: Math.floor(Math.random() * 80) + 10 },
     trafficStatus: ["smooth", "moderate", "congested"][Math.floor(Math.random() * 3)] as any,
+    lat,
+    lng,
     ...req.body
   };
+  
+  newItem.coordinates = resolvedCoordinates || newItem.coordinates;
+  newItem.lat = lat ?? newItem.lat;
+  newItem.lng = lng ?? newItem.lng;
+
   current.itineraries.push(newItem);
   
   // Post system message log
@@ -307,7 +422,7 @@ router.post("/itinerary/add", (req: Request, res: Response) => {
     senderName: "System",
     avatarColor: "#64748b",
     messageEncrypted: "",
-    messageDecrypted: `📌 Itinerary added: '${newItem.title}' (${newItem.locationName})`,
+    messageDecrypted: `📌 Itinerary added: '${newItem.title}' (${newItem.locationName || "No address"})`,
     timestamp: new Date().toISOString(),
     isTripUpdate: true
   };
@@ -318,18 +433,57 @@ router.post("/itinerary/add", (req: Request, res: Response) => {
 });
 
 // 3b. Edit an existing Itinerary point
-router.post("/itinerary/edit", (req: Request, res: Response) => {
-  const { id, title, description, locationName, time, category, cost, coordinates } = req.body;
+router.post("/itinerary/edit", async (req: Request, res: Response) => {
+  const { id, title, description, locationName, time, category, cost, coordinates, lat: inputLat, lng: inputLng } = req.body;
   const current = readTripsDB(req);
   const item = current.itineraries.find((i: any) => i.id === id);
   if (item) {
     if (title !== undefined) item.title = title;
     if (description !== undefined) item.description = description;
-    if (locationName !== undefined) item.locationName = locationName;
+    
+    if (locationName !== undefined) {
+      const oldLocation = item.locationName;
+      item.locationName = locationName;
+      
+      if (oldLocation !== locationName) {
+        const coords = await getCoordsWithTimeout(locationName);
+        if (coords) {
+          item.lat = coords.lat;
+          item.lng = coords.lng;
+          
+          const destCenter = current.destination || "Tokyo";
+          let center = { lat: 35.6762, lng: 139.6503 };
+          const d = destCenter.toLowerCase();
+          if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
+            center = { lat: 22.3193, lng: 114.1694 };
+          } else if (d.includes("paris") || d.includes("巴黎")) {
+            center = { lat: 48.8566, lng: 2.3522 };
+          } else if (d.includes("london") || d.includes("倫敦")) {
+            center = { lat: 51.5074, lng: -0.1278 };
+          } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
+            center = { lat: 25.0330, lng: 121.5654 };
+          } else if (d.includes("new york") || d.includes("nyc")) {
+            center = { lat: 40.7128, lng: -74.0060 };
+          }
+          
+          const latOffset = coords.lat - center.lat;
+          const lngOffset = coords.lng - center.lng;
+          const y = 50 - (latOffset / 0.0015);
+          const x = 50 + (lngOffset / 0.0018);
+          item.coordinates = {
+            x: Math.round(Math.max(5, Math.min(95, x))),
+            y: Math.round(Math.max(5, Math.min(95, y)))
+          };
+        }
+      }
+    }
+    
     if (time !== undefined) item.time = time;
     if (category !== undefined) item.category = category;
     if (cost !== undefined) item.cost = Number(cost) || 0;
     if (coordinates !== undefined) item.coordinates = coordinates;
+    if (inputLat !== undefined) item.lat = Number(inputLat);
+    if (inputLng !== undefined) item.lng = Number(inputLng);
     
     // Post system message log
     const systemMsg = {
@@ -338,7 +492,7 @@ router.post("/itinerary/edit", (req: Request, res: Response) => {
       senderName: "System",
       avatarColor: "#64748b",
       messageEncrypted: "",
-      messageDecrypted: `✏️ 行程更新：'${item.title}' (${item.locationName})`,
+      messageDecrypted: `✏️ 行程更新：'${item.title}' (${item.locationName || "No address"})`,
       timestamp: new Date().toISOString(),
       isTripUpdate: true
     };
