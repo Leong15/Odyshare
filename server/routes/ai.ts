@@ -9,8 +9,16 @@ let aiClient: GoogleGenAI | null = null;
 
 function getGenAI(): GoogleGenAI | null {
   if (!aiClient) {
-    const key = process.env.GEMINI_API_KEY;
-    if (key && key !== "MY_GEMINI_API_KEY" && key.trim() !== "") {
+    let key = process.env.GEMINI_API_KEY;
+    if (key) {
+      key = key.trim();
+      if (key.startsWith('"') && key.endsWith('"')) {
+        key = key.slice(1, -1).trim();
+      } else if (key.startsWith("'") && key.endsWith("'")) {
+        key = key.slice(1, -1).trim();
+      }
+    }
+    if (key && key !== "MY_GEMINI_API_KEY" && key !== "") {
       try {
         aiClient = new GoogleGenAI({
           apiKey: key,
