@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 // @ts-ignore
-import worldMapImg from "../assets/images/world_map_dark_1781851264473.jpg";
+import worldMapImg from "../assets/images/world_map_plate_carree.png";
 import { 
   TrendingUp, 
   Users, 
@@ -46,103 +46,33 @@ interface TripDashboardProps {
   onDeleteTrip: (tripId: string) => Promise<void>;
 }
 
-// 地圖經緯度校正邊界常數 (由最小二乘法反推之真實有效經度與緯度邊界，完全對齊 1000x562.5 精緻深色世界地圖背景)
-export const MAP_LON_MIN = -151.7;
-export const MAP_LON_MAX = 193.2;
-export const MAP_LAT_MAX = 76.4;
-export const MAP_LAT_MIN = -59.8;
+export const MAP_LON_MIN = -172.0;
+export const MAP_LON_MAX =  185.0;
+export const MAP_LAT_MAX =  97.0;
+export const MAP_LAT_MIN = -90.0;
 
-/**
- * 經緯度轉換為地圖容器內部的百分比座標位置 (gpsToPercent 譯自真實地圖幾何錨點)
- * @param lat 緯度 (輸入經由 clamping 限制在 [-90, 90] 安全區間)
- * @param lng 經度 (輸入經由 clamping 限制在 [-180, 180] 安全區間)
- */
 export function gpsToPercent(lat: number, lng: number): { left: number; top: number } {
-  // 經度限制在 [-180, 180] 之間、緯度限制在 [-90, 90] 之間 (Clamping 座標安全邊界限制)
-  const clampedLat = Math.max(-90, Math.min(90, Number(lat)));
-  const clampedLng = Math.max(-180, Math.min(180, Number(lng)));
-
-  // X 軸經度線性投影公式 (Plate Carrée)
-  const left = ((clampedLng - MAP_LON_MIN) / (MAP_LON_MAX - MAP_LON_MIN)) * 100;
-
-  // Y 軸緯度線性投影公式 (Plate Carrée)，緯度愈高愈上方，故以 MAX 減之以反轉 Y 軸方向
-  const top = ((MAP_LAT_MAX - clampedLat) / (MAP_LAT_MAX - MAP_LAT_MIN)) * 100;
-
-  return { left, top };
+  const clampedLat = Math.max(MAP_LAT_MIN, Math.min(MAP_LAT_MAX, Number(lat)));
+  const clampedLng = Math.max(MAP_LON_MIN, Math.min(MAP_LON_MAX, Number(lng)));
+  return {
+    left: ((clampedLng - MAP_LON_MIN) / (MAP_LON_MAX - MAP_LON_MIN)) * 100,
+    top:  ((MAP_LAT_MAX - clampedLat) / (MAP_LAT_MAX - MAP_LAT_MIN)) * 100,
+  };
 }
 
-// Deterministic high-fidelity hashing mapper for ANY translation or custom destination (Okinawa, Yilan, etc.)
-export function getCoordinatesForDestination(dest: string, lat?: number, lng?: number): { x: number; y: number } {
-  // If we have explicit, real coordinate values from OpenStreetMap, project them perfectly onto our 1000x562.5 map
-  if (lat !== undefined && lat !== null && lng !== undefined && lng !== null && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
-    // 藉由精準 gpsToPercent 百分比定位函式得到對應的比例錨點位置於 map viewBox 中
-    const { left, top } = gpsToPercent(lat, lng);
-    const x = (left / 100) * 1000;
-    const y = (top / 100) * 562.5;
-
-    // Crop within canvas safely with comfortable margin
-    const safeX = Math.max(30, Math.min(970, x));
-    const safeY = Math.max(30, Math.min(530, y));
-    return { x: Math.round(safeX), y: Math.round(safeY) };
+export function getCoordinatesForDestination(dest: string, lat?: number, lng?: number): { left: number; top: number } {
+  if (lat != null && lng != null && !isNaN(Number(lat)) && !isNaN(Number(lng))) {
+    return gpsToPercent(Number(lat), Number(lng));
   }
-
   const canonical = dest.toLowerCase().trim();
-  
-  const known: Record<string, { x: number; y: number }> = {
-    "tokyo": { x: 888, y: 170 },
-    "東京": { x: 888, y: 170 },
-    "okinawa": { x: 855, y: 199 },
-    "沖繩": { x: 855, y: 199 },
-    "taipei": { x: 838, y: 203 },
-    "台北": { x: 838, y: 203 },
-    "yilan": { x: 838, y: 204 },
-    "宜蘭": { x: 838, y: 204 },
-    "hong kong": { x: 817, y: 211 },
-    "香港": { x: 817, y: 211 },
-    "kyoto": { x: 877, y: 172 },
-    "京都": { x: 877, y: 172 },
-    "osaka": { x: 876, y: 173 },
-    "大阪": { x: 876, y: 173 },
-    "paris": { x: 506, y: 128 },
-    "巴黎": { x: 506, y: 128 },
-    "london": { x: 500, y: 120 },
-    "倫敦": { x: 500, y: 120 },
-    "new york": { x: 294, y: 154 },
-    "紐約": { x: 294, y: 154 },
-    "rome": { x: 535, y: 150 },
-    "羅馬": { x: 535, y: 150 },
-    "seoul": { x: 852, y: 164 },
-    "首爾": { x: 852, y: 164 },
-    "bangkok": { x: 779, y: 238 },
-    "曼谷": { x: 779, y: 238 },
-    "singapore": { x: 788, y: 277 },
-    "新加坡": { x: 788, y: 277 },
-    "sydney": { x: 920, y: 387 },
-    "雪梨": { x: 920, y: 387 },
-    "悉尼": { x: 920, y: 387 },
-    "iceland": { x: 439, y: 81 },
-    "冰島": { x: 439, y: 81 },
-    "hokkaido": { x: 898, y: 147 },
-    "北海道": { x: 898, y: 147 }
-  };
-
-  // Try parsing the destination string for exact/partial known keys
-  for (const k of Object.keys(known)) {
-    if (canonical.includes(k) || k.includes(canonical)) {
-      return known[k];
-    }
-  }
-
-  // Stable string hash generator for any user custom locations (宜蘭, 沖繩, any small towns)
   let hash = 0;
   for (let i = 0; i < canonical.length; i++) {
     hash = canonical.charCodeAt(i) + ((hash << 5) - hash);
   }
-  
-  // Cleanly map fallback coordinates onto world proportions (x: 160-840, y: 100-450)
-  const x = 160 + Math.abs((hash * 43) % 680);
-  const y = 100 + Math.abs((hash * 29) % 350);
-  return { x, y };
+  return {
+    left: 15 + Math.abs((hash * 43) % 70),
+    top:  10 + Math.abs((hash * 29) % 60),
+  };
 }
 
 export default function TripDashboard({
@@ -246,39 +176,30 @@ export default function TripDashboard({
     };
   }, [trips]);
 
-  // Compute unique placement offsets so multiple projects at the exact same location cluster gracefully
   const mappedProjects = useMemo(() => {
-    return trips.map((t, idx) => {
-      const baseCoords = getCoordinatesForDestination(t.destination, t.lat, t.lng);
-      
-      // Determine if there are other trips targeting the identical name/destination
+    return trips.map((t) => {
+      const basePos = getCoordinatesForDestination(t.destination, t.lat, t.lng);
       const identical = trips.filter(o => o.destination.toLowerCase().trim() === t.destination.toLowerCase().trim());
       const selfIndex = identical.findIndex(o => o.id === t.id);
-
-      let x = baseCoords.x;
-      let y = baseCoords.y;
-
+      let left = basePos.left;
+      let top = basePos.top;
       if (identical.length > 1) {
-        // Distribute them in a neat miniature glowing spiral satellite cluster style
         const angle = (selfIndex * (2 * Math.PI)) / identical.length;
-        const radius = 16;
-        x += Math.cos(angle) * radius;
-        y += Math.sin(angle) * radius;
+        left += Math.cos(angle) * 2;
+        top  += Math.sin(angle) * 2;
       }
-
-      // Calculate localized individual billing
+      left = Math.max(1, Math.min(99, left));
+      top  = Math.max(1, Math.min(99, top));
       const spent = t.expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
       const budget = t.totalBudget || 3000;
-      const progressPercent = Math.min(100, Math.round((spent / budget) * 100));
-
       return {
         ...t,
-        x,
-        y,
+        left,
+        top,
         spent,
-        progressPercent,
+        progressPercent: Math.min(100, Math.round((spent / budget) * 100)),
         membersCount: t.participants?.length || 1,
-        itinerariesCount: t.itineraries?.length || 0
+        itinerariesCount: t.itineraries?.length || 0,
       };
     });
   }, [trips]);
@@ -539,91 +460,75 @@ export default function TripDashboard({
             </span>
           </div>
 
-          {/* Dynamic high-contrast flat image world map visualizer (Zero overhead, High Performance) */}
-          <div 
+          <div
             ref={cardContainerRef}
             onMouseMove={handleMouseMove}
-            className="relative flex-1 w-full aspect-[1000/562.5] select-none mt-4 rounded-xl border border-white/5 overflow-hidden bg-slate-950"
+            className="relative w-full select-none mt-4 rounded-xl border border-white/5 overflow-hidden bg-slate-950"
+            style={{ aspectRatio: '2 / 1' }}
           >
-            {/* Real generated world map JPG adjusted with object-fill to prevent any mathematical scaling drift */}
-            <img 
-              src={worldMapImg} 
-              alt="World Map Grid Background" 
-              referrerPolicy="no-referrer"
-              className="absolute inset-0 w-full h-full object-fill opacity-[0.55] select-none pointer-events-none"
+            <img
+              src={worldMapImg}
+              alt="World Map"
+              className="absolute inset-0 w-full h-full pointer-events-none select-none"
+              style={{
+                objectFit: 'fill',
+                filter: 'invert(1) brightness(0.35) sepia(1) hue-rotate(180deg) saturate(3)',
+                opacity: 1
+              }}
             />
-            {/* Lat/Lng grid overlay lines */}
-            <svg viewBox="0 0 1000 562.5" className="absolute inset-0 w-full h-full opacity-[0.25] select-none pointer-events-none">
-              <line x1="0" y1="140" x2="1000" y2="140" stroke="#334155" strokeWidth="0.8" strokeDasharray="4,8" />
-              <line x1="0" y1="281" x2="1000" y2="281" stroke="#475569" strokeWidth="0.8" strokeDasharray="3,0" />
-              <line x1="0" y1="421" x2="1000" y2="421" stroke="#334155" strokeWidth="0.8" strokeDasharray="4,8" />
-              
-              <line x1="250" y1="0" x2="250" y2="562.5" stroke="#334155" strokeWidth="0.8" strokeDasharray="4,8" />
-              <line x1="500" y1="0" x2="500" y2="562.5" stroke="#475569" strokeWidth="0.8" strokeDasharray="3,0" />
-              <line x1="750" y1="0" x2="750" y2="562.5" stroke="#334155" strokeWidth="0.8" strokeDasharray="4,8" />
+
+            <svg
+              viewBox="0 0 360 180"
+              preserveAspectRatio="none"
+              className="absolute inset-0 w-full h-full opacity-20 pointer-events-none select-none"
+            >
+              <line x1="0" y1="90" x2="360" y2="90" stroke="#475569" strokeWidth="0.5" />
+              <line x1="0" y1="60" x2="360" y2="60" stroke="#334155" strokeWidth="0.4" strokeDasharray="2,4" />
+              <line x1="0" y1="120" x2="360" y2="120" stroke="#334155" strokeWidth="0.4" strokeDasharray="2,4" />
+              <line x1="180" y1="0" x2="180" y2="180" stroke="#475569" strokeWidth="0.5" />
             </svg>
 
-            {/* Latitude Coordinates Legend labels */}
-            <div className="absolute top-[25%] left-2 transform -translate-y-1/2 text-[8px] font-mono text-slate-500/70">30° N</div>
-            <div className="absolute top-[50%] left-2 transform -translate-y-1/2 text-[8px] font-mono text-slate-400/80">0° (Equator)</div>
-            <div className="absolute top-[75%] left-2 transform -translate-y-1/2 text-[8px] font-mono text-slate-500/70">30° S</div>
+            <div className="absolute left-2 text-[8px] font-mono text-slate-500/70 pointer-events-none"
+              style={{ top: '33.3%', transform: 'translateY(-50%)' }}>30° N</div>
+            <div className="absolute left-2 text-[8px] font-mono text-slate-400/80 pointer-events-none"
+              style={{ top: '50%', transform: 'translateY(-50%)' }}>0° (Equator)</div>
+            <div className="absolute left-2 text-[8px] font-mono text-slate-500/70 pointer-events-none"
+              style={{ top: '66.7%', transform: 'translateY(-50%)' }}>30° S</div>
 
-            {/* Glowing Interactive Project Constellation Nodes */}
             <div className="absolute inset-0">
               {mappedProjects.map((p) => {
                 const isHovered = hoveredTripId === p.id;
                 const isActive = trip?.id === p.id;
-                
-                // Convert percentage coordinates based on our 1000x562.5 canvas
-                const leftPct = (p.x / 1000) * 100;
-                const topPct = (p.y / 562.5) * 100;
-
                 return (
-                  /* 
-                    1. 圖標基準點對齊 (HTML <div> 絕對定位):
-                    在此我們採用絕對定位的 HTML <div> 置於世界地圖背景（SVG 外部），
-                    因此必須加上 transform -translate-x-1/2 -translate-y-1/2
-                    以消除因元件左上角原點對齊所導致的基準點位移，使圖標幾何中心與經緯度落點完美一致。
-                  */
                   <div
                     key={p.id}
                     className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${leftPct}%`, top: `${topPct}%`, zIndex: isActive ? 50 : 30 }}
+                    style={{ left: `${p.left}%`, top: `${p.top}%`, zIndex: isActive ? 50 : 30 }}
                     onMouseEnter={() => setHoveredTripId(p.id)}
                     onMouseLeave={() => setHoveredTripId(null)}
                   >
                     <div className="relative flex items-center justify-center">
-                      
-                      {/* Pulsing Target Rings for the active project */}
                       {isActive && (
                         <>
                           <div className="absolute w-12 h-12 rounded-full animate-ping border border-blue-500/40 bg-blue-500/10" style={{ pointerEvents: 'none' }} />
                           <div className="absolute w-7 h-7 rounded-full border border-blue-400/30" style={{ pointerEvents: 'none' }} />
                         </>
                       )}
-
-                      {/* Radar ring for non-active mapped pins on hover */}
                       {!isActive && isHovered && (
                         <div className="absolute w-7 h-7 rounded-full border border-indigo-400/30 bg-indigo-500/5 animate-pulse" style={{ pointerEvents: 'none' }} />
                       )}
-
-                      {/* Interactive Marker Pin Button */}
                       <button
                         type="button"
                         onClick={() => handleTriggerTripSwitch(p.id)}
                         className={`w-3.5 h-3.5 rounded-full border transition-all shadow-xl flex items-center justify-center cursor-pointer ${
-                          isActive 
-                            ? "bg-blue-500 border-white scale-125 shadow-blue-500/50" 
-                            : "bg-indigo-600 border-slate-900 hover:scale-120 hover:bg-indigo-500 hover:border-white"
+                          isActive
+                            ? "bg-blue-500 border-white scale-125 shadow-blue-500/50"
+                            : "bg-indigo-600 border-slate-900 hover:scale-110 hover:bg-indigo-500 hover:border-white"
                         }`}
                         title={p.name}
                       >
-                        {/* Tiny center point */}
                         <div className={`w-1 h-1 rounded-full ${isActive ? 'bg-white' : 'bg-slate-200'}`} />
                       </button>
-
-
-
                     </div>
                   </div>
                 );
