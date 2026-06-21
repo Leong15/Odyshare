@@ -70,6 +70,32 @@ export default function FlightHub({
   const [toCode, setToCode] = useState<string>("TYO");
   const [dateStr, setDateStr] = useState<string>("2026-10-12");
   
+  // Suggestions states
+  const [showFromSuggestions, setShowFromSuggestions] = useState(false);
+  const [showToSuggestions, setShowToSuggestions] = useState(false);
+
+  const filteredFromSuggestions = Object.keys(airportMap).filter(code => {
+    if (!fromCode) return true;
+    const search = fromCode.toLowerCase();
+    const item = airportMap[code];
+    return (
+      code.toLowerCase().includes(search) || 
+      item.zh.toLowerCase().includes(search) || 
+      item.en.toLowerCase().includes(search)
+    );
+  });
+
+  const filteredToSuggestions = Object.keys(airportMap).filter(code => {
+    if (!toCode) return true;
+    const search = toCode.toLowerCase();
+    const item = airportMap[code];
+    return (
+      code.toLowerCase().includes(search) || 
+      item.zh.toLowerCase().includes(search) || 
+      item.en.toLowerCase().includes(search)
+    );
+  });
+  
   // Trip style additions
   const [tripType, setTripType] = useState<"roundtrip" | "oneway">("roundtrip");
   const [returnDateStr, setReturnDateStr] = useState<string>("2026-10-19");
@@ -259,7 +285,7 @@ export default function FlightHub({
 
       {/* Flight Search Panel: support for full city name and codes */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white/3 border border-white/5 p-4 rounded-xl mb-5 text-xs">
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 relative">
           <label className="block text-[11px] font-bold text-slate-300 mb-1">
             {t.departureCity} {lang === "zh" ? "(全寫或縮寫，例如 LAX / 洛杉磯)" : "(Name / Airport code)"}
           </label>
@@ -267,13 +293,39 @@ export default function FlightHub({
             id="flight-from-input"
             type="text"
             value={fromCode}
-            onChange={(e) => setFromCode(e.target.value)}
+            onChange={(e) => {
+              setFromCode(e.target.value);
+              setShowFromSuggestions(true);
+            }}
+            onFocus={() => setShowFromSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowFromSuggestions(false), 200)}
             placeholder="e.g. LAX / Tokyo"
             className="w-full glass-input px-3 py-1.5 rounded-lg font-bold text-white uppercase"
           />
+          {showFromSuggestions && filteredFromSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-[150] divide-y divide-white/5 scrollbar-thin">
+              {filteredFromSuggestions.map(code => {
+                const item = airportMap[code];
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onMouseDown={() => {
+                      setFromCode(code);
+                      setShowFromSuggestions(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
+                  >
+                    <span>{lang === "zh" ? item.zh : item.en}</span>
+                    <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-bold uppercase">{code}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 relative">
           <label className="block text-[11px] font-bold text-slate-300 mb-1">
             {t.destinationCity} {lang === "zh" ? "(全寫或縮寫，例如 HND / 東京羽田)" : "(Name / Airport code)"}
           </label>
@@ -281,10 +333,36 @@ export default function FlightHub({
             id="flight-to-input"
             type="text"
             value={toCode}
-            onChange={(e) => setToCode(e.target.value)}
+            onChange={(e) => {
+              setToCode(e.target.value);
+              setShowToSuggestions(true);
+            }}
+            onFocus={() => setShowToSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowToSuggestions(false), 200)}
             placeholder="e.g. HND / Osaka"
             className="w-full glass-input px-3 py-1.5 rounded-lg font-bold text-white uppercase"
           />
+          {showToSuggestions && filteredToSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-[150] divide-y divide-white/5 scrollbar-thin">
+              {filteredToSuggestions.map(code => {
+                const item = airportMap[code];
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onMouseDown={() => {
+                      setToCode(code);
+                      setShowToSuggestions(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
+                  >
+                    <span>{lang === "zh" ? item.zh : item.en}</span>
+                    <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-bold uppercase">{code}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className={tripType === "roundtrip" ? "md:col-span-2" : "md:col-span-3"}>

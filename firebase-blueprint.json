@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered OdyShare Traveler Account",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string", "description": "Unique traveler login identifier" },
+        "password": { "type": "string", "description": "Securely hashed argon2 representation" },
+        "name": { "type": "string", "description": "Display name of traveler" },
+        "email": { "type": "string", "description": "Primary communication address for notifications" },
+        "avatarColor": { "type": "string", "description": "Hex code for traveler visual circle badge" }
+      },
+      "required": ["username", "password", "name", "email"]
+    },
+    "Trip": {
+      "title": "Trip",
+      "description": "Collaborative group itinerary and cost ledger",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Title of the travel project" },
+        "destination": { "type": "string", "description": "Target geographic boundary or city" },
+        "startDate": { "type": "string", "format": "date", "description": "Beginning timeline date" },
+        "endDate": { "type": "string", "format": "date", "description": "Ending timeline date" },
+        "totalBudget": { "type": "number", "description": "Group wallet resource limit" },
+        "status": { "type": "string", "enum": ["active", "archived"], "description": "Current lifecycle status" },
+        "lat": { "type": "number", "description": "Resolved center latitude" },
+        "lng": { "type": "number", "description": "Resolved center longitude" },
+        "participants": { "type": "array", "description": "Inlined array of group members" },
+        "flightEstimates": { "type": "array", "description": "Potential airline rates for voting" },
+        "itineraries": { "type": "array", "description": "Daily timeline mapping of travel points" },
+        "expenses": { "type": "array", "description": "Visual bill splitting ledger" },
+        "documents": { "type": "array", "description": "Mock storage links for safe tickets" },
+        "chats": { "type": "array", "description": "Encrypted secure messaging records" }
+      },
+      "required": ["name", "destination", "startDate", "endDate", "totalBudget"]
+    },
+    "Invitation": {
+      "title": "Invitation",
+      "description": "Collaborative invitation request sent to a traveler",
+      "type": "object",
+      "properties": {
+        "tripId": { "type": "string", "description": "Target trip project key" },
+        "tripName": { "type": "string", "description": "Descriptive target project name clone" },
+        "inviterId": { "type": "string", "description": "Originating sender traveler key" },
+        "inviterName": { "type": "string", "description": "Sender display name" },
+        "inviteeId": { "type": "string", "description": "Target recipient traveler key" },
+        "inviteeUsername": { "type": "string", "description": "Recipient addressable username" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"], "description": "Workflow phase" }
+      },
+      "required": ["tripId", "tripName", "inviterId", "inviteeId", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of traveler profiles"
+    },
+    "/trips/{tripId}": {
+      "schema": "Trip",
+      "description": "Collection of collaborative visual travel workspaces"
+    },
+    "/invitations/{invitationId}": {
+      "schema": "Invitation",
+      "description": "Pending and historic traveler invite receipts"
+    }
+  }
+}

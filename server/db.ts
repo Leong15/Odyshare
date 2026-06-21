@@ -1,9 +1,20 @@
 import path from "path";
 import fs from "fs";
 import { Request } from "express";
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, getDoc, setLogLevel } from "firebase/firestore";
 
-// Path to persistent DB file
+// Path to temporary DB file as a fallback
 export const DB_PATH = path.join(process.cwd(), "trips-db.json");
+
+// Set Firestore log level to 'error' to silent 'CANCELLED: Disconnecting idle stream' logs
+setLogLevel("error");
+
+// Load Firebase configuration safely from root
+const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+const firebaseApp = initializeApp(firebaseConfig);
+export const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || "default");
 
 // Initial default group trip to showcase features immediately
 export const DEFAULT_TRIP = {
@@ -230,73 +241,194 @@ export const DEFAULT_TRIP = {
   ]
 };
 
-// Initial state load helper
-export function getDB() {
-  let db: {
-    activeTripId: string;
-    users: any[];
-    trips: any[];
-    invitations: any[];
-  } = {
-    activeTripId: "tokyo-group-2026",
-    users: [
-      { id: "u1", username: "leo", password: "123", name: "Leo (You)", email: "leochau46@gmail.com", avatarColor: "#3b82f6" },
-      { id: "u2", username: "chloe", password: "123", name: "Chloe", email: "chloe.tan@example.com", avatarColor: "#ec4899" },
-      { id: "u3", username: "david", password: "123", name: "David", email: "david.w@example.com", avatarColor: "#10b981" },
-      { id: "u4", username: "sophy", password: "123", name: "Sophy", email: "sophy.k@example.com", avatarColor: "#f59e0b" }
-    ],
-    trips: [JSON.parse(JSON.stringify(DEFAULT_TRIP))],
-    invitations: []
-  };
-  if (fs.existsSync(DB_PATH)) {
-    try {
-      const raw = fs.readFileSync(DB_PATH, "utf-8");
-      const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.trips)) {
-        db = parsed;
-        if (!db.users || !Array.isArray(db.users) || db.users.length === 0) {
-          db.users = [
-            { id: "u1", username: "leo", password: "123", name: "Leo (You)", email: "leochau46@gmail.com", avatarColor: "#3b82f6" },
-            { id: "u2", username: "chloe", password: "123", name: "Chloe", email: "chloe.tan@example.com", avatarColor: "#ec4899" },
-            { id: "u3", username: "david", password: "123", name: "David", email: "david.w@example.com", avatarColor: "#10b981" },
-            { id: "u4", username: "sophy", password: "123", name: "Sophy", email: "sophy.k@example.com", avatarColor: "#f59e0b" }
-          ];
-        }
-        if (!db.invitations || !Array.isArray(db.invitations)) {
-          db.invitations = [];
-        }
-      } else if (parsed && parsed.id) {
-        // Upgrade flat structure
-        db = {
-          activeTripId: parsed.id || "tokyo-group-2026",
-          users: [
-            { id: "u1", username: "leo", password: "123", name: "Leo (You)", email: "leochau46@gmail.com", avatarColor: "#3b82f6" },
-            { id: "u2", username: "chloe", password: "123", name: "Chloe", email: "chloe.tan@example.com", avatarColor: "#ec4899" },
-            { id: "u3", username: "david", password: "123", name: "David", email: "david.w@example.com", avatarColor: "#10b981" },
-            { id: "u4", username: "sophy", password: "123", name: "Sophy", email: "sophy.k@example.com", avatarColor: "#f59e0b" }
-          ],
-          trips: [parsed],
-          invitations: []
-        };
-        writeDB(db);
-      }
-    } catch (err) {
-      console.error("Error parsing trips JSON DB:", err);
-    }
-  } else {
-    writeDB(db);
-  }
-  return db;
-}
+// Global memory cache representing our database state
+let memoryDB: {
+  activeTripId: string;
+  users: any[];
+  trips: any[];
+  invitations: any[];
+} = {
+  activeTripId: "tokyo-group-2026",
+  users: [
+    { id: "u1", username: "leo", password: "123", name: "Leo (You)", email: "leochau46@gmail.com", avatarColor: "#3b82f6" },
+    { id: "u2", username: "chloe", password: "123", name: "Chloe", email: "chloe.tan@example.com", avatarColor: "#ec4899" },
+    { id: "u3", username: "david", password: "123", name: "David", email: "david.w@example.com", avatarColor: "#10b981" },
+    { id: "u4", username: "sophy", password: "123", name: "Sophy", email: "sophy.k@example.com", avatarColor: "#f59e0b" }
+  ],
+  trips: [JSON.parse(JSON.stringify(DEFAULT_TRIP))],
+  invitations: []
+};
 
-export function writeDB(data: any) {
+// Initialize connection and pull initial documents to fill visual cache
+export async function initFirebase() {
+  console.log("[Firebase db.ts] Fetching stored documents from Cloud Firestore...");
   try {
-    fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2), "utf-8");
+    const usersSnapshot = await getDocs(collection(db, "users"));
+    const users: any[] = [];
+    usersSnapshot.forEach((doc) => {
+      users.push({ id: doc.id, ...doc.data() });
+    });
+
+    const tripsSnapshot = await getDocs(collection(db, "trips"));
+    const trips: any[] = [];
+    tripsSnapshot.forEach((doc) => {
+      trips.push({ id: doc.id, ...doc.data() });
+    });
+
+    const invSnapshot = await getDocs(collection(db, "invitations"));
+    const invitations: any[] = [];
+    invSnapshot.forEach((doc) => {
+      invitations.push({ id: doc.id, ...doc.data() });
+    });
+
+    const configDoc = await getDoc(doc(db, "config", "active"));
+    let activeTripId = "tokyo-group-2026";
+    if (configDoc.exists()) {
+      activeTripId = configDoc.data().activeTripId || activeTripId;
+    }
+
+    if (trips.length === 0) {
+      console.log("[Firebase db.ts] Firestore collection is blank. Seeding with high-fidelity defaults...");
+      
+      const defaultUsers = [
+        { id: "u1", username: "leo", password: "123", name: "Leo (You)", email: "leochau46@gmail.com", avatarColor: "#3b82f6" },
+        { id: "u2", username: "chloe", password: "123", name: "Chloe", email: "chloe.tan@example.com", avatarColor: "#ec4899" },
+        { id: "u3", username: "david", password: "123", name: "David", email: "david.w@example.com", avatarColor: "#10b981" },
+        { id: "u4", username: "sophy", password: "123", name: "Sophy", email: "sophy.k@example.com", avatarColor: "#f59e0b" }
+      ];
+      for (const u of defaultUsers) {
+        const { id, ...uData } = u;
+        await setDoc(doc(db, "users", id), uData);
+      }
+      
+      await setDoc(doc(db, "trips", DEFAULT_TRIP.id), DEFAULT_TRIP);
+      await setDoc(doc(db, "config", "active"), { activeTripId: "tokyo-group-2026" });
+
+      memoryDB = {
+        activeTripId: "tokyo-group-2026",
+        users: defaultUsers,
+        trips: [JSON.parse(JSON.stringify(DEFAULT_TRIP))],
+        invitations: []
+      };
+      
+      // Seed fallback local copy for reference
+      try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(memoryDB, null, 2), "utf-8");
+      } catch (e) {}
+    } else {
+      memoryDB = {
+        activeTripId,
+        users,
+        trips,
+        invitations
+      };
+      console.log(`[Firebase db.ts] Loaded Firestore dataset: Users (${users.length}), Trips (${trips.length}), Invitations (${invitations.length})`);
+    }
   } catch (err) {
-    console.error("Error writing db:", err);
+    console.error("[Firebase db.ts] Failed to establish active session with Firestore on boot:", err);
+    // Fall back to local file if available
+    if (fs.existsSync(DB_PATH)) {
+      try {
+        const raw = fs.readFileSync(DB_PATH, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed?.trips) {
+          memoryDB = parsed;
+          console.log("[Firebase db.ts] Safely failed back to cached local DB state.");
+        }
+      } catch (e) {}
+    }
   }
 }
 
+// Synchronous fetch of current state
+export function getDB() {
+  return memoryDB;
+}
+
+// Background Delta Sync of Cache to Firestore (zero lock times, high responsiveness)
+export function writeDB(data: any) {
+  const oldDB = { ...memoryDB };
+  memoryDB = {
+    activeTripId: data.activeTripId || memoryDB.activeTripId,
+    users: Array.isArray(data.users) ? data.users : memoryDB.users,
+    trips: Array.isArray(data.trips) ? data.trips : memoryDB.trips,
+    invitations: Array.isArray(data.invitations) ? data.invitations : memoryDB.invitations
+  };
+
+  // Run async firestore updates
+  (async () => {
+    try {
+      // 1. Sync Active Config
+      if (memoryDB.activeTripId !== oldDB.activeTripId) {
+        await setDoc(doc(db, "config", "active"), { activeTripId: memoryDB.activeTripId });
+      }
+
+      // 2. Sync Users
+      const oldUsers = new Map(oldDB.users.map(u => [u.id, u]));
+      const newUsers = new Map(memoryDB.users.map(u => [u.id, u]));
+
+      for (const [id, u] of newUsers.entries()) {
+        const oldU = oldUsers.get(id);
+        if (!oldU || JSON.stringify(oldU) !== JSON.stringify(u)) {
+          const payload = { ...u };
+          delete payload.id;
+          await setDoc(doc(db, "users", id), payload);
+        }
+      }
+      for (const id of oldUsers.keys()) {
+        if (!newUsers.has(id)) {
+          await deleteDoc(doc(db, "users", id));
+        }
+      }
+
+      // 3. Sync Trips Group
+      const oldTrips = new Map(oldDB.trips.map(t => [t.id, t]));
+      const newTrips = new Map(memoryDB.trips.map(t => [t.id, t]));
+
+      for (const [id, t] of newTrips.entries()) {
+        const oldT = oldTrips.get(id);
+        if (!oldT || JSON.stringify(oldT) !== JSON.stringify(t)) {
+          const payload = { ...t };
+          delete payload.id;
+          await setDoc(doc(db, "trips", id), payload);
+        }
+      }
+      for (const id of oldTrips.keys()) {
+        if (!newTrips.has(id)) {
+          await deleteDoc(doc(db, "trips", id));
+        }
+      }
+
+      // 4. Sync Invitations
+      const oldInvs = new Map(oldDB.invitations.map(i => [i.id, i]));
+      const newInvs = new Map(memoryDB.invitations.map(i => [i.id, i]));
+
+      for (const [id, i] of newInvs.entries()) {
+        const oldI = oldInvs.get(id);
+        if (!oldI || JSON.stringify(oldI) !== JSON.stringify(i)) {
+          const payload = { ...i };
+          delete payload.id;
+          await setDoc(doc(db, "invitations", id), payload);
+        }
+      }
+      for (const id of oldInvs.keys()) {
+        if (!newInvs.has(id)) {
+          await deleteDoc(doc(db, "invitations", id));
+        }
+      }
+
+      // Backup to disk too
+      try {
+        fs.writeFileSync(DB_PATH, JSON.stringify(memoryDB, null, 2), "utf-8");
+      } catch (e) {}
+
+    } catch (error) {
+      console.error("[Firebase db.ts] Failed to synchronize delta states to Cloud Firestore:", error);
+    }
+  })();
+}
+
+// Standard Request-scoped helpers
 export function getTripForRequest(req: Request) {
   const userId = req.headers["x-user-id"] as string;
   const tripId = req.headers["x-trip-id"] as string;
@@ -483,6 +615,3 @@ export function writeTripsDB(data: any, req?: Request) {
   }
   writeDB(db);
 }
-
-// Initialize on require
-getDB();

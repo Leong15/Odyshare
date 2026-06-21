@@ -39,6 +39,16 @@ export default function ItineraryPlanner({
   const [category, setCategory] = useState<ItineraryItem["category"]>("restaurant");
   const [cost, setCost] = useState<string>("35");
 
+  const maxItineraryDay = itineraries.reduce((max, item) => Math.max(max, item.dayIndex), 0);
+  const [totalDays, setTotalDays] = useState<number>(() => Math.max(3, maxItineraryDay + 1));
+
+  useEffect(() => {
+    const maxIdx = itineraries.reduce((max, item) => Math.max(max, item.dayIndex), 0);
+    if (maxIdx >= totalDays) {
+      setTotalDays(maxIdx + 1);
+    }
+  }, [itineraries]);
+
   const [activeCommentDrawerId, setActiveCommentDrawerId] = useState<string | null>(null);
   const [newCommentInput, setNewCommentInput] = useState<string>("");
 
@@ -144,7 +154,7 @@ export default function ItineraryPlanner({
   };
 
   const t = translations[lang];
-  const daysToShow = [0, 1, 2]; // 3-day view
+  const daysToShow = Array.from({ length: totalDays }, (_, i) => i);
 
   const filteredItems = itineraries
     .filter(item => item.dayIndex === activeDay)
@@ -247,7 +257,7 @@ export default function ItineraryPlanner({
           {/* Header Controls */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 border-b border-white/10 pb-4 text-xs">
             {/* Days Tabs */}
-            <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 backdrop-blur-md">
+            <div className="flex flex-wrap items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 backdrop-blur-md">
               {daysToShow.map((dayIdx) => (
                 <button
                   key={dayIdx}
@@ -265,6 +275,15 @@ export default function ItineraryPlanner({
                   {t.day} {dayIdx + 1} {lang === "zh" ? "天" : ""}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setTotalDays(prev => prev + 1)}
+                className="px-2.5 py-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 border border-transparent hover:border-blue-500/20"
+                title={lang === "zh" ? "增加日數" : "Add Day"}
+              >
+                <Plus size={13} />
+                <span>{lang === "zh" ? "增加天數" : "Add Day"}</span>
+              </button>
             </div>
 
             <button

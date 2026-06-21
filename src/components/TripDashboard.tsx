@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
-// @ts-ignore
-import worldMapImg from "../assets/images/world_map_plate_carree.png";
+import { POPULAR_HOT_PLACES } from "./CreateTripModal";
 import { 
   TrendingUp, 
   Users, 
@@ -92,6 +91,33 @@ export default function TripDashboard({
   const [hoveredTripId, setHoveredTripId] = useState<string | null>(null);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLightTheme, setIsLightTheme] = useState(false);
+  const [mapImgSrc, setMapImgSrc] = useState<string>("/world_map_plate_carree.png");
+
+  useEffect(() => {
+    setIsLightTheme(document.body.classList.contains("light-theme"));
+    const observer = new MutationObserver(() => {
+      setIsLightTheme(document.body.classList.contains("light-theme"));
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setMapImgSrc("/world_map_plate_carree.png");
+  }, []);
+
+  const [showEditSuggestions, setShowEditSuggestions] = useState(false);
+  const filteredEditSuggestions = POPULAR_HOT_PLACES.filter(place => {
+    if (!editDestination) return true;
+    const search = editDestination.toLowerCase();
+    return (
+      place.zh.toLowerCase().includes(search) || 
+      place.en.toLowerCase().includes(search) ||
+      place.countryZh.toLowerCase().includes(search) ||
+      place.countryEn.toLowerCase().includes(search)
+    );
+  });
 
   // Mouse coordinate and boundaries tracking for dynamic follow-cursor Tooltip
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -309,18 +335,43 @@ export default function TripDashboard({
                       required
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 relative">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wide">
                       {lang === "zh" ? "目的地 (可任意輸入任何地方)" : "Destination (Any Location)"}
                     </span>
                     <input
                       type="text"
                       value={editDestination}
-                      onChange={(e) => setEditDestination(e.target.value)}
+                      onChange={(e) => {
+                        setEditDestination(e.target.value);
+                        setShowEditSuggestions(true);
+                      }}
+                      onFocus={() => setShowEditSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowEditSuggestions(false), 200)}
                       className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
                       required
                       placeholder="e.g. 宜蘭, 沖繩, 巴黎"
                     />
+                    {showEditSuggestions && filteredEditSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-[200] divide-y divide-white/5 scrollbar-thin">
+                        {filteredEditSuggestions.map((place, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onMouseDown={() => {
+                              setEditDestination(lang === "zh" ? place.zh : place.en);
+                              setShowEditSuggestions(false);
+                            }}
+                            className="w-full text-left px-3.5 py-2 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
+                          >
+                            <span>{lang === "zh" ? `${place.zh} (${place.countryZh})` : `${place.en} (${place.countryEn})`}</span>
+                            <span className="text-[10px] text-slate-400 font-mono italic">
+                              {lang === "zh" ? place.en : place.zh}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wide">
@@ -463,17 +514,23 @@ export default function TripDashboard({
           <div
             ref={cardContainerRef}
             onMouseMove={handleMouseMove}
-            className="relative w-full select-none mt-4 rounded-xl border border-white/5 overflow-hidden bg-slate-950"
+            className="relative w-full select-none mt-4 rounded-xl border border-white/5 overflow-hidden bg-slate-900/40 glass-card"
             style={{ aspectRatio: '2 / 1' }}
           >
             <img
-              src={worldMapImg}
+              src={mapImgSrc}
               alt="World Map"
-              className="absolute inset-0 w-full h-full pointer-events-none select-none"
+              onError={() => {
+                // If local image fails to load, gracefully fall back to Wikimedia Commons equirectangular blank outline map
+                setMapImgSrc("https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/World_map_blank_black_white.svg/1024px-World_map_blank_black_white.svg.png");
+              }}
+              className="absolute inset-0 w-full h-full pointer-events-none select-none transition-all duration-300"
               style={{
                 objectFit: 'fill',
-                filter: 'invert(1) brightness(0.35) sepia(1) hue-rotate(180deg) saturate(3)',
-                opacity: 1
+                filter: isLightTheme
+                  ? 'invert(1) brightness(0.15) contrast(1.2)'
+                  : 'brightness(1.5) contrast(1.1) invert(0.85)',
+                opacity: isLightTheme ? 0.08 : 0.28
               }}
             />
 
