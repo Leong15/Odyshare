@@ -83,6 +83,31 @@ export default function App() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
+  // 12-Hour Session Timeout Listener
+  useEffect(() => {
+    if (!loggedInUserId) return;
+
+    const checkSession = () => {
+      const loginTime = localStorage.getItem("loginTimestamp");
+      if (loginTime) {
+        const elapsed = Date.now() - Number(loginTime);
+        const twelveHours = 12 * 60 * 60 * 1000;
+        if (elapsed > twelveHours) {
+          console.warn("Session expired (12 hours limit reached). Logging out...");
+          setAuthError(lang === "zh" ? "您的工作階段已過期 (12 小時)，請重新登入。" : "Your session has expired (12 hours timeout), please log in again.");
+          handleLogout();
+        }
+      } else {
+        // Fallback: set timestamp if user is logged in but has no timestamp saved
+        localStorage.setItem("loginTimestamp", Date.now().toString());
+      }
+    };
+
+    checkSession();
+    const interval = setInterval(checkSession, 30000); // Check every 30 seconds
+    return () => clearInterval(interval);
+  }, [loggedInUserId, lang]);
+
   // Request-scoper wrapper
   const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
     const uId = localStorage.getItem("loggedInUserId") || loggedInUserId || "";
@@ -250,6 +275,7 @@ export default function App() {
         localStorage.setItem("loggedInUserName", loggedUser.name);
         localStorage.setItem("loggedInUserColor", loggedUser.avatarColor || "#3b82f6");
         localStorage.setItem("loggedInUserUsername", loggedUser.username || "");
+        localStorage.setItem("loginTimestamp", Date.now().toString());
         setLoggedInUserId(loggedUser.id);
         setCurrentUser(loggedUser);
         
@@ -672,6 +698,8 @@ export default function App() {
     localStorage.removeItem("loggedInUserId");
     localStorage.removeItem("loggedInUserName");
     localStorage.removeItem("loggedInUserColor");
+    localStorage.removeItem("loggedInUserUsername");
+    localStorage.removeItem("loginTimestamp");
     setLoggedInUserId(null);
     setCurrentUser(null);
   };
@@ -1067,6 +1095,8 @@ export default function App() {
                   onPostAISystemMessage={handlePostAISystemMessage}
                   backupItineraries={trip.backupItineraries || []}
                   onRestoreItineraries={handleRestoreItineraries}
+                  onDeleteItineraryItem={handleDeleteItineraryItem}
+                  onUpdateItineraryItem={handleUpdateItineraryItem}
                 />
               )}
 
@@ -1084,6 +1114,8 @@ export default function App() {
                   onUpdateItineraryItem={handleUpdateItineraryItem}
                   onDeleteItineraryItem={handleDeleteItineraryItem}
                   lang={lang}
+                  tripLat={trip.lat}
+                  tripLng={trip.lng}
                 />
               )}
 

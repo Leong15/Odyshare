@@ -240,7 +240,7 @@ async function getCoordsWithTimeout(destination: string): Promise<{ lat: number;
 
   return Promise.race([
     fetchCoordinates(destination),
-    new Promise<{ lat: number; lng: number } | null>((resolve) => setTimeout(() => resolve(null), 1500))
+    new Promise<{ lat: number; lng: number } | null>((resolve) => setTimeout(() => resolve(null), 6000))
   ]);
 }
 

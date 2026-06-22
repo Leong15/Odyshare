@@ -101,6 +101,8 @@ interface OfflineMapSimulatorProps {
   lang?: "en" | "zh";
   participants?: Participant[];
   currentUserId?: string;
+  tripLat?: number;
+  tripLng?: number;
 }
 
 interface MapTarget {
@@ -125,7 +127,9 @@ export default function OfflineMapSimulator({
   onDeleteItineraryItem,
   lang = "en",
   participants = [],
-  currentUserId
+  currentUserId,
+  tripLat,
+  tripLng
 }: OfflineMapSimulatorProps) {
   const [viewMode, setViewMode] = useState<"simulator" | "leaflet">("leaflet");
   const [offlineMode, setOfflineMode] = useState<boolean>(false);
@@ -143,6 +147,9 @@ export default function OfflineMapSimulator({
 
   // Geolocation and navigation
   const [currentGeoLocation, setCurrentGeoLocation] = useState<{ lat: number; lng: number }>(() => {
+    if (tripLat !== undefined && tripLat !== null && tripLng !== undefined && tripLng !== null && !isNaN(Number(tripLat)) && !isNaN(Number(tripLng))) {
+      return { lat: Number(tripLat), lng: Number(tripLng) };
+    }
     return resolveLatLng(destination, destination, 34, 65);
   });
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -178,18 +185,22 @@ export default function OfflineMapSimulator({
 
   // Helper to convert real Lat/Lng standard coordinates to pseudo canvas X/Y
   const getSvgCoordsFromLatLng = (lat: number, lng: number): { x: number; y: number } => {
-    const d = destination.toLowerCase();
     let center = { lat: 35.6762, lng: 139.6503 }; // Tokyo default
-    if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
-      center = { lat: 22.3193, lng: 114.1694 };
-    } else if (d.includes("paris") || d.includes("巴黎")) {
-      center = { lat: 48.8566, lng: 2.3522 };
-    } else if (d.includes("london") || d.includes("倫敦")) {
-      center = { lat: 51.5074, lng: -0.1278 };
-    } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
-      center = { lat: 25.0330, lng: 121.5654 };
-    } else if (d.includes("new york") || d.includes("nyc")) {
-      center = { lat: 40.7128, lng: -74.0060 };
+    if (tripLat !== undefined && tripLat !== null && tripLng !== undefined && tripLng !== null && !isNaN(Number(tripLat)) && !isNaN(Number(tripLng))) {
+      center = { lat: Number(tripLat), lng: Number(tripLng) };
+    } else {
+      const d = destination.toLowerCase();
+      if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
+        center = { lat: 22.3193, lng: 114.1694 };
+      } else if (d.includes("paris") || d.includes("巴黎")) {
+        center = { lat: 48.8566, lng: 2.3522 };
+      } else if (d.includes("london") || d.includes("倫敦")) {
+        center = { lat: 51.5074, lng: -0.1278 };
+      } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
+        center = { lat: 25.0330, lng: 121.5654 };
+      } else if (d.includes("new york") || d.includes("nyc")) {
+        center = { lat: 40.7128, lng: -74.0060 };
+      }
     }
 
     const y = 50 - (lat - center.lat) / 0.0015;
@@ -530,13 +541,15 @@ export default function OfflineMapSimulator({
       description: lang === "zh"
         ? `偵測到該地區的熱門推荐！當前路況判定：${spot.traffic === "smooth" ? "暢通" : spot.traffic === "moderate" ? "多車" : "壅塞"}`
         : `Explore local hotspot '${spot.name}' in active destination ${destination}. Traffic indicator: ${spot.traffic}`,
-      locationName: spot.name,
+      locationName: spot.lat && spot.lng && spot.isCustom ? `${spot.lat.toFixed(6)}, ${spot.lng.toFixed(6)}` : spot.name,
       category: spot.type === "food" ? "restaurant" : "sight",
       cost: 0,
       votes: [],
       comments: [],
       coordinates: { x: spot.x, y: spot.y },
-      trafficStatus: spot.traffic as any
+      trafficStatus: spot.traffic as any,
+      lat: spot.lat,
+      lng: spot.lng
     };
 
     setActiveItem(mockItem);
@@ -627,9 +640,10 @@ export default function OfflineMapSimulator({
     }
 
     if (!mapRef.current) {
-      const center = resolveLatLng(destination, destination, 50, 50);
+      const centerLat = tripLat !== undefined && tripLat !== null && !isNaN(Number(tripLat)) ? Number(tripLat) : resolveLatLng(destination, destination, 50, 50).lat;
+      const centerLng = tripLng !== undefined && tripLng !== null && !isNaN(Number(tripLng)) ? Number(tripLng) : resolveLatLng(destination, destination, 50, 50).lng;
       const mapInstance = L.map(mapContainerRef.current, {
-        center: [center.lat, center.lng],
+        center: [centerLat, centerLng],
         zoom: 12,
         attributionControl: false
       });

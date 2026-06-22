@@ -15,6 +15,8 @@ interface ItineraryPlannerProps {
   onPostAISystemMessage?: (text: string) => void;
   backupItineraries?: ItineraryItem[];
   onRestoreItineraries?: () => void;
+  onDeleteItineraryItem?: (itemId: string) => void;
+  onUpdateItineraryItem?: (item: ItineraryItem) => void;
 }
 
 export default function ItineraryPlanner({
@@ -28,7 +30,9 @@ export default function ItineraryPlanner({
   onApplyAIOptimization,
   onPostAISystemMessage,
   backupItineraries = [],
-  onRestoreItineraries
+  onRestoreItineraries,
+  onDeleteItineraryItem,
+  onUpdateItineraryItem
 }: ItineraryPlannerProps) {
   const [activeDay, setActiveDay] = useState<number>(0);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
@@ -284,6 +288,40 @@ export default function ItineraryPlanner({
                 <Plus size={13} />
                 <span>{lang === "zh" ? "增加天數" : "Add Day"}</span>
               </button>
+
+              {totalDays > 1 && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (onDeleteItineraryItem) {
+                      // Delete all items that fall into the activeDay index
+                      const itemsOnDay = itineraries.filter(item => item.dayIndex === activeDay);
+                      for (const item of itemsOnDay) {
+                        await onDeleteItineraryItem(item.id);
+                      }
+                      // Shift all items on subsequent days down by 1 day index
+                      const subsequentItems = itineraries.filter(item => item.dayIndex > activeDay);
+                      for (const item of subsequentItems) {
+                        if (onUpdateItineraryItem) {
+                          await onUpdateItineraryItem({
+                            ...item,
+                            dayIndex: item.dayIndex - 1
+                          });
+                        }
+                      }
+                    }
+                    // Decrement days count safely 
+                    setTotalDays(prev => Math.max(1, prev - 1));
+                    setActiveDay(prev => Math.max(0, Math.min(totalDays - 2, prev)));
+                    setActiveCommentDrawerId(null);
+                  }}
+                  className="px-2.5 py-1.5 text-rose-450 hover:text-rose-400 hover:bg-rose-500/10 font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1 border border-transparent hover:border-rose-500/15"
+                  title={lang === "zh" ? "刪除此天所有行程 & 移除這天" : "Delete active day and shift schedule"}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  <span>{lang === "zh" ? "刪除此天" : "Remove Day"}</span>
+                </button>
+              )}
             </div>
 
             <button
@@ -496,6 +534,24 @@ export default function ItineraryPlanner({
                           <MessageSquare size={11} className="text-slate-400" />
                           <span>{item.comments.length}</span>
                         </div>
+
+                        {/* Delete Activity Action Button */}
+                        {onDeleteItineraryItem && (
+                          <button
+                            id={`delete-activity-${item.id}`}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await onDeleteItineraryItem(item.id);
+                              if (activeCommentDrawerId === item.id) {
+                                setActiveCommentDrawerId(null);
+                              }
+                            }}
+                            className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-xl transition cursor-pointer flex items-center justify-center shrink-0"
+                            title={lang === "zh" ? "刪除此日程" : "Delete active itinerary"}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                          </button>
+                        )}
                       </div>
 
                       {/* Voter Avatars list */}
