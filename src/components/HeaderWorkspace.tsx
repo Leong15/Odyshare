@@ -35,6 +35,7 @@ export default function HeaderWorkspace({
   const isLight = theme === "light";
 
   const [showChangePwdModal, setShowChangePwdModal] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [currentPwd, setCurrentPwd] = useState("");
   const [newPwd, setNewPwd] = useState("");
   const [pwdError, setPwdError] = useState("");
@@ -111,47 +112,54 @@ export default function HeaderWorkspace({
 
           {/* Trip Project Dropdown */}
           <div className="flex items-center flex-wrap gap-2">
-            <div className="flex items-center bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl backdrop-blur-md text-xs">
-              <FolderLock size={12} className="text-blue-300 mr-2" />
-              <span className="text-[9.5px] font-extrabold text-slate-400 mr-1.5 uppercase tracking-wide select-none">
-                {lang === "zh" ? "旅程專案結構" : "Workspace:"}
-              </span>
-              
-              <select
-                id="trip-project-dropdown"
-                value={trip.id}
-                onChange={(e) => onSelectTrip(e.target.value)}
-                className="bg-transparent border-0 font-bold text-white text-xs leading-none focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none"
-              >
-                {(trip.tripsList || []).map(tOpt => (
-                  <option key={tOpt.id} value={tOpt.id} className="bg-slate-900 text-slate-100 font-extrabold text-xs">
-                    {tOpt.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <div className="flex items-center bg-white/5 border border-white/10 p-1 rounded-xl backdrop-blur-md text-xs">
+              <div className="flex items-center pl-2.5 pr-2 py-0.5">
+                <FolderLock size={12} className="text-blue-300 mr-2" />
+                <span className="text-[9.5px] font-extrabold text-slate-400 mr-1.5 uppercase tracking-wide select-none">
+                  {lang === "zh" ? "旅程專案" : "Workspace:"}
+                </span>
+                
+                <select
+                  id="trip-project-dropdown"
+                  value={trip.id}
+                  onChange={(e) => onSelectTrip(e.target.value)}
+                  className="bg-transparent border-0 font-bold text-white text-xs leading-none focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none mr-1.5 pr-1"
+                >
+                  {(trip.tripsList || []).map(tOpt => (
+                    <option key={tOpt.id} value={tOpt.id} className="bg-slate-900 text-slate-100 font-extrabold text-xs">
+                      {tOpt.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            {/* Create project button */}
-            <button
-              id="create-new-trip-btn"
-              onClick={onShowCreateTripModal}
-              className="p-1.5 px-2.5 bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/20 rounded-xl font-bold flex items-center gap-1 cursor-pointer transition text-[11px] text-blue-300"
-            >
-              <FolderPlus size={11.5} />
-              <span>{lang === "zh" ? "新增" : "+ New"}</span>
-            </button>
+              <div className="h-4.5 w-[1px] bg-white/15 mx-1" />
 
-            {/* Delete current project */}
-            {(trip.tripsList || []).length > 1 && (
+              {/* Create project button inside capsule */}
               <button
-                id="delete-trip-btn"
-                onClick={() => onDeleteTrip(trip.id)}
-                className="p-1.5 px-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/15 rounded-xl font-bold flex items-center gap-1 cursor-pointer transition text-[11px] text-rose-300"
-                title={lang === "zh" ? "刪除此行" : "Delete folder"}
+                id="create-new-trip-btn"
+                onClick={onShowCreateTripModal}
+                className="p-1 px-2.5 hover:bg-white/10 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition text-[11px] text-blue-300 hover:text-white"
               >
-                <Trash size={11} />
+                <FolderPlus size={11.5} />
+                <span>{lang === "zh" ? "新增" : "+ New"}</span>
               </button>
-            )}
+
+              {/* Delete current project inside capsule */}
+              {(trip.tripsList || []).length > 1 && (
+                <>
+                  <div className="h-4.5 w-[1px] bg-white/15 mx-1" />
+                  <button
+                    id="delete-trip-btn"
+                    onClick={() => onDeleteTrip(trip.id)}
+                    className="p-1 px-2 hover:bg-rose-500/20 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition text-[11px] text-rose-300"
+                    title={lang === "zh" ? "刪除此專案" : "Delete folder"}
+                  >
+                    <Trash size={11} />
+                  </button>
+                </>
+              )}
+            </div>
 
             {/* Dynamic Traveler Avatars Stack with Highlight Invite Button */}
             <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl backdrop-blur-md">
@@ -190,74 +198,97 @@ export default function HeaderWorkspace({
           
           {/* Profile Display Box */}
           {currentUser && (
-            <div className="flex items-center gap-1.5 animate-fadeIn">
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 p-1.5 px-3 rounded-xl text-xs backdrop-blur-md">
+            <div 
+              className="relative"
+              onMouseEnter={() => setShowUserDropdown(true)}
+              onMouseLeave={() => setShowUserDropdown(false)}
+            >
+              <button
+                type="button"
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="flex items-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 p-1.5 px-3 rounded-xl text-xs backdrop-blur-md cursor-pointer transition select-none"
+              >
                 <div
                   style={{ backgroundColor: currentUser.avatarColor }}
-                  className="w-5.5 h-5.5 rounded-full text-[9.5px] font-black text-white flex items-center justify-center border border-white/20 shadow-sm"
+                  className="w-5.5 h-5.5 rounded-full text-[9.5px] font-black text-white flex items-center justify-center border border-white/20 shadow-sm shrink-0 uppercase"
                 >
                   {currentUser.name[0]}
                 </div>
-                <span id="user-profile-display" className="font-bold text-white text-[11.5px] leading-none select-none font-sans">
+                <span id="user-profile-display" className="font-bold text-white text-[11.5px] leading-none font-sans max-w-[100px] truncate">
                   {currentUser.name}
                 </span>
-              </div>
+                <span className="text-[7.5px] text-slate-400">▼</span>
+              </button>
 
-              {/* Change Password Button */}
-              <button
-                id="header-change-password-btn"
-                type="button"
-                onClick={() => {
-                  setPwdError("");
-                  setPwdSuccess("");
-                  setCurrentPwd("");
-                  setNewPwd("");
-                  setShowChangePwdModal(true);
-                }}
-                className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/15 rounded-xl cursor-pointer transition-all flex items-center justify-center"
-                title={lang === "zh" ? "修改密碼" : "Change password"}
-              >
-                <span>🔑</span>
-              </button>
-              
-              {/* Logout Button */}
-              <button
-                onClick={onLogout}
-                className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-450 border border-rose-500/15 rounded-xl cursor-pointer transition-all flex items-center justify-center"
-                title={lang === "zh" ? "登出旅伴身分" : "Log out"}
-              >
-                <LogOut size={12} className="text-rose-400" />
-              </button>
+              {/* Popover actions dropdown */}
+              {showUserDropdown && (
+                <div className="absolute right-0 mt-1.5 w-36 bg-slate-950 border border-white/15 rounded-xl shadow-2xl py-1 z-50 text-[11px] flex flex-col backdrop-blur-lg animate-in fade-in slide-in-from-top-1 duration-100">
+                  <button
+                    id="header-change-password-btn"
+                    type="button"
+                    onClick={() => {
+                      setPwdError("");
+                      setPwdSuccess("");
+                      setCurrentPwd("");
+                      setNewPwd("");
+                      setShowChangePwdModal(true);
+                      setShowUserDropdown(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-slate-200 hover:bg-white/10 transition flex items-center gap-1.5 cursor-pointer font-bold leading-none"
+                  >
+                    <span>🔑</span>
+                    <span>{lang === "zh" ? "修改密碼" : "Password"}</span>
+                  </button>
+
+                  <div className="h-[1px] bg-white/10 my-0.5" />
+
+                  <button
+                    onClick={() => {
+                      onLogout();
+                      setShowUserDropdown(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-rose-400 hover:bg-rose-500/10 transition flex items-center gap-1.5 cursor-pointer font-bold leading-none"
+                  >
+                    <LogOut size={11} className="text-rose-455" />
+                    <span>{lang === "zh" ? "登出系統" : "Log out"}</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Light vs Dark Theme Selection */}
-          <button
-            id="theme-switch-btn"
-            type="button"
-            onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
-            className="p-1.5 py-2 px-2 bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl cursor-pointer transition-all flex items-center justify-center text-amber-300 backdrop-blur-md select-none text-xs"
-            title={lang === "zh" ? "日間/夜間主題切換" : "Toggle theme mode"}
-          >
-            {theme === "light" ? (
-              <Moon size={13} className="text-indigo-500 animate-pulse" />
-            ) : (
-              <Sun size={13} className="text-amber-400 animate-spin-slow" />
-            )}
-          </button>
-
-          {/* Language Selector */}
-          <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 p-1.5 px-2 rounded-xl text-xs backdrop-blur-md">
-            <Languages size={12} className="text-blue-400" />
-            <select
-              id="language-selector"
-              value={lang}
-              onChange={(e) => setLang(e.target.value as "en" | "zh")}
-              className="bg-transparent border-0 font-bold text-white text-[11.5px] focus:outline-none focus:ring-0 cursor-pointer p-0"
+          {/* Consolidated System Settings Capsule */}
+          <div className="flex items-center bg-white/5 border border-white/10 p-1 rounded-xl text-xs backdrop-blur-md">
+            {/* Light vs Dark Theme Selection */}
+            <button
+              id="theme-switch-btn"
+              type="button"
+              onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
+              className="p-1 px-2.5 hover:bg-white/10 rounded-lg cursor-pointer transition-all flex items-center justify-center text-amber-300 select-none text-xs"
+              title={lang === "zh" ? "日間/夜間主題切換" : "Toggle theme mode"}
             >
-              <option value="zh" className="bg-slate-900 text-slate-100">繁中 (ZH)</option>
-              <option value="en" className="bg-slate-900 text-slate-100">EN</option>
-            </select>
+              {theme === "light" ? (
+                <Moon size={12.5} className="text-indigo-400" />
+              ) : (
+                <Sun size={12.5} className="text-amber-400 animate-spin-slow" />
+              )}
+            </button>
+
+            <div className="h-4 w-[1px] bg-white/15 mx-1" />
+
+            {/* Language Selector */}
+            <div className="flex items-center gap-1.5 pl-1.5 pr-2 py-1">
+              <Languages size={11.5} className="text-blue-400" />
+              <select
+                id="language-selector"
+                value={lang}
+                onChange={(e) => setLang(e.target.value as "en" | "zh")}
+                className="bg-transparent border-0 font-bold text-white text-[11.5px] focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none pr-1"
+              >
+                <option value="zh" className="bg-slate-900 text-slate-100">繁中 (ZH)</option>
+                <option value="en" className="bg-slate-900 text-slate-100">EN</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

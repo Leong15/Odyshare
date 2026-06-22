@@ -47,7 +47,7 @@ export default function EncryptedWorkspaceChat({
   };
 
   return (
-    <div className="glass-container rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col h-[525px] border border-white/10 animate-fadeIn text-slate-100">
+    <div className="glass-container rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col h-[750px] md:h-[525px] border border-white/10 animate-fadeIn text-slate-100">
       {/* Top security status bar */}
       <div className="p-4 bg-slate-950/70 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5">
@@ -77,7 +77,7 @@ export default function EncryptedWorkspaceChat({
           {/* Scroll container */}
           <div
             ref={chatScrollRef}
-            className="flex-grow overflow-y-auto p-4 space-y-4 max-h-[380px] scrollbar-thin text-xs"
+            className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin text-xs"
           >
             {chats.map((msg) => {
               const isSystem = msg.senderId === "system";
@@ -196,7 +196,7 @@ export default function EncryptedWorkspaceChat({
         </div>
 
         {/* Right side: Active participants panel */}
-        <div className="w-full md:w-56 border-t md:border-t-0 md:border-l border-white/5 p-4 bg-slate-950/20 flex flex-col h-full shrink-0 justify-between">
+        <div className="w-full md:w-56 border-t md:border-t-0 md:border-l border-white/5 p-4 bg-slate-950/20 flex flex-col h-auto md:h-full shrink-0 justify-between">
           <div>
             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest block mb-4 flex items-center gap-1.5 leading-none">
               <Users size={11} className="text-blue-400" />

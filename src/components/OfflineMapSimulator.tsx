@@ -938,10 +938,10 @@ export default function OfflineMapSimulator({
   };
 
   return (
-    <div className="glass-container rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col md:flex-row h-[580px] border border-white/10 animate-fadeIn font-sans">
+    <div className="glass-container rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col md:flex-row h-[880px] md:h-[580px] border border-white/10 animate-fadeIn font-sans">
       
       {/* Left map controls panel */}
-      <div className="w-full md:w-80 border-r border-white/5 p-5 flex flex-col h-full bg-slate-950/20 backdrop-blur-md shrink-0">
+      <div className="w-full md:w-80 border-r border-white/5 p-5 flex flex-col h-[380px] md:h-full overflow-y-auto bg-slate-950/20 backdrop-blur-md shrink-0">
         
         {/* Live GPS positioning control for HTTPS compliant environments */}
         {viewMode === "leaflet" && (
@@ -1128,7 +1128,7 @@ export default function OfflineMapSimulator({
       </div>
 
       {/* Right Canvas Map Area with beautiful custom topographic styling background */}
-      <div className="flex-1 relative bg-[#0f111a] overflow-hidden min-h-[300px]">
+      <div className="flex-1 relative bg-[#0f111a] overflow-hidden min-h-[300px] h-[500px] md:h-full">
         
         {/* Top HUD float info bar */}
         <div className="absolute top-4 left-4 right-4 z-[4000] flex justify-between items-center pointer-events-none">
