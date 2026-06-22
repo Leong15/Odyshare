@@ -22,12 +22,12 @@ app.use(express.json());
 app.get("/world_map_plate_carree.png", (req, res) => {
   const filePath = path.join(process.cwd(), "src/assets/images/world_map_plate_carree.png");
   if (fs.existsSync(filePath)) {
-    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Content-Type", "image/jpeg");
     res.sendFile(filePath);
   } else {
     const distPath = path.join(process.cwd(), "dist/world_map_plate_carree.png");
     if (fs.existsSync(distPath)) {
-      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Content-Type", "image/jpeg");
       res.sendFile(distPath);
     } else {
       res.status(404).send("Not Found");

@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
+import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
 import { POPULAR_HOT_PLACES } from "./CreateTripModal";
 import { 
   TrendingUp, 
@@ -45,10 +46,10 @@ interface TripDashboardProps {
   onDeleteTrip: (tripId: string) => Promise<void>;
 }
 
-export const MAP_LON_MIN = -172.0;
-export const MAP_LON_MAX =  185.0;
-export const MAP_LAT_MAX =  97.0;
-export const MAP_LAT_MIN = -90.0;
+export const MAP_LON_MIN = -180.0;
+export const MAP_LON_MAX =  180.0;
+export const MAP_LAT_MAX =  92.0;
+export const MAP_LAT_MIN = -95.0;
 
 export function gpsToPercent(lat: number, lng: number): { left: number; top: number } {
   const clampedLat = Math.max(MAP_LAT_MIN, Math.min(MAP_LAT_MAX, Number(lat)));
@@ -92,7 +93,6 @@ export default function TripDashboard({
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLightTheme, setIsLightTheme] = useState(false);
-  const [mapImgSrc, setMapImgSrc] = useState<string>("/world_map_plate_carree.png");
 
   useEffect(() => {
     setIsLightTheme(document.body.classList.contains("light-theme"));
@@ -101,10 +101,6 @@ export default function TripDashboard({
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
     return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    setMapImgSrc("/world_map_plate_carree.png");
   }, []);
 
   const [showEditSuggestions, setShowEditSuggestions] = useState(false);
@@ -515,24 +511,42 @@ export default function TripDashboard({
             ref={cardContainerRef}
             onMouseMove={handleMouseMove}
             className="relative w-full select-none mt-4 rounded-xl border border-white/5 overflow-hidden bg-slate-900/40 glass-card"
-            style={{ aspectRatio: '2 / 1' }}
+            style={{
+              aspectRatio: '2 / 1',
+              backgroundColor: isLightTheme ? '#e0f2fe' : '#0a1628'
+            }}
           >
-            <img
-              src={mapImgSrc}
-              alt="World Map"
-              onError={() => {
-                // If local image fails to load, gracefully fall back to Wikimedia Commons equirectangular blank outline map
-                setMapImgSrc("https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/World_map_blank_black_white.svg/1024px-World_map_blank_black_white.svg.png");
+            <ComposableMap
+              projection="geoEquirectangular"
+              width={800}
+              height={400}
+              style={{ width: "100%", height: "100%", position: "absolute", inset: 0 }}
+              projectionConfig={{
+                scale: 128,
+                center: [0, 0]
               }}
-              className="absolute inset-0 w-full h-full pointer-events-none select-none transition-all duration-300"
-              style={{
-                objectFit: 'fill',
-                filter: isLightTheme
-                  ? 'invert(1) brightness(0.15) contrast(1.2)'
-                  : 'brightness(1.5) contrast(1.1) invert(0.85)',
-                opacity: isLightTheme ? 0.08 : 0.28
-              }}
-            />
+            >
+              <Geographies geography="https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json">
+                {({ geographies }) =>
+                  geographies.map((geo) => (
+                    <Geography
+                      key={geo.rsmKey}
+                      geography={geo}
+                      style={{
+                        default: {
+                          fill: isLightTheme ? "#cbd5e1" : "#1e3a5f",
+                          stroke: isLightTheme ? "#94a3b8" : "#0f2744",
+                          strokeWidth: 0.3,
+                          outline: "none",
+                        },
+                        hover: { fill: isLightTheme ? "#cbd5e1" : "#1e3a5f", outline: "none" },
+                        pressed: { fill: isLightTheme ? "#cbd5e1" : "#1e3a5f", outline: "none" },
+                      }}
+                    />
+                  ))
+                }
+              </Geographies>
+            </ComposableMap>
 
             <svg
               viewBox="0 0 360 180"
