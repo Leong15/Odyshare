@@ -193,8 +193,8 @@ export default function HeaderWorkspace({
           </div>
         </div>
 
-        {/* Active profile controls, Light Mode Toggle & Language switcher in Glass form */}
-        <div className="flex items-stretch sm:items-center gap-2.5 w-full lg:w-auto shrink-0 justify-end">
+        {/* Active profile controls, Light Mode Toggle & Language switcher (Absolute top-right on mobile) */}
+        <div className="absolute top-4 right-4 lg:relative lg:top-0 lg:right-0 flex items-center gap-2.5 z-40">
           
           {/* Profile Display Box */}
           {currentUser && (
@@ -222,7 +222,46 @@ export default function HeaderWorkspace({
 
               {/* Popover actions dropdown */}
               {showUserDropdown && (
-                <div className="absolute right-0 mt-1.5 w-36 bg-slate-950 border border-white/15 rounded-xl shadow-2xl py-1 z-50 text-[11px] flex flex-col backdrop-blur-lg animate-in fade-in slide-in-from-top-1 duration-100">
+                <div className="absolute right-0 mt-1.5 w-44 lg:w-36 bg-slate-950 border border-white/15 rounded-xl shadow-2xl py-1 z-50 text-[11px] flex flex-col backdrop-blur-lg animate-in fade-in slide-in-from-top-1 duration-100">
+                  
+                  {/* Mobile-only theme/mode and language integration */}
+                  <div className="px-3 py-1.5 text-slate-400 font-extrabold uppercase text-[9px] border-b border-white/10 lg:hidden block">
+                    {lang === "zh" ? "設定" : "System preferences"}
+                  </div>
+
+                  {/* Mode switcher inside list only for mobile */}
+                  <button
+                    type="button"
+                    onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
+                    className="lg:hidden w-full text-left px-3 py-2 text-slate-200 hover:bg-white/10 transition flex items-center justify-between cursor-pointer font-bold leading-none"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span>🌓</span>
+                      <span>{lang === "zh" ? "日間/夜間" : "Theme Mode"}</span>
+                    </span>
+                    <span className="text-amber-300">
+                      {theme === "light" ? <Moon size={11} /> : <Sun size={11} className="animate-spin-slow" />}
+                    </span>
+                  </button>
+
+                  {/* Language Selector inside list only for mobile */}
+                  <div className="lg:hidden w-full px-3 py-1.5 hover:bg-white/10 transition flex items-center justify-between font-bold leading-none">
+                    <span className="flex items-center gap-1.5 text-slate-200">
+                      <Languages size={11.5} className="text-blue-400" />
+                      <span>{lang === "zh" ? "語言" : "Language"}</span>
+                    </span>
+                    <select
+                      value={lang}
+                      onChange={(e) => setLang(e.target.value as "en" | "zh")}
+                      className="bg-transparent border-0 font-bold text-white text-[10px] focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none mr-1"
+                    >
+                      <option value="zh" className="bg-slate-900 text-slate-100">繁中</option>
+                      <option value="en" className="bg-slate-900 text-slate-100">EN</option>
+                    </select>
+                  </div>
+
+                  <div className="h-[1px] bg-white/10 my-0.5 lg:hidden" />
+
                   <button
                     id="header-change-password-btn"
                     type="button"
@@ -257,8 +296,8 @@ export default function HeaderWorkspace({
             </div>
           )}
 
-          {/* Consolidated System Settings Capsule */}
-          <div className="flex items-center bg-white/5 border border-white/10 p-1 rounded-xl text-xs backdrop-blur-md">
+          {/* Consolidated System Settings Capsule - Desktop-Only */}
+          <div className="hidden lg:flex items-center bg-white/5 border border-white/10 p-1 rounded-xl text-xs backdrop-blur-md">
             {/* Light vs Dark Theme Selection */}
             <button
               id="theme-switch-btn"

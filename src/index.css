@@ -264,34 +264,71 @@ body.light-theme .glass-button-secondary:hover {
   background: rgba(15, 23, 42, 0.12) !important;
 }
 
-body.light-theme .text-blue-300 {
-  color: #2563eb !important;
+body.light-theme .text-blue-100,
+body.light-theme .text-blue-200,
+body.light-theme .text-blue-300,
+body.light-theme .text-blue-400 {
+  color: #1d4ed8 !important;
 }
 
-body.light-theme .text-emerald-300 {
-  color: #16a34a !important;
+body.light-theme .text-emerald-100,
+body.light-theme .text-emerald-200,
+body.light-theme .text-emerald-300,
+body.light-theme .text-emerald-400 {
+  color: #047857 !important;
 }
 
-body.light-theme .text-pink-300 {
+body.light-theme .text-pink-100,
+body.light-theme .text-pink-200,
+body.light-theme .text-pink-300,
+body.light-theme .text-pink-400 {
   color: #db2777 !important;
 }
 
-body.light-theme .text-purple-300 {
-  color: #9333ea !important;
+body.light-theme .text-purple-100,
+body.light-theme .text-purple-200,
+body.light-theme .text-purple-300,
+body.light-theme .text-purple-400 {
+  color: #7e22ce !important;
 }
 
+body.light-theme .text-amber-100,
+body.light-theme .text-amber-200,
 body.light-theme .text-amber-300,
-body.light-theme .text-amber-400 {
-  color: #d97706 !important;
+body.light-theme .text-amber-400,
+body.light-theme .text-amber-505,
+body.light-theme .text-amber-500 {
+  color: #b45309 !important;
 }
 
-body.light-theme .text-sky-300 {
-  color: #0284c7 !important;
+body.light-theme .text-sky-100,
+body.light-theme .text-sky-200,
+body.light-theme .text-sky-300,
+body.light-theme .text-sky-400 {
+  color: #0369a1 !important;
 }
 
+body.light-theme .text-rose-100,
+body.light-theme .text-rose-200,
 body.light-theme .text-rose-300,
+body.light-theme .text-rose-400,
+body.light-theme .text-rose-455,
 body.light-theme .text-rose-450 {
-  color: #dc2626 !important;
+  color: #be123c !important;
+}
+
+body.light-theme .text-indigo-100,
+body.light-theme .text-indigo-200,
+body.light-theme .text-indigo-300,
+body.light-theme .text-indigo-400 {
+  color: #4338ca !important;
+}
+
+body.light-theme .text-teal-100,
+body.light-theme .text-teal-200,
+body.light-theme .text-teal-300,
+body.light-theme .text-teal-400 {
+  color: #0f766e !important;
 }
 
 body.light-theme .border-white\/5,

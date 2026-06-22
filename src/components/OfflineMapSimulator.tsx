@@ -938,7 +938,7 @@ export default function OfflineMapSimulator({
   };
 
   return (
-    <div className="glass-container rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col md:flex-row h-[880px] md:h-[580px] border border-white/10 animate-fadeIn font-sans">
+    <div className="glass-container rounded-2xl p-0 shadow-xl overflow-visible md:overflow-hidden flex flex-col md:flex-row h-auto md:h-[580px] border border-white/10 animate-fadeIn font-sans">
       
       {/* Left map controls panel */}
       <div className="w-full md:w-80 border-r border-white/5 p-5 flex flex-col h-[380px] md:h-full overflow-y-auto bg-slate-950/20 backdrop-blur-md shrink-0">
@@ -1150,7 +1150,7 @@ export default function OfflineMapSimulator({
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 15 }}
-              className="absolute bottom-4 left-4 right-4 z-[4000] bg-slate-900/95 border border-white/15 backdrop-blur-md rounded-2xl p-4 shadow-2xl text-white max-w-lg mx-auto overflow-y-auto max-h-[310px]"
+              className="absolute bottom-4 left-4 right-4 z-[4000] bg-slate-900/95 border border-white/15 backdrop-blur-md rounded-2xl p-3 sm:p-4 shadow-2xl text-white max-w-lg mx-auto overflow-y-auto max-h-[220px] md:max-h-[310px]"
             >
               {!isEditingActiveItem ? (
                 // VIEW INFO MODE

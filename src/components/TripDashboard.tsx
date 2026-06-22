@@ -139,6 +139,19 @@ export default function TripDashboard({
     const width = cardContainerRef.current.clientWidth;
     const height = cardContainerRef.current.clientHeight;
 
+    const isMobile = (typeof window !== "undefined" && window.innerWidth < 768) || (width < 500);
+    if (isMobile) {
+      return {
+        left: "12px",
+        right: "12px",
+        bottom: "12px",
+        top: "auto",
+        width: "auto",
+        position: "fixed" as const,
+        zIndex: 9999,
+      };
+    }
+
     const tooltipWidth = 260;  // Match our premium card styling dimensions
     const tooltipHeight = 185; // Estimated height for the statistics/bars
 
@@ -529,7 +542,7 @@ export default function TripDashboard({
       {/* Premium Constellation World Map section + Hover frequency */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* SVG Tactical Cyber Map View */}
-        <div className="lg:col-span-2 bg-slate-950 border border-white/10 rounded-2xl p-5 flex flex-col justify-between shadow-xl min-h-[400px] overflow-hidden relative">
+        <div className="lg:col-span-2 bg-slate-950 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xl min-h-[220px] md:min-h-[400px] overflow-hidden relative">
           <div className="flex justify-between items-start gap-4">
             <div>
               <span className="text-[10px] text-blue-400 font-mono font-bold tracking-widest uppercase block">
