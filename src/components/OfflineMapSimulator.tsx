@@ -465,7 +465,11 @@ export default function OfflineMapSimulator({
         lng: activeItem?.lng
       });
       if (activeItem) {
-        setCustomHotspots(prev => prev.filter(c => c.name !== activeItem.locationName));
+        setCustomHotspots(prev => prev.filter(c => {
+          const nameMatches = c.name !== activeItem.title && c.name !== activeItem.locationName;
+          const coordMatches = !(c.lat && activeItem.lat && Math.abs(c.lat - activeItem.lat) < 0.0001 && Math.abs(c.lng - activeItem.lng) < 0.0001);
+          return nameMatches && coordMatches;
+        }));
       }
       setActiveItem(null);
       setIsEditingActiveItem(false);
@@ -525,7 +529,11 @@ export default function OfflineMapSimulator({
         await onDeleteItineraryItem(activeItem.id);
       }
     } else {
-      setCustomHotspots(prev => prev.filter(c => c.name !== activeItem.locationName));
+      setCustomHotspots(prev => prev.filter(c => {
+        const nameMatches = c.name !== activeItem.title && c.name !== activeItem.locationName;
+        const coordMatches = !(c.lat && activeItem.lat && Math.abs(c.lat - activeItem.lat) < 0.0001 && Math.abs(c.lng - activeItem.lng) < 0.0001);
+        return nameMatches && coordMatches;
+      }));
     }
     setActiveItem(null);
     setIsEditingActiveItem(false);
@@ -935,32 +943,6 @@ export default function OfflineMapSimulator({
       {/* Left map controls panel */}
       <div className="w-full md:w-80 border-r border-white/5 p-5 flex flex-col h-full bg-slate-950/20 backdrop-blur-md shrink-0">
         
-        {/* Map View Mode Switcher */}
-        <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 mb-3 shrink-0 text-xs font-bold leading-none">
-          <button
-            type="button"
-            onClick={() => setViewMode("leaflet")}
-            className={`flex-1 py-1.8 rounded-lg transition-all cursor-pointer text-center text-[11px] ${
-              viewMode === "leaflet"
-                ? "bg-blue-600 text-white font-black shadow"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            🗺️ {lang === "zh" ? "Leaflet 地圖" : "Leaflet Map"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("simulator")}
-            className={`flex-1 py-1.8 rounded-lg transition-all cursor-pointer text-center text-[11px] ${
-              viewMode === "simulator"
-                ? "bg-blue-600 text-white font-black shadow"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            👾 {lang === "zh" ? "GPS 模擬器" : "GPS Simulator"}
-          </button>
-        </div>
-
         {/* Live GPS positioning control for HTTPS compliant environments */}
         {viewMode === "leaflet" && (
           <div className="mb-4 shrink-0 space-y-1.5">
@@ -992,18 +974,6 @@ export default function OfflineMapSimulator({
                 <p className="text-[9px] text-emerald-400 text-center font-mono bg-emerald-500/5 p-1 rounded-md">
                   ✅ Lat: {currentGeoLocation.lat.toFixed(4)}, Lng: {currentGeoLocation.lng.toFixed(4)}
                 </p>
-                <div className="flex items-center justify-between p-2 rounded-xl bg-blue-500/10 border border-blue-500/15 text-white">
-                  <span className="text-[9px] font-bold">🚶‍♂️ {lang === "zh" ? "實時移動模擬" : "Live Walk simulator"}</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsSimulatedMoving(!isSimulatedMoving)}
-                    className={`px-2.5 py-0.5 text-[9px] font-bold rounded cursor-pointer transition ${
-                      isSimulatedMoving ? "bg-emerald-600 text-white" : "bg-slate-700 text-slate-350"
-                    }`}
-                  >
-                    {isSimulatedMoving ? (lang === "zh" ? "開啟 (ON)" : "ON") : (lang === "zh" ? "關閉 (OFF)" : "OFF")}
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -1428,7 +1398,7 @@ export default function OfflineMapSimulator({
                         />
                       </div>
                       <div>
-                        <label className="text-[9px] text-slate-400 font-bold block mb-0.5">{lang === "zh" ? "預算 ($USD)" : "Budget ($)"}</label>
+                        <label className="text-[9px] text-slate-400 font-bold block mb-0.5">{lang === "zh" ? "預算 ($)" : "Budget ($)"}</label>
                         <input
                           type="number"
                           value={editCost}

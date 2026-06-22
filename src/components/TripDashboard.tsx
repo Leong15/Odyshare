@@ -16,7 +16,9 @@ import {
   Wallet,
   Activity,
   ArrowRightLeft,
-  Trash2
+  Trash2,
+  Search,
+  X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Trip } from "../types";
@@ -89,10 +91,12 @@ export default function TripDashboard({
   const [editDestination, setEditDestination] = useState(trip?.destination || "Tokyo");
   const [editBudget, setEditBudget] = useState(trip?.totalBudget || 3000);
   const [editStatus, setEditStatus] = useState<"active" | "inactive">(trip?.status || "active");
-  const [hoveredTripId, setHoveredTripId] = useState<string | null>(null);
+  const [hoveredLocationKey, setHoveredLocationKey] = useState<string | null>(null);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLightTheme, setIsLightTheme] = useState(false);
+  const [projectSearchQuery, setProjectSearchQuery] = useState("");
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   useEffect(() => {
     setIsLightTheme(document.body.classList.contains("light-theme"));
@@ -201,17 +205,8 @@ export default function TripDashboard({
   const mappedProjects = useMemo(() => {
     return trips.map((t) => {
       const basePos = getCoordinatesForDestination(t.destination, t.lat, t.lng);
-      const identical = trips.filter(o => o.destination.toLowerCase().trim() === t.destination.toLowerCase().trim());
-      const selfIndex = identical.findIndex(o => o.id === t.id);
-      let left = basePos.left;
-      let top = basePos.top;
-      if (identical.length > 1) {
-        const angle = (selfIndex * (2 * Math.PI)) / identical.length;
-        left += Math.cos(angle) * 2;
-        top  += Math.sin(angle) * 2;
-      }
-      left = Math.max(1, Math.min(99, left));
-      top  = Math.max(1, Math.min(99, top));
+      const left = Math.max(1, Math.min(99, basePos.left));
+      const top  = Math.max(1, Math.min(99, basePos.top));
       const spent = t.expenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
       const budget = t.totalBudget || 3000;
       return {
@@ -226,11 +221,47 @@ export default function TripDashboard({
     });
   }, [trips]);
 
-  // Find which trip to display in the hover HUD panel (ONLY when hovering over a node)
-  const hudTrip = useMemo(() => {
-    if (!hoveredTripId) return null;
-    return mappedProjects.find(p => p.id === hoveredTripId) || null;
-  }, [hoveredTripId, mappedProjects]);
+  const filteredProjects = useMemo(() => {
+    if (!projectSearchQuery.trim()) return mappedProjects;
+    const q = projectSearchQuery.toLowerCase().trim();
+    return mappedProjects.filter(p => 
+      p.name.toLowerCase().includes(q) || 
+      p.destination?.toLowerCase().includes(q)
+    );
+  }, [projectSearchQuery, mappedProjects]);
+
+  // Group pins by clean lowercase trimmed destination name
+  const groupedPins = useMemo(() => {
+    const groups: { [key: string]: typeof mappedProjects } = {};
+    mappedProjects.forEach(p => {
+      const key = p.destination.toLowerCase().trim();
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(p);
+    });
+
+    return Object.keys(groups).map((key) => {
+      const list = groups[key];
+      const hasActive = list.some(o => trip?.id === o.id);
+      const activeItem = list.find(o => trip?.id === o.id) || list[0];
+      return {
+        key,
+        destinationName: activeItem.destination,
+        left: activeItem.left,
+        top: activeItem.top,
+        trips: list,
+        hasActive,
+        id: activeItem.id
+      };
+    });
+  }, [mappedProjects, trip]);
+
+  // Find which grouped destination to display in the hover HUD panel
+  const hudGroup = useMemo(() => {
+    if (!hoveredLocationKey) return null;
+    return groupedPins.find(g => g.key === hoveredLocationKey) || null;
+  }, [hoveredLocationKey, groupedPins]);
 
   const handleDeleteProject = async () => {
     const confirmMsg = lang === "zh" 
@@ -371,7 +402,7 @@ export default function TripDashboard({
                   </div>
                   <div className="space-y-1">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wide">
-                      {lang === "zh" ? "經費預算 (USD)" : "Budget ($)"}
+                      {lang === "zh" ? "經費預算 ($)" : "Budget ($)"}
                     </span>
                     <input
                       type="number"
@@ -567,16 +598,16 @@ export default function TripDashboard({
               style={{ top: '66.7%', transform: 'translateY(-50%)' }}>30° S</div>
 
             <div className="absolute inset-0">
-              {mappedProjects.map((p) => {
-                const isHovered = hoveredTripId === p.id;
-                const isActive = trip?.id === p.id;
+              {groupedPins.map((g) => {
+                const isHovered = hoveredLocationKey === g.key;
+                const isActive = g.hasActive;
                 return (
                   <div
-                    key={p.id}
+                    key={g.key}
                     className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                    style={{ left: `${p.left}%`, top: `${p.top}%`, zIndex: isActive ? 50 : 30 }}
-                    onMouseEnter={() => setHoveredTripId(p.id)}
-                    onMouseLeave={() => setHoveredTripId(null)}
+                    style={{ left: `${g.left}%`, top: `${g.top}%`, zIndex: isActive ? 50 : 30 }}
+                    onMouseEnter={() => setHoveredLocationKey(g.key)}
+                    onMouseLeave={() => setHoveredLocationKey(null)}
                   >
                     <div className="relative flex items-center justify-center">
                       {isActive && (
@@ -590,13 +621,18 @@ export default function TripDashboard({
                       )}
                       <button
                         type="button"
-                        onClick={() => handleTriggerTripSwitch(p.id)}
+                        onClick={() => {
+                          const activeOrFirst = g.trips.find(p => p.id === trip?.id) || g.trips[0];
+                          if (activeOrFirst) {
+                            handleTriggerTripSwitch(activeOrFirst.id);
+                          }
+                        }}
                         className={`w-3.5 h-3.5 rounded-full border transition-all shadow-xl flex items-center justify-center cursor-pointer ${
                           isActive
                             ? "bg-blue-500 border-white scale-125 shadow-blue-500/50"
                             : "bg-indigo-600 border-slate-900 hover:scale-110 hover:bg-indigo-500 hover:border-white"
                         }`}
-                        title={p.name}
+                        title={g.destinationName}
                       >
                         <div className={`w-1 h-1 rounded-full ${isActive ? 'bg-white' : 'bg-slate-200'}`} />
                       </button>
@@ -606,55 +642,67 @@ export default function TripDashboard({
               })}
             </div>
 
-            {/* Floating Dynamic HUD GPS Telemetry Panel (Follows mouse cursor and clamped inside map bounds) */}
-            {hudTrip && (
+            {/* Floating Dynamic HUD GPS Telemetry Panel is grouped to show multiple projects if identical locations exist */}
+            {hudGroup && (
               <div 
-                className="absolute w-[220px] md:w-[240px] bg-slate-950/95 backdrop-blur-[8px] border border-white/15 p-3.5 rounded-xl shadow-2xl z-50 text-[11px] text-slate-300 pointer-events-none select-none transition-transform duration-75 ease-out animate-in fade-in zoom-in-95"
+                className="absolute w-[240px] md:w-[260px] bg-slate-950/95 backdrop-blur-[8px] border border-white/15 p-3.5 rounded-xl shadow-2xl z-50 text-[11px] text-slate-300 pointer-events-none select-none transition-transform duration-75 ease-out animate-in fade-in zoom-in-95"
                 style={{
                   ...getTooltipStyle(),
                 }}
               >
                 <div className="flex justify-between items-center pb-2 border-b border-white/10">
-                  <span className="font-extrabold text-white text-[11px] leading-none truncate max-w-[130px] flex items-center gap-1">
-                    🌐 {hudTrip.name}
+                  <span className="font-extrabold text-white text-[11.5px] leading-none truncate max-w-[160px] flex items-center gap-1">
+                    📍 {hudGroup.destinationName}
                   </span>
-                  <span className={`text-[8.5px] px-1.5 py-0.5 rounded font-mono font-bold leading-none ${
-                    trip?.id === hudTrip.id ? 'bg-blue-600/20 border border-blue-500/30 text-blue-400' : 'bg-slate-900 border border-white/5 text-slate-400'
-                  }`}>
-                    {trip?.id === hudTrip.id ? (lang === "zh" ? '當前啟用' : 'Active') : (lang === "zh" ? '可點擊切換' : 'Jump')}
+                  <span className="text-[8.5px] px-1.5 py-0.5 rounded font-mono font-bold leading-none bg-indigo-600/20 border border-indigo-500/30 text-indigo-400">
+                    {hudGroup.trips.length} {lang === "zh" ? "個專案" : "Projects"}
                   </span>
                 </div>
 
-                <div className="space-y-1.5 mt-2.5">
-                  <p className="text-[10px] text-indigo-300 font-medium">
-                    📍 {lang === "zh" ? "漫遊站點：" : "Destination: "} <span className="font-extrabold text-white">{hudTrip.destination}</span>
-                  </p>
-                  
-                  <p className="text-slate-400 font-mono flex justify-between">
-                    <span>👥 {lang === "zh" ? "協作人數" : "Operators"}:</span>
-                    <span className="text-slate-300 font-bold">{hudTrip.membersCount} {lang === "zh" ? "員" : "Peers"}</span>
-                  </p>
+                <div className="space-y-3 mt-2.5 max-h-[170px] overflow-y-auto pr-1">
+                  {hudGroup.trips.map((p, idx) => {
+                    const isActive = trip?.id === p.id;
+                    return (
+                      <div key={p.id} className={`space-y-1.5 ${idx > 0 ? "pt-2.5 border-t border-white/5" : ""}`}>
+                        <div className="flex items-center justify-between">
+                          <span className={`font-black text-[11px] truncate max-w-[155px] ${isActive ? "text-blue-400 font-extrabold" : "text-white"}`}>
+                            🌐 {p.name}
+                          </span>
+                          {isActive && (
+                            <span className="text-[7.5px] bg-blue-500/15 border border-blue-500/30 text-blue-400 px-1 py-0.1 rounded uppercase scale-90 font-mono font-black shrink-0">
+                              {lang === "zh" ? '啟用' : 'Active'}
+                            </span>
+                          )}
+                        </div>
 
-                  <p className="text-slate-400 font-mono flex justify-between">
-                    <span>📅 {lang === "zh" ? "旅行日期" : "Duration"}:</span>
-                    <span className="text-slate-300 font-bold text-[9px]">{hudTrip.startDate} ~ {hudTrip.endDate}</span>
-                  </p>
+                        <p className="text-slate-400 font-mono flex justify-between text-[10px]">
+                          <span>👥 {lang === "zh" ? "協作人員" : "Operators"}:</span>
+                          <span className="text-slate-300 font-bold">{p.membersCount} {lang === "zh" ? "人" : "Peers"}</span>
+                        </p>
 
-                  {/* Progress spending bar spent/budget */}
-                  <div className="space-y-1 pt-1.5 border-t border-white/5">
-                    <div className="flex justify-between text-[9px] font-bold font-mono">
-                      <span className="text-amber-400">💸 {lang === "zh" ? "累計花費:" : "Spent:"} ${hudTrip.spent}</span>
-                      <span className="text-slate-400">/ ${hudTrip.totalBudget}</span>
-                    </div>
-                    <div className="w-full bg-slate-900/80 h-1.5 rounded-full overflow-hidden border border-white/5">
-                      <div 
-                        className={`h-full rounded-full transition-all duration-500 ${
-                          hudTrip.progressPercent > 80 ? 'bg-red-500' : hudTrip.progressPercent > 50 ? 'bg-amber-400' : 'bg-emerald-400'
-                        }`}
-                        style={{ width: `${hudTrip.progressPercent}%` }}
-                      />
-                    </div>
-                  </div>
+                        <p className="text-slate-400 font-mono flex justify-between text-[10px]">
+                          <span>📅 {lang === "zh" ? "時程" : "Duration"}:</span>
+                          <span className="text-slate-300 font-bold text-[9px]">{p.startDate} ~ {p.endDate}</span>
+                        </p>
+
+                        {/* Spending indicator */}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-[9px] font-bold font-mono">
+                            <span className="text-amber-400">💸 ${p.spent}</span>
+                            <span className="text-slate-400">/ ${p.totalBudget}</span>
+                          </div>
+                          <div className="w-full bg-slate-900/80 h-1 rounded-full overflow-hidden border border-white/5">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-550 ${
+                                p.progressPercent > 80 ? 'bg-red-500' : p.progressPercent > 50 ? 'bg-amber-400' : 'bg-emerald-400'
+                              }`}
+                              style={{ width: `${p.progressPercent}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -673,52 +721,116 @@ export default function TripDashboard({
             </h4>
           </div>
 
-          <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[250px] pr-1.5 scrollbar-none">
-            {mappedProjects.map((t) => {
-              const isActive = trip?.id === t.id;
-              return (
+          {/* Autocomplete Search input */}
+          <div className="relative">
+            <div className="relative flex items-center bg-slate-950/60 rounded-xl border border-white/10 px-3 py-2 focus-within:border-blue-500/60 focus-within:ring-2 focus-within:ring-blue-500/15 transition-all">
+              <Search size={14} className="text-slate-400 shrink-0 mr-2" />
+              <input
+                type="text"
+                value={projectSearchQuery}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => {
+                  // Small timeout to allow suggestion click events to register
+                  setTimeout(() => setIsSearchFocused(false), 200);
+                }}
+                onChange={(e) => setProjectSearchQuery(e.target.value)}
+                placeholder={lang === "zh" ? "搜尋漫遊專案或目的地..." : "Search project or destination..."}
+                className="bg-transparent text-xs text-white placeholder-slate-500 w-full focus:outline-none"
+              />
+              {projectSearchQuery && (
                 <button
-                  key={t.id}
-                  onClick={() => handleTriggerTripSwitch(t.id)}
-                  className={`w-full text-left p-3.5 rounded-xl border transition flex items-center justify-between cursor-pointer ${
-                    isActive 
-                      ? "bg-blue-600/10 border-blue-500/80 text-white shadow-lg" 
-                      : "bg-slate-950/40 border-white/5 text-slate-400 hover:border-white/15 hover:bg-slate-950/60"
-                  }`}
+                  type="button"
+                  onClick={() => setProjectSearchQuery("")}
+                  className="p-1 text-slate-400 hover:text-white rounded-full hover:bg-white/5 transition cursor-pointer"
                 >
-                  <div className="truncate pr-2 w-full">
-                    <div className="flex items-center justify-between gap-1">
-                      <p className={`text-xs font-black truncate ${isActive ? "text-blue-400" : "text-white"}`}>
-                        {t.name}
-                      </p>
-                      {isActive ? (
-                        <span className="text-[8px] bg-blue-500/15 border border-blue-500/30 text-blue-400 px-1 py-0.2 rounded shrink-0">
-                          {t.status === "inactive" ? (lang === "zh" ? "當前啟用 (已停用)" : "ACTIVE (INACTIVE)") : (lang === "zh" ? "當前啟用" : "ACTIVE")}
-                        </span>
-                      ) : (
-                        <span className={`text-[8px] px-1 py-0.2 rounded shrink-0 border ${
-                          t.status === "inactive" 
-                            ? "bg-slate-800/20 border-slate-700 text-slate-500" 
-                            : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                        }`}>
-                          {t.status === "inactive" ? (lang === "zh" ? "已停用" : "INACTIVE") : (lang === "zh" ? "啟用中" : "ACTIVE")}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <p className="text-[10px] text-zinc-400 truncate mt-0.5 font-sans">
-                      📍 {t.destination || "Tokyo, Japan"}
-                    </p>
-
-                    <div className="flex justify-between text-[8.5px] text-slate-500 font-mono mt-1.5 border-t border-white/5 pt-1">
-                      <span>👤 {t.membersCount} {lang === "zh" ? "位成員" : "peers"}</span>
-                      <span>💸 ${t.spent} / ${t.totalBudget}</span>
-                    </div>
-                  </div>
-                  <ChevronRight size={13} className="text-slate-500 shrink-0 select-none ml-1" />
+                  <X size={12} />
                 </button>
-              );
-            })}
+              )}
+            </div>
+
+            {/* Auto-complete Suggestions Dropdown */}
+            {isSearchFocused && projectSearchQuery.trim() && (
+              <div className="absolute top-full left-0 right-0 mt-1.5 bg-slate-900 border border-white/15 rounded-xl shadow-2xl z-50 overflow-hidden max-h-[180px] overflow-y-auto">
+                {filteredProjects.length === 0 ? (
+                  <div className="p-3 text-center text-slate-500 text-[11px]">
+                    {lang === "zh" ? "找不到匹配的專案" : "No projects found"}
+                  </div>
+                ) : (
+                  filteredProjects.map((p) => (
+                    <button
+                      key={`suggest-${p.id}`}
+                      type="button"
+                      onMouseDown={() => {
+                        handleTriggerTripSwitch(p.id);
+                        setProjectSearchQuery("");
+                      }}
+                      className="w-full text-left px-3.5 py-2.5 hover:bg-blue-600/10 hover:text-white transition flex flex-col gap-0.5 border-b border-white/5 last:border-b-0 cursor-pointer"
+                    >
+                      <span className="text-xs font-bold text-white leading-tight truncate">
+                        {p.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-medium truncate">
+                        📍 {p.destination}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[220px] pr-1.5 scrollbar-none">
+            {filteredProjects.length === 0 ? (
+              <div className="p-5 text-center text-slate-500 text-[11px] bg-slate-950/20 border border-white/5 rounded-xl">
+                {lang === "zh" ? "無符合搜尋條件的漫遊專案" : "No matching trip workspaces"}
+              </div>
+            ) : (
+              filteredProjects.map((t) => {
+                const isActive = trip?.id === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => handleTriggerTripSwitch(t.id)}
+                    className={`w-full text-left p-3.5 rounded-xl border transition flex items-center justify-between cursor-pointer ${
+                      isActive 
+                        ? "bg-blue-600/10 border-blue-500/80 text-white shadow-lg" 
+                        : "bg-slate-950/40 border-white/5 text-slate-400 hover:border-white/15 hover:bg-slate-950/60"
+                    }`}
+                  >
+                    <div className="truncate pr-2 w-full">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className={`text-xs font-black truncate ${isActive ? "text-blue-400" : "text-white"}`}>
+                          {t.name}
+                        </p>
+                        {isActive ? (
+                          <span className="text-[8px] bg-blue-500/15 border border-blue-500/30 text-blue-400 px-1 py-0.2 rounded shrink-0">
+                            {t.status === "inactive" ? (lang === "zh" ? "當前啟用 (已停用)" : "ACTIVE (INACTIVE)") : (lang === "zh" ? "當前啟用" : "ACTIVE")}
+                          </span>
+                        ) : (
+                          <span className={`text-[8px] px-1 py-0.2 rounded shrink-0 border ${
+                            t.status === "inactive" 
+                              ? "bg-slate-800/20 border-slate-700 text-slate-500" 
+                              : "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                          }`}>
+                            {t.status === "inactive" ? (lang === "zh" ? "已停用" : "INACTIVE") : (lang === "zh" ? "啟用中" : "ACTIVE")}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <p className="text-[10px] text-zinc-400 truncate mt-0.5 font-sans">
+                        📍 {t.destination || "Tokyo, Japan"}
+                      </p>
+
+                      <div className="flex justify-between text-[8.5px] text-slate-500 font-mono mt-1.5 border-t border-white/5 pt-1">
+                        <span>👤 {t.membersCount} {lang === "zh" ? "位成員" : "peers"}</span>
+                        <span>💸 ${t.spent} / ${t.totalBudget}</span>
+                      </div>
+                    </div>
+                    <ChevronRight size={13} className="text-slate-500 shrink-0 select-none ml-1" />
+                  </button>
+                );
+              })
+            )}
           </div>
 
           <button

@@ -247,7 +247,7 @@ export default function CreateTripModal({
 
           <div>
             <label className="block text-slate-350 font-bold mb-1 font-sans">
-              {lang === "zh" ? "預算預留上限 (USD)" : "Total Budget Reserved (USD)"}
+              {lang === "zh" ? "預算預留上限" : "Total Budget Reserved"}
             </label>
             <input
               type="number"
