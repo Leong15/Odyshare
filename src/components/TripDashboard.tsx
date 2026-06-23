@@ -182,13 +182,13 @@ export default function TripDashboard({
 
   // Sync edit values when active trip updates
   useEffect(() => {
-    if (trip) {
+    if (trip && !isEditing) {
       setEditName(trip.name);
       setEditDestination(trip.destination);
       setEditBudget(trip.totalBudget);
       setEditStatus(trip.status || "active");
     }
-  }, [trip]);
+  }, [trip, isEditing]);
 
   // Core cross-project statistics aggregations
   const aggregateStats = useMemo(() => {

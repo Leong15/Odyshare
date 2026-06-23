@@ -15,6 +15,9 @@ interface CreateTripModalProps {
 }
 
 export const POPULAR_HOT_PLACES = [
+  // --- 香港 ---
+    { zh: "香港", en: "Hong Kong", countryZh: "香港", countryEn: "Hong Kong" },
+    
   // --- 日本 ---
   { zh: "東京", en: "Tokyo", countryZh: "日本", countryEn: "Japan" },
   { zh: "大阪", en: "Osaka", countryZh: "日本", countryEn: "Japan" },
@@ -95,8 +98,7 @@ export const POPULAR_HOT_PLACES = [
   { zh: "阿德萊德", en: "Adelaide", countryZh: "澳洲", countryEn: "Australia" },
   { zh: "荷巴特", en: "Hobart", countryZh: "澳洲", countryEn: "Australia" },
 
-  // --- 中國與港澳 ---
-  { zh: "香港", en: "Hong Kong", countryZh: "中國香港", countryEn: "Hong Kong" },
+  // --- 中國 ---
   { zh: "澳門", en: "Macau", countryZh: "中國澳門", countryEn: "Macau" },
   { zh: "北京", en: "Beijing", countryZh: "中國", countryEn: "China" },
   { zh: "上海", en: "Shanghai", countryZh: "中國", countryEn: "China" },

@@ -1,5 +1,9 @@
 import { Router, Request, Response } from "express";
-import { readTripsDB, writeTripsDB, getDB, writeDB } from "../db";
+import { 
+  readTripsDB, writeTripsDB, getDB, writeDB,
+  createFirestoreTrip, updateFirestoreTrip, deleteFirestoreTrip,
+  createFirestoreInvitation, updateFirestoreInvitation, deleteFirestoreInvitation
+} from "../db";
 
 const router = Router();
 
@@ -145,10 +149,11 @@ router.get("/", async (req: Request, res: Response) => {
 });
 
 // 2. Add or update trip details
-router.post("/update", (req: Request, res: Response) => {
+router.post("/update", async (req: Request, res: Response) => {
   const current = readTripsDB(req);
   const updated = { ...current, ...req.body };
   writeTripsDB(updated, req);
+  await updateFirestoreTrip(updated.id, updated);
   res.json({ success: true, trip: readTripsDB(req) });
 });
 
@@ -299,6 +304,7 @@ router.post("/create", async (req: Request, res: Response) => {
 
   db.trips.push(newTrip);
   db.activeTripId = newTripId;
+  await createFirestoreTrip(newTrip.id, newTrip);
   writeDB(db);
 
   req.headers["x-trip-id"] = newTripId;
@@ -338,6 +344,7 @@ router.post("/update-meta", async (req: Request, res: Response) => {
   const tripIdx = db.trips.findIndex(t => t.id === currentTrip.id);
   if (tripIdx !== -1) {
     db.trips[tripIdx] = currentTrip;
+    await updateFirestoreTrip(currentTrip.id, currentTrip);
     writeDB(db);
   }
 
@@ -345,7 +352,7 @@ router.post("/update-meta", async (req: Request, res: Response) => {
 });
 
 // 2d. Delete a trip
-router.post("/delete", (req: Request, res: Response) => {
+router.post("/delete", async (req: Request, res: Response) => {
   const { tripId } = req.body;
   const db = getDB();
   if (db.trips.length <= 1) {
@@ -356,6 +363,7 @@ router.post("/delete", (req: Request, res: Response) => {
   if (db.activeTripId === tripId) {
     db.activeTripId = db.trips[0].id;
   }
+  await deleteFirestoreTrip(tripId);
   writeDB(db);
 
   res.json({ success: true, trip: readTripsDB(req) });
@@ -429,6 +437,7 @@ router.post("/itinerary/add", async (req: Request, res: Response) => {
   current.chats.push(systemMsg);
 
   writeTripsDB(current, req);
+  await updateFirestoreTrip(current.id, current);
   res.json({ success: true, item: newItem, trip: current });
 });
 
@@ -499,6 +508,7 @@ router.post("/itinerary/edit", async (req: Request, res: Response) => {
     current.chats.push(systemMsg);
     
     writeTripsDB(current, req);
+    await updateFirestoreTrip(current.id, current);
     res.json({ success: true, item, trip: current });
   } else {
     res.status(404).json({ error: "Item not found" });
@@ -506,7 +516,7 @@ router.post("/itinerary/edit", async (req: Request, res: Response) => {
 });
 
 // 3c. Delete an existing Itinerary point
-router.post("/itinerary/delete", (req: Request, res: Response) => {
+router.post("/itinerary/delete", async (req: Request, res: Response) => {
   const { id } = req.body;
   const current = readTripsDB(req);
   const initialLen = current.itineraries.length;
@@ -524,6 +534,7 @@ router.post("/itinerary/delete", (req: Request, res: Response) => {
     };
     current.chats.push(systemMsg);
     writeTripsDB(current, req);
+    await updateFirestoreTrip(current.id, current);
     res.json({ success: true, trip: current });
   } else {
     res.status(404).json({ error: "Item not found" });
@@ -531,7 +542,7 @@ router.post("/itinerary/delete", (req: Request, res: Response) => {
 });
 
 // 4. Vote on Itinerary Item or Flight Recommendation
-router.post("/vote", (req: Request, res: Response) => {
+router.post("/vote", async (req: Request, res: Response) => {
   const { targetType, targetId, userId } = req.body;
   const current = readTripsDB(req);
 
@@ -556,11 +567,12 @@ router.post("/vote", (req: Request, res: Response) => {
   }
 
   writeTripsDB(current, req);
+  await updateFirestoreTrip(current.id, current);
   res.json({ success: true, trip: current });
 });
 
 // 5. Comment on an Itinerary Item, shop, or restaurant
-router.post("/itinerary/comment", (req: Request, res: Response) => {
+router.post("/itinerary/comment", async (req: Request, res: Response) => {
   const { itemId, userId, userName, text } = req.body;
   if (!text || text.trim() === "") {
     return res.status(400).json({ error: "Comment text is required" });
@@ -578,6 +590,7 @@ router.post("/itinerary/comment", (req: Request, res: Response) => {
     };
     item.comments.push(newComment);
     writeTripsDB(current, req);
+    await updateFirestoreTrip(current.id, current);
     res.json({ success: true, comment: newComment, trip: current });
   } else {
     res.status(404).json({ error: "Itinerary item not found" });
@@ -585,7 +598,7 @@ router.post("/itinerary/comment", (req: Request, res: Response) => {
 });
 
 // 6. Add Expense SPLIT costs automatically
-router.post("/expense/add", (req: Request, res: Response) => {
+router.post("/expense/add", async (req: Request, res: Response) => {
   const current = readTripsDB(req);
   const newExpense = {
     id: "exp-" + Date.now(),
@@ -608,20 +621,22 @@ router.post("/expense/add", (req: Request, res: Response) => {
   current.chats.push(systemMsg);
 
   writeTripsDB(current, req);
+  await updateFirestoreTrip(current.id, current);
   res.json({ success: true, expense: newExpense, trip: current });
 });
 
 // 7. Delete Expense
-router.post("/expense/delete", (req: Request, res: Response) => {
+router.post("/expense/delete", async (req: Request, res: Response) => {
   const { expenseId } = req.body;
   const current = readTripsDB(req);
   current.expenses = current.expenses.filter((e: any) => e.id !== expenseId);
   writeTripsDB(current, req);
+  await updateFirestoreTrip(current.id, current);
   res.json({ success: true, trip: current });
 });
 
 // 8. Upload travel Document Locker (mocks server storage records securely)
-router.post("/document/upload", (req: Request, res: Response) => {
+router.post("/document/upload", async (req: Request, res: Response) => {
   const { name, size, type, uploadedBy } = req.body;
   const current = readTripsDB(req);
   const newDoc = {
@@ -631,7 +646,7 @@ router.post("/document/upload", (req: Request, res: Response) => {
     type: type || "application/pdf",
     uploadedAt: new Date().toISOString(),
     url: "#",
-    accessKey: "doc_hash_sha256_" + Math.random().toString(36).substring(2, 12),
+    accessKey: "doc_hash_sha250_" + Math.random().toString(36).substring(2, 12),
     uploadedBy: uploadedBy || "Leo"
   };
   current.documents.push(newDoc);
@@ -650,11 +665,12 @@ router.post("/document/upload", (req: Request, res: Response) => {
   current.chats.push(systemMsg);
 
   writeTripsDB(current, req);
+  await updateFirestoreTrip(current.id, current);
   res.json({ success: true, document: newDoc, trip: current });
 });
 
 // 9. Send real-time chat with encryptions simulated
-router.post("/chat/send", (req: Request, res: Response) => {
+router.post("/chat/send", async (req: Request, res: Response) => {
   const { senderId, senderName, avatarColor, messageDecrypted, messageEncrypted } = req.body;
   const current = readTripsDB(req);
 
@@ -670,11 +686,12 @@ router.post("/chat/send", (req: Request, res: Response) => {
 
   current.chats.push(newMsg);
   writeTripsDB(current, req);
+  await updateFirestoreTrip(current.id, current);
   res.json({ success: true, msg: newMsg, trip: current });
 });
 
 // 10. Invite user - creates a pending invitation record
-router.post("/invite", (req: Request, res: Response) => {
+router.post("/invite", async (req: Request, res: Response) => {
   const { username } = req.body;
   const userId = req.headers["x-user-id"] as string;
 
@@ -720,13 +737,14 @@ router.post("/invite", (req: Request, res: Response) => {
   };
 
   db.invitations.push(newInvitation);
+  await createFirestoreInvitation(newInvitation.id, newInvitation);
   writeDB(db);
 
   res.json({ success: true, invitation: newInvitation });
 });
 
 // 10.5. Kick user/participant out of the trip group
-router.post("/kick", (req: Request, res: Response) => {
+router.post("/kick", async (req: Request, res: Response) => {
   const { userIdToKick } = req.body;
   const requestUserId = req.headers["x-user-id"] as string;
 
@@ -768,6 +786,7 @@ router.post("/kick", (req: Request, res: Response) => {
   });
 
   writeTripsDB(current, req);
+  await updateFirestoreTrip(current.id, current);
   res.json({ success: true, trip: current });
 });
 
@@ -793,7 +812,7 @@ router.get("/invitations", (req: Request, res: Response) => {
 });
 
 // 12. Accept or Decline an invitation
-router.post("/invitations/respond", (req: Request, res: Response) => {
+router.post("/invitations/respond", async (req: Request, res: Response) => {
   const userId = req.headers["x-user-id"] as string;
   const { invitationId, action } = req.body; // action: "accept" | "decline"
   if (!userId) {
@@ -851,11 +870,16 @@ router.post("/invitations/respond", (req: Request, res: Response) => {
         }
       }
     }
+    if (trip) {
+      await updateFirestoreTrip(trip.id, trip);
+    }
+    await updateFirestoreInvitation(invitation.id, invitation);
     writeDB(db);
     return res.json({ success: true, message: "Invitation accepted!" });
   } else {
     // Decline invitation
     invitation.status = "declined";
+    await updateFirestoreInvitation(invitation.id, invitation);
     writeDB(db);
     return res.json({ success: true, message: "Invitation declined successfully" });
   }

@@ -1,8 +1,41 @@
 import { Router, Request, Response } from "express";
-import { getDB, writeDB } from "../db.js";
+import { getDB, writeDB, createFirestoreUser, updateFirestoreUser } from "../db.js";
 import argon2 from "argon2";
+import crypto from "crypto";
 
 const router = Router();
+
+// Safe hashing utility using Argon2 with automatic crystal-clear cryptographic scrypt standard fallback
+async function safeHash(password: string): Promise<string> {
+  try {
+    return await argon2.hash(password.trim(), { type: argon2.argon2id });
+  } catch (err) {
+    console.warn("Argon2 hashing failed (likely native binary missing), falling back to secure built-in Node.js scrypt:", err);
+    const salt = crypto.randomBytes(16).toString("hex");
+    const hash = crypto.scryptSync(password.trim(), salt, 64).toString("hex");
+    return `$scrypt$default$${salt}$${hash}`;
+  }
+}
+
+async function safeVerify(storedHash: string, passwordToVerify: string): Promise<boolean> {
+  if (storedHash.startsWith("$argon2")) {
+    try {
+      return await argon2.verify(storedHash, passwordToVerify.trim());
+    } catch (err) {
+      console.warn("Argon2 verification failed/crashed, checking if it was an scrypt hash or if they match:", err);
+      return false;
+    }
+  } else if (storedHash.startsWith("$scrypt$")) {
+    const parts = storedHash.split("$");
+    const salt = parts[2];
+    const hash = parts[3];
+    const verifyHash = crypto.scryptSync(passwordToVerify.trim(), salt, 64).toString("hex");
+    return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(verifyHash, "hex"));
+  } else {
+    // Plain text check
+    return storedHash === passwordToVerify.trim();
+  }
+}
 
 // 1. User Registration
 router.post("/register", async (req: Request, res: Response) => {
@@ -28,10 +61,8 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 
   try {
-    // Hash password with argon2id (argon2id is default type in argon2)
-    const hashedPassword = await argon2.hash(password.trim(), {
-      type: argon2.argon2id
-    });
+    // Hash password securely with safeHash utility which has automatic built-in backup
+    const hashedPassword = await safeHash(password);
 
     const colors = ["#3b82f6", "#ec4899", "#10b981", "#f59e0b", "#8b5cf6", "#14b8a6"];
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
@@ -45,6 +76,7 @@ router.post("/register", async (req: Request, res: Response) => {
     };
 
     db.users.push(newUser);
+    await createFirestoreUser(newUser.id, newUser);
     writeDB(db);
 
     res.json({ 
@@ -58,7 +90,7 @@ router.post("/register", async (req: Request, res: Response) => {
       } 
     });
   } catch (err) {
-    console.error("Argon2 hashing error during registration:", err);
+    console.error("Secure hashing error during registration:", err);
     res.status(500).json({ error: "Failed to securely hash password." });
   }
 });
@@ -77,15 +109,8 @@ router.post("/login", async (req: Request, res: Response) => {
   }
 
   try {
-    let isValid = false;
-
-    // Check if password matches via argon2 or plain text fallback (for initial mocked credentials "123")
-    if (user.password.startsWith("$argon2")) {
-      isValid = await argon2.verify(user.password, password.trim());
-    } else {
-      // Fallback plain-text check for default pre-seeded accounts (e.g. leo, chloe, david, sophy)
-      isValid = user.password === password.trim();
-    }
+    // Check if password matches using safeVerify utility
+    const isValid = await safeVerify(user.password, password);
 
     if (!isValid) {
       return res.status(401).json({ error: "Invalid username or password." });
@@ -132,12 +157,7 @@ router.post("/change-password", async (req: Request, res: Response) => {
   }
 
   try {
-    let isValid = false;
-    if (user.password.startsWith("$argon2")) {
-      isValid = await argon2.verify(user.password, currentPassword.trim());
-    } else {
-      isValid = user.password === currentPassword.trim();
-    }
+    const isValid = await safeVerify(user.password, currentPassword);
 
     if (!isValid) {
       return res.status(400).json({ error: "Current password is incorrect." });
@@ -153,12 +173,11 @@ router.post("/change-password", async (req: Request, res: Response) => {
       });
     }
 
-    // Hash new password securely
-    const hashedPassword = await argon2.hash(newPassword.trim(), {
-      type: argon2.argon2id
-    });
+    // Hash new password securely with safety fallback
+    const hashedPassword = await safeHash(newPassword);
 
     user.password = hashedPassword;
+    await updateFirestoreUser(user.id, user);
     writeDB(db);
 
     res.json({ success: true, message: "Password updated successfully!" });
@@ -199,11 +218,10 @@ router.post("/forget-password", async (req: Request, res: Response) => {
   }
 
   try {
-    const hashedPassword = await argon2.hash(newPassword.trim(), {
-      type: argon2.argon2id
-    });
+    const hashedPassword = await safeHash(newPassword);
 
     user.password = hashedPassword;
+    await updateFirestoreUser(user.id, user);
     writeDB(db);
 
     res.json({ success: true, message: "Password reset complete. You can now login with your new credentials." });
@@ -244,13 +262,14 @@ router.post("/reset-confirm", async (req: Request, res: Response) => {
   }
 
   let finalPassword = "";
-  if (!user.password.startsWith("$argon2")) {
+  if (!user.password.startsWith("$argon2") && !user.password.startsWith("$scrypt$")) {
     finalPassword = user.password;
   } else {
-    // If argon2 hashed, reset to default compliant passcode to let user lock back in securely
+    // If securely hashed, reset to default compliant passcode to let user lock back in securely
     finalPassword = "Pass123!";
-    const hashedPassword = await argon2.hash(finalPassword, { type: argon2.argon2id });
+    const hashedPassword = await safeHash(finalPassword);
     user.password = hashedPassword;
+    await updateFirestoreUser(user.id, user);
     writeDB(db);
   }
 

@@ -28,10 +28,7 @@ export const DEFAULT_TRIP = {
   lat: 35.6762,
   lng: 139.6503,
   participants: [
-    { id: "u1", name: "Leo (You)", email: "leochau46@gmail.com", avatarColor: "#3b82f6", publicKey: "pub_key_sec_leo_908f" },
-    { id: "u2", name: "Chloe", email: "chloe.tan@example.com", avatarColor: "#ec4899", publicKey: "pub_key_sec_chloe_324a" },
-    { id: "u3", name: "David", email: "david.w@example.com", avatarColor: "#10b981", publicKey: "pub_key_sec_david_455e" },
-    { id: "u4", name: "Sophy", email: "sophy.k@example.com", avatarColor: "#f59e0b", publicKey: "pub_key_sec_sophy_112c" }
+    { id: "u1", username: "Admin", password: "123", name: "Admin", email: "admin@gmail.com", avatarColor: "#3b82f6" },
   ],
   flightEstimates: [
     {
@@ -250,10 +247,7 @@ let memoryDB: {
 } = {
   activeTripId: "tokyo-group-2026",
   users: [
-    { id: "u1", username: "leo", password: "123", name: "Leo (You)", email: "leochau46@gmail.com", avatarColor: "#3b82f6" },
-    { id: "u2", username: "chloe", password: "123", name: "Chloe", email: "chloe.tan@example.com", avatarColor: "#ec4899" },
-    { id: "u3", username: "david", password: "123", name: "David", email: "david.w@example.com", avatarColor: "#10b981" },
-    { id: "u4", username: "sophy", password: "123", name: "Sophy", email: "sophy.k@example.com", avatarColor: "#f59e0b" }
+    { id: "u1", username: "Admin", password: "123", name: "Admin", email: "admin@gmail.com", avatarColor: "#3b82f6" },
   ],
   trips: [JSON.parse(JSON.stringify(DEFAULT_TRIP))],
   invitations: []
@@ -291,10 +285,7 @@ export async function initFirebase() {
       console.log("[Firebase db.ts] Firestore collection is blank. Seeding with high-fidelity defaults...");
       
       const defaultUsers = [
-        { id: "u1", username: "leo", password: "123", name: "Leo (You)", email: "leochau46@gmail.com", avatarColor: "#3b82f6" },
-        { id: "u2", username: "chloe", password: "123", name: "Chloe", email: "chloe.tan@example.com", avatarColor: "#ec4899" },
-        { id: "u3", username: "david", password: "123", name: "David", email: "david.w@example.com", avatarColor: "#10b981" },
-        { id: "u4", username: "sophy", password: "123", name: "Sophy", email: "sophy.k@example.com", avatarColor: "#f59e0b" }
+        { id: "u1", username: "Admin", password: "123", name: "Admin", email: "admin@gmail.com", avatarColor: "#3b82f6" },
       ];
       for (const u of defaultUsers) {
         const { id, ...uData } = u;
@@ -615,3 +606,60 @@ export function writeTripsDB(data: any, req?: Request) {
   }
   writeDB(db);
 }
+
+// Explicit Firestore CRUD functions to ensure physical cloud database integrations are called and awaited synchronously
+
+export async function createFirestoreUser(userId: string, userData: any) {
+  console.log(`[Firebase db.ts] Creating user document in Firestore: ${userId}`);
+  const payload = { ...userData };
+  delete payload.id;
+  await setDoc(doc(db, "users", userId), payload);
+}
+
+export async function updateFirestoreUser(userId: string, userData: any) {
+  console.log(`[Firebase db.ts] Updating user document in Firestore: ${userId}`);
+  const payload = { ...userData };
+  delete payload.id;
+  await setDoc(doc(db, "users", userId), payload);
+}
+
+export async function createFirestoreTrip(tripId: string, tripData: any) {
+  console.log(`[Firebase db.ts] Creating trip document in Firestore: ${tripId}`);
+  const payload = { ...tripData };
+  delete payload.id;
+  delete payload.tripsList;
+  await setDoc(doc(db, "trips", tripId), payload);
+}
+
+export async function updateFirestoreTrip(tripId: string, tripData: any) {
+  console.log(`[Firebase db.ts] Updating trip document in Firestore: ${tripId}`);
+  const payload = { ...tripData };
+  delete payload.id;
+  delete payload.tripsList;
+  await setDoc(doc(db, "trips", tripId), payload);
+}
+
+export async function deleteFirestoreTrip(tripId: string) {
+  console.log(`[Firebase db.ts] Deleting trip document from Firestore: ${tripId}`);
+  await deleteDoc(doc(db, "trips", tripId));
+}
+
+export async function createFirestoreInvitation(invitationId: string, invitationData: any) {
+  console.log(`[Firebase db.ts] Creating invitation document in Firestore: ${invitationId}`);
+  const payload = { ...invitationData };
+  delete payload.id;
+  await setDoc(doc(db, "invitations", invitationId), payload);
+}
+
+export async function updateFirestoreInvitation(invitationId: string, invitationData: any) {
+  console.log(`[Firebase db.ts] Updating invitation document in Firestore: ${invitationId}`);
+  const payload = { ...invitationData };
+  delete payload.id;
+  await setDoc(doc(db, "invitations", invitationId), payload);
+}
+
+export async function deleteFirestoreInvitation(invitationId: string) {
+  console.log(`[Firebase db.ts] Deleting invitation document from Firestore: ${invitationId}`);
+  await deleteDoc(doc(db, "invitations", invitationId));
+}
+
