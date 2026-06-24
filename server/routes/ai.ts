@@ -36,6 +36,36 @@ function getGenAI(): GoogleGenAI | null {
   return aiClient;
 }
 
+// Helper to perform Gemini generateContent calls with robust automatic retry and model fallback (e.g. to gemini-3.1-flash-lite on 503/429/high-demand)
+async function generateContentWithRetry(ai: GoogleGenAI, params: { model: string; contents: any; config?: any }, maxRetries = 2): Promise<any> {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await ai.models.generateContent(params);
+    } catch (err: any) {
+      attempt++;
+      const errorString = String(err?.message || err || "").toLowerCase();
+      const isRetryable = errorString.includes("503") || 
+                          errorString.includes("429") || 
+                          errorString.includes("unavailable") || 
+                          errorString.includes("high demand") || 
+                          err?.status === 503 ||
+                          err?.status === 429 ||
+                          err?.statusCode === 503 ||
+                          err?.statusCode === 429;
+      
+      if (isRetryable && attempt < maxRetries) {
+        console.warn(`Gemini API call failed (attempt ${attempt}/${maxRetries}): ${errorString}. Retrying with gemini-3.1-flash-lite...`);
+        params.model = "gemini-3.1-flash-lite";
+        // Wait a bit (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, 300 * attempt));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 // A. Chat Assistant for travel guidelines, hidden gems, transport
 router.post("/chat-assistant", async (req: Request, res: Response) => {
   const { message, chatHistory } = req.body;
@@ -55,15 +85,40 @@ router.post("/chat-assistant", async (req: Request, res: Response) => {
       parts: [{ text: h.messageDecrypted || h.text || "" }]
     }));
 
+    const systemInstruction = "You are OdyShareSmart, an expert AI Group Travel Coordinator. Your voice is supportive, concise, and incredibly knowledgeable. Keep answers under 120 words. Focus on practical insights, optimal route order, traffic alerts, and budget-saving flight/boarding opportunities.";
+
     const chat = ai.chats.create({
       model,
-      config: {
-        systemInstruction: "You are OdyShareSmart, an expert AI Group Travel Coordinator. Your voice is supportive, concise, and incredibly knowledgeable. Keep answers under 120 words. Focus on practical insights, optimal route order, traffic alerts, and budget-saving flight/boarding opportunities.",
-      },
+      config: { systemInstruction },
       history: historyFormatted
     });
 
-    const response = await chat.sendMessage({ message });
+    let response;
+    try {
+      response = await chat.sendMessage({ message });
+    } catch (err: any) {
+      const errorString = String(err?.message || err || "").toLowerCase();
+      const isRetryable = errorString.includes("503") || 
+                          errorString.includes("429") || 
+                          errorString.includes("unavailable") || 
+                          errorString.includes("high demand") || 
+                          err?.status === 503 ||
+                          err?.status === 429 ||
+                          err?.statusCode === 503 ||
+                          err?.statusCode === 429;
+      if (isRetryable) {
+        console.warn(`Chat sendMessage failed, retrying once with gemini-3.1-flash-lite...`);
+        const fallbackChat = ai.chats.create({
+          model: "gemini-3.1-flash-lite",
+          config: { systemInstruction },
+          history: historyFormatted
+        });
+        response = await fallbackChat.sendMessage({ message });
+      } else {
+        throw err;
+      }
+    }
+
     res.json({ reply: response.text });
   } catch (err: any) {
     console.error("Error calling Gemini API for travel chat, falling back to helper mode:", err);
@@ -125,7 +180,7 @@ router.post("/optimize-itinerary", async (req: Request, res: Response) => {
   }
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -319,7 +374,7 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
   }
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -429,7 +484,7 @@ router.post("/parse-voice-schedule", async (req: Request, res: Response) => {
   }
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -545,7 +600,7 @@ Example Output format:
   "optimizedIndices": [2, 0, 1, 3]
 }`;
 
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -663,7 +718,7 @@ router.post("/parse-email-confirmation", async (req: Request, res: Response) => 
   }
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-3.5-flash",
       contents: prompt,
       config: {
@@ -783,7 +838,7 @@ router.post("/ocr-receipt", async (req: Request, res: Response) => {
       };
     }
 
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-3.5-flash",
       contents,
       config: {
