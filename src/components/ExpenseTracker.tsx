@@ -551,7 +551,7 @@ export default function ExpenseTracker({
                     ) : (
                       <div className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-2">
                         <div className="font-bold text-slate-300 border-b border-white/5 pb-1 mb-2">
-                          {lang === "zh" ? "✍️ 請輸入各成員個人原始消費額 (美金)" : "✍️ Input individual raw purchase amount for each:"}
+                          {lang === "zh" ? "✍️ 請輸入各成員個人原始消費額" : "✍️ Input individual raw purchase amount for each:"}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                           {participants.map(p => {

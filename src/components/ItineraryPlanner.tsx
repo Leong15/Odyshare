@@ -65,9 +65,9 @@ export default function ItineraryPlanner({
 }: ItineraryPlannerProps) {
   const [activeDay, setActiveDay] = useState<number>(0);
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
-  const [title, setTitle] = useState<string>("Tsukiji Morning Seafood Tasting");
-  const [description, setDescription] = useState<string>("Taste authentic high grade sashimi and fresh sushi rolls near outer market streets.");
-  const [locationName, setLocationName] = useState<string>("Tsukiji Outer Market, Tokyo");
+  const [title, setTitle] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [locationName, setLocationName] = useState<string>("");
   const [time, setTime] = useState<string>("09:00");
   const [category, setCategory] = useState<ItineraryItem["category"]>("restaurant");
   const [cost, setCost] = useState<string>("35");
