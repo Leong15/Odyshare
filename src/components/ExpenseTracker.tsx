@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Plus, Trash2, Users, ChevronRight, AlertCircle, CheckSquare, Square, DollarSign } from "lucide-react";
 import { ExpenseItem, Participant } from "../types";
 import { translations } from "../lib/translations";
+import SettlementModal from "./SettlementModal";
 import {
   getExpenseActualTotal,
   getExpenseShareForUser,
@@ -42,12 +43,15 @@ export default function ExpenseTracker({
   const [paidBy, setPaidBy] = useState<string>(activeUserId || participants[0]?.id || "");
   const [splitAmong, setSplitAmong] = useState<string[]>(participants.map(p => p.id));
   const [category, setCategory] = useState<ExpenseItem["category"]>("food");
+  const [ocrInput, setOcrInput] = useState<string>("");
+  const [ocrParsing, setOcrParsing] = useState<boolean>(false);
 
   // Collapsible state metrics for the right-column auxiliary elements
   const [isBudgetCollapsed, setIsBudgetCollapsed] = useState<boolean>(false);
   const [isPersonalCollapsed, setIsPersonalCollapsed] = useState<boolean>(false);
   const [isMemberLimitsCollapsed, setIsMemberLimitsCollapsed] = useState<boolean>(false);
   const [isSettlementCollapsed, setIsSettlementCollapsed] = useState<boolean>(false);
+  const [showSettlementModal, setShowSettlementModal] = useState<boolean>(false);
 
   useEffect(() => {
     // On cellphones and tablets, default these widgets to collapsed to prevent massive vertical clutter
@@ -164,6 +168,29 @@ export default function ExpenseTracker({
       setUncheckedExpenseIds(uncheckedExpenseIds.filter(x => x !== id));
     } else {
       setUncheckedExpenseIds([...uncheckedExpenseIds, id]);
+    }
+  };
+
+  const handleReceiptOcrSubmit = async () => {
+    if (!ocrInput.trim()) return;
+    setOcrParsing(true);
+    try {
+      const res = await fetch("/api/ai/ocr-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ receiptText: ocrInput })
+      });
+      const data = await res.json();
+      if (data && data.amount != null) {
+        setDescription(data.description || "🧾 OCR Receipt Expense");
+        setAmount(data.amount.toString());
+        setCategory(data.category || "food");
+        setOcrInput("");
+      }
+    } catch (err) {
+      console.error("Receipt OCR failed:", err);
+    } finally {
+      setOcrParsing(false);
     }
   };
 
@@ -285,6 +312,73 @@ export default function ExpenseTracker({
                   {lang === "zh" ? "取消" : "Cancel"}
                 </button>
               </h4>
+
+              {/* 🧾 AI Receipt Scanner OCR Panel */}
+              <div className="bg-white/4 border border-white/5 rounded-xl p-3.5 mb-2.5 text-xs text-left select-none animate-fadeIn flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-400 flex items-center gap-1.5 text-[11px]">
+                    <span>🧾</span>
+                    <span>{lang === "zh" ? "AI 智慧實體收據辨識 (OCR)" : "AI Smart Receipt OCR Scanner"}</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">Powered by Gemini</span>
+                </div>
+                <p className="text-[10.5px] text-slate-400 leading-relaxed">
+                  {lang === "zh" 
+                    ? "在國外拿到實體紙本發票時，可在此貼上收據明細、貼上 base64 圖片，AI 將自動辨識總金額、品項、消費類別，快速完成記帳！" 
+                    : "When you get physical receipts in Japan or Europe, paste details or mock-upload below. AI will auto-extract total amount, currency, and category!"}
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-2 mt-1">
+                  <input
+                    type="text"
+                    placeholder={lang === "zh" ? "貼上收據文字或簡介..." : "Paste receipt text details..."}
+                    value={ocrInput}
+                    onChange={(e) => setOcrInput(e.target.value)}
+                    className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1.5 text-[11px] text-white outline-none"
+                  />
+
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={handleReceiptOcrSubmit}
+                      disabled={ocrParsing || !ocrInput.trim()}
+                      className="py-1.5 px-3 bg-emerald-600/90 hover:bg-emerald-650 border border-emerald-500/15 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shrink-0"
+                    >
+                      {ocrParsing ? (
+                        <>
+                          <span className="animate-spin text-white">⏳</span>
+                          <span>{lang === "zh" ? "辨識中..." : "Extracting..."}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>⚡</span>
+                          <span>{lang === "zh" ? "智慧一鍵辨識" : "Scan Receipt"}</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* Presets dropdown to easily mock receipt uploads! */}
+                    <select
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "izakaya") {
+                          setOcrInput("居酒屋 志ん宿 (Shinjuku Izakaya Bill)\n生ビール x4: JPY 2,200\n刺身盛り合わせ x1: JPY 3,500\n串焼き 12本: JPY 2,400\n消費税 10%\nTOTAL AMOUNT: JPY 8,650");
+                        } else if (val === "train") {
+                          setOcrInput("JR東日本 東海道新幹線 (Tokaido Shinkansen Ticket)\n東京 -> 京都 (Tokyo to Kyoto Adult Regular)\n席位: 指定席 Car 4 Row 12-A\nFARE PRICE: JPY 14,500");
+                        } else if (val === "starbucks") {
+                          setOcrInput("STARBUCKS COFFEE SHIBUYA TSUTAYA\n1x Caramel Macchiato: JPY 650\n1x Matcha Frappuccino: JPY 600\nSUBTOTAL: JPY 1,250\nTAX 8%: JPY 100\nTOTAL JPY 1,250");
+                        }
+                      }}
+                      className="bg-slate-950 border border-white/10 hover:border-white/25 rounded-xl px-2 text-[10.5px] text-slate-400 cursor-pointer outline-none shrink-0"
+                    >
+                      <option value="">📋 {lang === "zh" ? "載入真實收據範例" : "Load Receipt Template"}</option>
+                      <option value="izakaya">🍣 {lang === "zh" ? "新宿居酒屋細目 (8,650日圓)" : "Shinjuku Izakaya (8,650 JPY)"}</option>
+                      <option value="train">🚄 {lang === "zh" ? "新幹線單程票 (14,500日圓)" : "Shinkansen fare (14,500 JPY)"}</option>
+                      <option value="starbucks">☕ {lang === "zh" ? "澀谷星巴克咖啡 (1,250日圓)" : "Starbucks Coffee (1,250 JPY)"}</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
 
               {/* Calc values for preview */}
               {(() => {
@@ -1007,9 +1101,25 @@ export default function ExpenseTracker({
           {/* Content */}
           {!isSettlementCollapsed && (
             <div className="p-4 space-y-3 animate-fadeIn">
-              <p className="text-[11px] text-slate-400 mb-2 leading-relaxed font-sans">
+              <p className="text-[11px] text-slate-400 mb-1 leading-relaxed font-sans">
                 {lang === "zh" ? "以左側勾選的帳目計出的自動化費用拆帳結算書：" : "Reconciliation settlement calculated live based on checked ledger entries:"}
               </p>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-xl mb-3">
+                <div className="text-[10.5px] text-indigo-300 font-bold leading-relaxed max-w-[75%]">
+                  {lang === "zh"
+                    ? "✨ 結算完成！可一鍵導出精美 HTML/PDF 結帳收據，並為台灣(街口/LINE Pay)與香港(FPS)自動生成還款二維碼。"
+                    : "✨ Settlement complete! Generate printable receipts & customized payment links (LINE Pay, Jkopay, FPS) for your companions."}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSettlementModal(true)}
+                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl transition-all cursor-pointer shadow-lg text-[10.5px] flex items-center gap-1 shrink-0 self-end sm:self-auto"
+                >
+                  <Users size={12} />
+                  <span>{lang === "zh" ? "匯出結算與繳費" : "Export & Repay"}</span>
+                </button>
+              </div>
 
               <div className="space-y-3">
                 {transactions.length === 0 ? (
@@ -1053,6 +1163,19 @@ export default function ExpenseTracker({
           )}
         </div>
       </div>
+
+      {/* Interactive Settlement Receipt Modal Overlay */}
+      <SettlementModal
+        isOpen={showSettlementModal}
+        onClose={() => setShowSettlementModal(false)}
+        expenses={activeExpenses}
+        participants={participants}
+        transactions={transactions}
+        balances={balances}
+        totalBudget={editableBudget}
+        totalSpent={totalSpent}
+        lang={lang}
+      />
     </div>
   );
 }

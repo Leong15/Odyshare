@@ -113,23 +113,97 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
   );
 
   // ---------------------------------------------------------------------------
-  // Start polling when a user is logged in
+  // Start Server-Sent Events (SSE) live connection with robust fallback polling
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
     const uid = localStorage.getItem("loggedInUserId") || loggedInUserId;
     if (!uid) return;
 
+    // Run initial fetch on mount
     fetchTripData(true);
-    const id = setInterval(() => {
-      const currentUid = localStorage.getItem("loggedInUserId") || loggedInUserId;
-      if (currentUid) fetchTripData(false);
-    }, POLL_INTERVAL_MS);
 
-    return () => clearInterval(id);
-    // fetchTripData is stable (useCallback with stable deps), safe to include
+    let eventSource: EventSource | null = null;
+    let fallbackInterval: any = null;
+    let reconnectTimeout: any = null;
+
+    const startFallbackPolling = (ms: number) => {
+      if (fallbackInterval) clearInterval(fallbackInterval);
+      fallbackInterval = setInterval(() => {
+        const currentUid = localStorage.getItem("loggedInUserId") || loggedInUserId;
+        if (currentUid) fetchTripData(false);
+      }, ms);
+    };
+
+    const setupSSE = () => {
+      const activeTripId = localStorage.getItem("activeTripId") || tripIdRef.current;
+      if (!activeTripId) {
+        startFallbackPolling(4000);
+        return;
+      }
+
+      console.log("[SSE] Establishing live stream connection for active trip:", activeTripId);
+      
+      // Close previous eventSource if any
+      if (eventSource) {
+        eventSource.close();
+      }
+
+      eventSource = new EventSource(`/api/trip/events?tripId=${activeTripId}`);
+
+      eventSource.onmessage = (event) => {
+        try {
+          if (event.data === ": keepalive") return;
+          const data = JSON.parse(event.data);
+          if (data.type === "update") {
+            console.log("[SSE] Live modification detected on server, triggering dynamic refresh...");
+            fetchTripData(false);
+          }
+        } catch (err) {
+          console.error("[SSE] Failed to parse SSE message payload:", err);
+        }
+      };
+
+      eventSource.onerror = () => {
+        console.warn("[SSE] Live stream connection interrupted. Falling back to background polling...");
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+        
+        // Activate a 10s fallback polling loop to ensure continuity
+        startFallbackPolling(10000);
+
+        // Schedule SSE reconnection attempt in 5 seconds
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+        reconnectTimeout = setTimeout(() => {
+          setupSSE();
+        }, 5000);
+      };
+
+      // When SSE connects, we can slow down or clear the background polling entirely (rely on pushes)
+      eventSource.onopen = () => {
+        console.log("[SSE] Live stream connected successfully. Silencing periodic polling.");
+        if (fallbackInterval) {
+          clearInterval(fallbackInterval);
+          fallbackInterval = null;
+        }
+      };
+    };
+
+    setupSSE();
+
+    return () => {
+      if (eventSource) {
+        console.log("[SSE] Tearing down connection.");
+        eventSource.close();
+      }
+      if (fallbackInterval) clearInterval(fallbackInterval);
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+    // Re-run whenever user login status or active trip ID changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loggedInUserId]);
+  }, [loggedInUserId, trip?.id]);
 
   // ---------------------------------------------------------------------------
   // Helpers exposed to consumers
@@ -149,9 +223,76 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
     [buildHeaders]
   );
 
+  // ---------------------------------------------------------------------------
+  // Offline State Tracking & Local-First Queue Sync
+  // ---------------------------------------------------------------------------
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  const flushOfflineQueue = useCallback(async () => {
+    const queue = JSON.parse(localStorage.getItem("activeTripOfflineQueue") || "[]");
+    if (queue.length === 0) return;
+
+    // Aggregate all queued partial updates in sequence
+    let mergedFields: Partial<Trip> = {};
+    queue.forEach((fields: Partial<Trip>) => {
+      mergedFields = { ...mergedFields, ...fields };
+    });
+
+    try {
+      console.log("[PWA] Flushing aggregated local updates to cloud server:", mergedFields);
+      const res = await fetchWithAuth("/api/trip/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mergedFields),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTrip(data.trip);
+        localStorage.removeItem("activeTripOfflineQueue");
+        console.log("[PWA] Offline queue successfully synchronized and cleared!");
+      }
+    } catch (err) {
+      console.error("[PWA] Synchronizing offline queue failed, keeping queue items.", err);
+    }
+  }, [fetchWithAuth]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      console.log("[PWA] Back online! Syncing local operations queue...");
+      flushOfflineQueue();
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      console.log("[PWA] Working in local-first offline/airplane mode.");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [flushOfflineQueue]);
+
   /** Post a partial trip update and refresh local state from server response. */
   const postTripUpdate = useCallback(
     async (updatedFields: Partial<Trip>) => {
+      // 1. Optimistic UI: Apply updates locally immediately
+      setTrip(prev => {
+        if (!prev) return null;
+        return { ...prev, ...updatedFields };
+      });
+
+      // 2. If currently offline, queue and return
+      if (!navigator.onLine) {
+        const queue = JSON.parse(localStorage.getItem("activeTripOfflineQueue") || "[]");
+        queue.push(updatedFields);
+        localStorage.setItem("activeTripOfflineQueue", JSON.stringify(queue));
+        console.log("[PWA] Queued partial update in local storage due to offline state.");
+        return;
+      }
+
       try {
         const res = await fetchWithAuth("/api/trip/update", {
           method: "POST",
@@ -163,7 +304,10 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
           setTrip(data.trip);
         }
       } catch (err) {
-        console.error("postTripUpdate failed:", err);
+        console.warn("postTripUpdate connection failed, enqueuing local update.", err);
+        const queue = JSON.parse(localStorage.getItem("activeTripOfflineQueue") || "[]");
+        queue.push(updatedFields);
+        localStorage.setItem("activeTripOfflineQueue", JSON.stringify(queue));
       }
     },
     [fetchWithAuth]
@@ -217,5 +361,6 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
     postTripUpdate,
     handleSelectTrip,
     handleRespondInvitation,
+    isOffline,
   };
 }

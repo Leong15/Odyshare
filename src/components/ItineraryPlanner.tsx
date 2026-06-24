@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Clock, MapPin, MessageSquare, ThumbsUp, Plus, Eye, Send, Landmark, ShoppingBag, Utensils, Route, Bed, Sparkles, RefreshCw } from "lucide-react";
 import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
+import ItineraryMap from "./ItineraryMap";
 
 interface ItineraryPlannerProps {
   itineraries: ItineraryItem[];
@@ -18,6 +19,34 @@ interface ItineraryPlannerProps {
   onDeleteItineraryItem?: (itemId: string) => void;
   onUpdateItineraryItem?: (item: ItineraryItem) => void;
 }
+
+const getTransitIconAndDetails = (itemA: ItineraryItem, itemB: ItineraryItem, lang: "en" | "zh") => {
+  const dx = (itemA.coordinates?.x || 30) - (itemB.coordinates?.x || 50);
+  const dy = (itemA.coordinates?.y || 40) - (itemB.coordinates?.y || 60);
+  const rawDist = Math.sqrt(dx * dx + dy * dy);
+  
+  let timeMins = Math.max(5, Math.floor(rawDist * 1.5));
+  let icon = "🚶";
+  let mode = lang === "zh" ? "步行" : "Walk";
+  let line = "";
+
+  if (timeMins > 25) {
+    icon = "🚇";
+    mode = lang === "zh" ? "搭乘地鐵" : "MTR Subway";
+    const subways = lang === "zh" ? ["東鐵綫", "丸之內線", "銀座線", "山手線", "新宿線"] : ["East Rail Line", "Marunouchi Line", "Ginza Line", "Yamanote Line", "Shinjuku Line"];
+    line = " " + subways[Math.abs(itemA.title.length - itemB.title.length) % subways.length];
+  } else if (timeMins > 12) {
+    icon = "🚌";
+    mode = lang === "zh" ? "搭乘巴士" : "Bus Connection";
+    line = " No." + (Math.abs(itemA.title.length + itemB.title.length) % 80 + 1);
+  }
+
+  return {
+    icon,
+    label: lang === "zh" ? `${mode}${line} — ${timeMins}分鐘` : `${mode}${line} — ${timeMins} mins`,
+    distText: lang === "zh" ? `距離約 ${(rawDist * 0.15).toFixed(1)} 公里` : `dist approx ${(rawDist * 0.15).toFixed(1)} km`
+  };
+};
 
 export default function ItineraryPlanner({
   itineraries,
@@ -42,6 +71,7 @@ export default function ItineraryPlanner({
   const [time, setTime] = useState<string>("09:00");
   const [category, setCategory] = useState<ItineraryItem["category"]>("restaurant");
   const [cost, setCost] = useState<string>("35");
+  const [showMap, setShowMap] = useState<boolean>(true);
 
   // Edit states for modifying exist itinerary items
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -79,6 +109,11 @@ export default function ItineraryPlanner({
     }
   ]);
   const [submittingChat, setSubmittingChat] = useState<boolean>(false);
+  const [voiceInput, setVoiceInput] = useState<string>("");
+  const [voiceParsing, setVoiceParsing] = useState<boolean>(false);
+  const [emailInput, setEmailInput] = useState<string>("");
+  const [emailParsing, setEmailParsing] = useState<boolean>(false);
+  const [tspOptimizing, setTspOptimizing] = useState<boolean>(false);
 
   useEffect(() => {
     if (activeCommentDrawerId) {
@@ -137,6 +172,120 @@ export default function ItineraryPlanner({
       console.error("Itinerary optimization failed:", err);
     } finally {
       setOptimizing(false);
+    }
+  };
+
+  const handleTSPOptimization = async () => {
+    if (!onApplyAIOptimization || filteredItems.length <= 1) return;
+    setTspOptimizing(true);
+    try {
+      const res = await fetch("/api/ai/optimize-tsp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: filteredItems })
+      });
+      const data = await res.json();
+      if (data.optimized) {
+        // Merge optimized items back into the rest of the itineraries (which are on OTHER days)
+        const otherDaysItems = itineraries.filter(item => item.dayIndex !== activeDay);
+        const combined = [...otherDaysItems, ...data.optimized];
+        onApplyAIOptimization(combined);
+        
+        if (onPostAISystemMessage) {
+          const namesFlow = data.optimized.map((it: any) => `「${it.title}」(${it.time})`).join(" ➡️ ");
+          onPostAISystemMessage(
+            lang === "zh"
+              ? `🤖 OdyShareSmart AI 順路優化完成！已規劃最短順路路徑，減少折返跑交通時間：\n${namesFlow}`
+              : `🤖 OdyShareSmart AI Route (TSP) optimization complete! Rearranged Day ${activeDay + 1} attractions to minimize round-trip travel time:\n${namesFlow}`
+          );
+        }
+      }
+    } catch (err) {
+      console.error("TSP optimization failed:", err);
+    } finally {
+      setTspOptimizing(false);
+    }
+  };
+
+  const handleVoiceScheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!voiceInput.trim()) return;
+    setVoiceParsing(true);
+    try {
+      const res = await fetch("/api/ai/parse-voice-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userQuery: voiceInput })
+      });
+      const data = await res.json();
+      if (data.items && Array.isArray(data.items)) {
+        for (const item of data.items) {
+          onAddItineraryItem({
+            dayIndex: item.dayIndex != null ? item.dayIndex : activeDay,
+            time: item.time || "14:00",
+            title: item.title,
+            description: item.description,
+            locationName: item.locationName,
+            category: item.category || "sight",
+            cost: item.cost || 0
+          });
+        }
+        
+        if (onPostAISystemMessage) {
+          const names = data.items.map((it: any) => it.title).join(", ");
+          onPostAISystemMessage(
+            lang === "zh"
+              ? `🎙️ AI 語音排程成功！已自動偵測並排定：${names}`
+              : `🎙️ AI Voice Schedule Successful! Auto-parsed and scheduled: ${names}`
+          );
+        }
+        setVoiceInput("");
+      }
+    } catch (err) {
+      console.error("Voice schedule parsing failed:", err);
+    } finally {
+      setVoiceParsing(false);
+    }
+  };
+
+  const handleEmailConfirmationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailInput.trim()) return;
+    setEmailParsing(true);
+    try {
+      const res = await fetch("/api/ai/parse-email-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emailText: emailInput, activeDay })
+      });
+      const data = await res.json();
+      if (data.items && Array.isArray(data.items)) {
+        for (const item of data.items) {
+          onAddItineraryItem({
+            dayIndex: item.dayIndex != null ? item.dayIndex : activeDay,
+            time: item.time || "14:00",
+            title: item.title,
+            description: item.description,
+            locationName: item.locationName,
+            category: item.category || "other",
+            cost: item.cost || 0
+          });
+        }
+        
+        if (onPostAISystemMessage) {
+          const names = data.items.map((it: any) => it.title).join(", ");
+          onPostAISystemMessage(
+            lang === "zh"
+              ? `📥 智慧確認信解析成功！已自動偵測並匯入日程：${names}`
+              : `📥 Smart Confirmation Email Parsed! Automatically imported activities: ${names}`
+          );
+        }
+        setEmailInput("");
+      }
+    } catch (err) {
+      console.error("Email confirmation parsing failed:", err);
+    } finally {
+      setEmailParsing(false);
     }
   };
 
@@ -333,13 +482,42 @@ export default function ItineraryPlanner({
               )}
             </div>
 
-            <button
-              id="add-itinerary-trigger"
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-1.5 glass-button-primary text-white font-semibold py-2 px-3.5 rounded-xl cursor-pointer"
-            >
-              <Plus size={14} /> {t.addDailyActivity}
-            </button>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setShowMap(!showMap)}
+                className={`flex items-center gap-1.5 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-md ${
+                  showMap 
+                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25" 
+                    : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
+                }`}
+                title={lang === "zh" ? "切換地圖檢視模式" : "Toggle Split Map View"}
+              >
+                <span>🗺️</span>
+                <span>{lang === "zh" ? "行程地圖" : "Map View"} {showMap ? (lang === "zh" ? "開啟" : "ON") : (lang === "zh" ? "關閉" : "OFF")}</span>
+              </button>
+
+              {filteredItems.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handleTSPOptimization}
+                  disabled={tspOptimizing}
+                  className="flex items-center gap-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 hover:border-indigo-500/45 text-indigo-300 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md"
+                  title={lang === "zh" ? "計算這天所有景點的最短路徑與搭乘時間" : "Find the shortest circular route among all activities"}
+                >
+                  <Route size={14} className={tspOptimizing ? "animate-spin" : ""} />
+                  <span>{tspOptimizing ? (lang === "zh" ? "計算中..." : "Optimizing...") : (lang === "zh" ? "AI 順路優化 (TSP)" : "AI Route (TSP)")}</span>
+                </button>
+              )}
+
+              <button
+                id="add-itinerary-trigger"
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="flex items-center gap-1.5 glass-button-primary text-white font-semibold py-2 px-3.5 rounded-xl cursor-pointer shrink-0"
+              >
+                <Plus size={14} /> {t.addDailyActivity}
+              </button>
+            </div>
           </div>
 
           {/* Add Activity Form */}
@@ -451,15 +629,18 @@ export default function ItineraryPlanner({
             </form>
           )}
 
-          {/* Timeline View */}
-          <div className="flex-grow space-y-3 pr-1 max-h-[460px] overflow-y-auto overflow-x-hidden scrollbar-thin">
-            {filteredItems.length === 0 ? (
-              <div className="py-20 text-center flex flex-col items-center justify-center p-6 bg-white/3 border border-white/5 rounded-2xl border-dashed">
-                <Clock className="text-indigo-400 mb-2" size={24} />
-                <p className="text-xs text-slate-400 max-w-md">{t.vacantMessage}</p>
-              </div>
-            ) : (
-              filteredItems.map((item) => {
+          {/* Timeline View & Map Split Wrapper */}
+          <div className={`flex-grow ${showMap ? "grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[400px]" : "flex flex-col"}`}>
+            {/* Timeline List Column */}
+            <div className={`flex flex-col justify-between ${showMap ? "lg:col-span-7 h-[460px]" : "flex-grow"}`}>
+              <div className="flex-grow space-y-3 pr-1 h-full overflow-y-auto overflow-x-hidden scrollbar-thin">
+                {filteredItems.length === 0 ? (
+                  <div className="py-20 text-center flex flex-col items-center justify-center p-6 bg-white/3 border border-white/5 rounded-2xl border-dashed">
+                    <Clock className="text-indigo-400 mb-2" size={24} />
+                    <p className="text-xs text-slate-400 max-w-md">{t.vacantMessage}</p>
+                  </div>
+                ) : (
+                  filteredItems.map((item, idx) => {
                 const voterMetas = getVoterMeta(item.votes);
                 const userVoted = item.votes.includes(currentUser);
 
@@ -728,9 +909,35 @@ export default function ItineraryPlanner({
                         </div>
                       )}
                     </div>
+                    
+                    {/* 🚗 Transportation Connection Card */}
+                    {idx < filteredItems.length - 1 && (
+                      <div className="my-2 ml-7 pl-5 border-l border-dashed border-white/15 flex items-center gap-3 py-1 text-[11px] text-slate-400 select-none animate-fadeIn">
+                        <div className="flex items-center gap-2 bg-white/4 border border-white/5 hover:bg-white/8 px-2.5 py-0.5 rounded-xl text-slate-200">
+                          <span className="text-xs">{getTransitIconAndDetails(item, filteredItems[idx + 1], lang).icon}</span>
+                          <span className="font-semibold text-[9px]">{getTransitIconAndDetails(item, filteredItems[idx + 1], lang).label}</span>
+                        </div>
+                        <span className="text-[9px] text-slate-500 font-mono">
+                          {getTransitIconAndDetails(item, filteredItems[idx + 1], lang).distText}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })
+            )}
+              </div>
+            </div>
+
+            {/* Live Interactive Itinerary Map Column */}
+            {showMap && (
+              <div className="lg:col-span-5 w-full h-[360px] lg:h-[460px] min-h-[350px] lg:min-h-0 animate-fadeIn flex flex-col">
+                <ItineraryMap
+                  destination={filteredItems[0]?.locationName || "Tokyo"}
+                  items={filteredItems}
+                  lang={lang}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -817,6 +1024,110 @@ export default function ItineraryPlanner({
                         )}
                       </button>
                     </div>
+                  </div>
+
+                  {/* Voice / Natural Language Scheduling Bar */}
+                  <div className="bg-white/3 border border-white/5 p-3.5 rounded-xl space-y-2 shrink-0">
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-300">
+                      <span>🎙️</span>
+                      <span>{lang === "zh" ? "AI 語音/自然語言排班" : "AI Voice / Natural Schedule"}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      {lang === "zh" 
+                        ? "輸入自然口語（如：「幫我把下午 3 點加進明治神宮，順便推薦附近預算 1500 日圓內的咖啡廳」），系統會自動拆分並寫入對應的日程表！" 
+                        : "Type or speak naturally (e.g. 'Add Meiji Shrine at 3 PM and recommend a cafe nearby under 1500 JPY'). System parses and schedules directly!"}
+                    </p>
+                    <form onSubmit={handleVoiceScheduleSubmit} className="space-y-1.5 text-xs">
+                      <textarea
+                        value={voiceInput}
+                        onChange={(e) => setVoiceInput(e.target.value)}
+                        placeholder={lang === "zh" ? "輸入語音指令或文字..." : "Enter voice command or text schedule..."}
+                        className="w-full text-xs p-2.5 bg-slate-900/80 border border-white/10 rounded-lg text-white font-medium h-12 resize-none focus:border-indigo-500/50 focus:ring-0"
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          type="submit"
+                          disabled={voiceParsing || !voiceInput.trim()}
+                          className="flex-1 py-1.5 bg-indigo-600/90 hover:bg-indigo-600 border border-indigo-500/20 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shadow-md"
+                        >
+                          {voiceParsing ? (
+                            <>
+                              <RefreshCw size={11} className="animate-spin text-white" />
+                              <span>{lang === "zh" ? "解析中..." : "Parsing..."}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>⚡</span>
+                              <span>{lang === "zh" ? "一鍵智慧排程" : "Generate Schedule"}</span>
+                            </>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setVoiceInput(lang === "zh" ? "幫我把第三天下午 3 點加進淺草寺，順便推薦附近步行 10 分鐘內、預算在 2000 日圓內的拉麵店" : "Add Sensoji temple on Day 3 afternoon, and recommend a ramen shop nearby under 2000 JPY")}
+                          className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0"
+                          title={lang === "zh" ? "載入語音範例" : "Load Example"}
+                        >
+                          💡
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* Email Confirmation Parser Card */}
+                  <div className="bg-white/3 border border-white/5 p-3.5 rounded-xl space-y-2 shrink-0">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-300">
+                      <span>📥</span>
+                      <span>{lang === "zh" ? "一鍵導入機票/酒店確認信" : "Import Flight/Hotel confirmation"}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                      {lang === "zh" 
+                        ? "直接貼上航空公司、Booking.com 或 Airbnb 的訂單/確認信內文，由 AI 自動解析並建立對應日程！" 
+                        : "Directly paste confirmation email text from airlines, Booking.com or Airbnb. AI will parse and schedule!"}
+                    </p>
+                    <form onSubmit={handleEmailConfirmationSubmit} className="space-y-1.5 text-xs">
+                      <textarea
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        placeholder={lang === "zh" ? "貼上機票或酒店預約信內文..." : "Paste flight details or hotel reservation text..."}
+                        className="w-full text-[10.5px] p-2 bg-slate-900/80 border border-white/10 rounded-lg text-white font-medium h-14 resize-none focus:border-teal-500/50 focus:ring-0"
+                      />
+                      <div className="flex gap-1">
+                        <button
+                          type="submit"
+                          disabled={emailParsing || !emailInput.trim()}
+                          className="flex-1 py-1.5 bg-teal-600/90 hover:bg-teal-650 border border-teal-500/20 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shadow-md"
+                        >
+                          {emailParsing ? (
+                            <>
+                              <RefreshCw size={11} className="animate-spin text-white" />
+                              <span>{lang === "zh" ? "解析中..." : "Parsing..."}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>🚀</span>
+                              <span>{lang === "zh" ? "智慧一鍵導入" : "Import & Parse"}</span>
+                            </>
+                          )}
+                        </button>
+                        
+                        {/* Custom loaded sample button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmailInput(
+                              lang === "zh"
+                                ? `【機票確認】全日空 ANA NH811\n起飛：香港國際機場 HKG 09:30 AM\n抵達：東京成田機場 NRT 02:45 PM\n機型：Boeing 787-9\n訂位代號：#ANA-74D389\n備註：請準備好電子護照辦理入境登記。`
+                                : `Booking.com confirmation:\nReservation: #BK-1849102\nHotel: Ginza Grand Hotel Tokyo\nCheck-in Date: Day 1 at 15:00\nRoom Type: Standard Queen Non-Smoking\nBreakfast: Included\nLocation: 8-6-15 Ginza, Chuo, Tokyo`
+                            );
+                          }}
+                          className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0"
+                          title={lang === "zh" ? "載入機票預約範例" : "Load Booking Example"}
+                        >
+                          📋
+                        </button>
+                      </div>
+                    </form>
                   </div>
 
                   {/* Conversation Box */}

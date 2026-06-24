@@ -182,7 +182,7 @@ export default function App() {
   }
 
   const isLight = theme === "light";
-  const { trip, syncing, errorState, pendingInvitations } = sync;
+  const { trip, syncing, errorState, pendingInvitations, isOffline } = sync;
 
   return (
     <div className={`min-h-screen flex flex-col font-sans selection:bg-blue-600/35 antialiased overflow-x-hidden relative transition-colors duration-300 ${
@@ -194,6 +194,20 @@ export default function App() {
       
       <div className="z-10 flex flex-col min-h-screen">
         
+        {isOffline && (
+          <div className="bg-amber-500 text-slate-900 px-4 py-2 text-center text-xs font-bold flex items-center justify-center gap-2 shadow-lg animate-fadeIn z-50 transition-all border-b border-amber-600">
+            <span className="flex h-2 w-2 relative shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-950 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-slate-950"></span>
+            </span>
+            <span>
+              {lang === "zh" 
+                ? "✈️ 飛航離線模式：您已中斷網際網路連線。所有變更皆會保存在本地，並在連線後自動同步至雲端資料庫。"
+                : "✈️ Offline Airplane Mode: You are currently disconnected from the Internet. Your edits will be saved locally and sync automatically when connected."}
+            </span>
+          </div>
+        )}
+
         {/* 1. Header Workspace */}
         {trip && (
           <HeaderWorkspace

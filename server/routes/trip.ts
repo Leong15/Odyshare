@@ -6,7 +6,7 @@
  */
 import { Router, Request, Response } from "express";
 import {
-  readTripsDB, writeTripsDB, getDB, writeDB,
+  readTripsDB, writeTripsDB, getDB, writeDB, registerSSEClient, unregisterSSEClient,
 } from "../db.js";
 import { resolveCoordinates } from "../utils/geocoding.js";
 
@@ -313,6 +313,38 @@ router.post("/chat/send", async (req: Request, res: Response) => {
   current.chats.push(newMsg);
   writeTripsDB(current, req);
   res.json({ success: true, msg: newMsg, trip: current });
+});
+
+// ── GET /api/trip/events ─────────────────────────────────────────────────────
+router.get("/events", (req: Request, res: Response) => {
+  const tripId = req.query.tripId as string;
+  if (!tripId) {
+    return res.status(400).json({ error: "Missing tripId parameter" });
+  }
+
+  // Set headers for Server-Sent Events
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  // Register client
+  registerSSEClient(tripId, res);
+
+  // Send initial connection state
+  res.write(`data: ${JSON.stringify({ type: "connected", tripId })}\n\n`);
+
+  // Setup interval to keep connection alive (prevent intermediate reverse proxy timeout)
+  const keepAliveInterval = setInterval(() => {
+    res.write(": keepalive\n\n");
+  }, 30000);
+
+  // Clean up registration on disconnect
+  req.on("close", () => {
+    clearInterval(keepAliveInterval);
+    unregisterSSEClient(tripId, res);
+    res.end();
+  });
 });
 
 export default router;

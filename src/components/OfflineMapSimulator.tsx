@@ -1486,11 +1486,10 @@ export default function OfflineMapSimulator({
 
         {/* Beautiful interactive Leaflet OpenStreetMap view or Simulator view */}
         {viewMode === "leaflet" ? (
-          <div className="w-full h-full relative" style={{ minHeight: "350px" }}>
+          <div className="w-full h-full relative min-h-[350px]">
             <div
               ref={mapContainerRef}
-              className="w-full h-full text-slate-900"
-              style={{ minHeight: "100%", background: "#0b0e14" }}
+              className="w-full h-full text-slate-900 min-h-full bg-[#0b0e14]"
             />
           </div>
         ) : (

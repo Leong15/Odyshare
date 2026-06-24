@@ -564,11 +564,7 @@ export default function TripDashboard({
               setLockedLocationKey(null);
               setLockedMousePos(null);
             }}
-            className="relative w-full select-none mt-4 rounded-xl border border-white/5 overflow-hidden bg-slate-900/40 glass-card"
-            style={{
-              aspectRatio: '2 / 1',
-              backgroundColor: isLightTheme ? '#e0f2fe' : '#0a1628'
-            }}
+            className="relative w-full aspect-[2/1] select-none mt-4 rounded-xl border border-white/5 overflow-hidden glass-card bg-[#e0f2fe] dark:bg-[#0a1628]"
           >
             <ComposableMap
               projection="geoEquirectangular"
@@ -613,12 +609,9 @@ export default function TripDashboard({
               <line x1="180" y1="0" x2="180" y2="180" stroke="#475569" strokeWidth="0.5" />
             </svg>
 
-            <div className="absolute left-2 text-[8px] font-mono text-slate-500/70 pointer-events-none"
-              style={{ top: '33.3%', transform: 'translateY(-50%)' }}>30° N</div>
-            <div className="absolute left-2 text-[8px] font-mono text-slate-400/80 pointer-events-none"
-              style={{ top: '50%', transform: 'translateY(-50%)' }}>0° (Equator)</div>
-            <div className="absolute left-2 text-[8px] font-mono text-slate-500/70 pointer-events-none"
-              style={{ top: '66.7%', transform: 'translateY(-50%)' }}>30° S</div>
+            <div className="absolute left-2 text-[8px] font-mono text-slate-500/70 pointer-events-none top-[33.3%] -translate-y-1/2">30° N</div>
+            <div className="absolute left-2 text-[8px] font-mono text-slate-400/80 pointer-events-none top-[50%] -translate-y-1/2">0° (Equator)</div>
+            <div className="absolute left-2 text-[8px] font-mono text-slate-500/70 pointer-events-none top-[66.7%] -translate-y-1/2">30° S</div>
 
             <div className="absolute inset-0">
               {groupedPins.map((g) => {
@@ -635,12 +628,12 @@ export default function TripDashboard({
                     <div className="relative flex items-center justify-center">
                       {isActive && (
                         <>
-                          <div className="absolute w-12 h-12 rounded-full animate-ping border border-blue-500/40 bg-blue-500/10" style={{ pointerEvents: 'none' }} />
-                          <div className="absolute w-7 h-7 rounded-full border border-blue-400/30" style={{ pointerEvents: 'none' }} />
+                          <div className="absolute w-12 h-12 rounded-full animate-ping border border-blue-500/40 bg-blue-500/10 pointer-events-none" />
+                          <div className="absolute w-7 h-7 rounded-full border border-blue-400/30 pointer-events-none" />
                         </>
                       )}
                       {!isActive && isHovered && (
-                        <div className="absolute w-7 h-7 rounded-full border border-indigo-400/30 bg-indigo-500/5 animate-pulse" style={{ pointerEvents: 'none' }} />
+                        <div className="absolute w-7 h-7 rounded-full border border-indigo-400/30 bg-indigo-500/5 animate-pulse pointer-events-none" />
                       )}
                       <button
                         type="button"
