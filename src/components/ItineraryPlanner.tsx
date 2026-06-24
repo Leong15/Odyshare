@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Clock, MapPin, MessageSquare, ThumbsUp, Plus, Eye, Send, Landmark, ShoppingBag, Utensils, Route, Bed, Sparkles, RefreshCw } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Clock, MapPin, MessageSquare, ThumbsUp, Plus, Eye, Send, Landmark, ShoppingBag, Utensils, Route, Bed, Sparkles, RefreshCw, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 import ItineraryMap from "./ItineraryMap";
@@ -114,6 +114,50 @@ export default function ItineraryPlanner({
   const [emailInput, setEmailInput] = useState<string>("");
   const [emailParsing, setEmailParsing] = useState<boolean>(false);
   const [tspOptimizing, setTspOptimizing] = useState<boolean>(false);
+
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isOptimizerCollapsed, setIsOptimizerCollapsed] = useState<boolean>(false);
+  const [isVoiceCollapsed, setIsVoiceCollapsed] = useState<boolean>(false);
+  const [isEmailCollapsed, setIsEmailCollapsed] = useState<boolean>(false);
+  const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(false);
+
+  const dayTabsScrollRef = useRef<HTMLDivElement>(null);
+  const scrollDayTabs = (direction: "left" | "right") => {
+    if (dayTabsScrollRef.current) {
+      const scrollAmount = 180;
+      dayTabsScrollRef.current.scrollBy({
+        left: direction === "left" ? -scrollAmount : scrollAmount,
+        behavior: "smooth"
+      });
+    }
+  };
+
+  useEffect(() => {
+    const scrollTabToCenter = () => {
+      if (dayTabsScrollRef.current) {
+        const activeTabEl = document.getElementById(`day-tab-${activeDay}`);
+        if (activeTabEl) {
+          const container = dayTabsScrollRef.current;
+          const containerWidth = container.offsetWidth;
+          const tabWidth = activeTabEl.offsetWidth;
+          const tabOffsetLeft = activeTabEl.offsetLeft;
+          
+          // Calculate target scrollLeft to center the tab
+          const targetScrollLeft = tabOffsetLeft - (containerWidth / 2) + (tabWidth / 2);
+          
+          container.scrollTo({
+            left: targetScrollLeft,
+            behavior: "smooth"
+          });
+        }
+      }
+    };
+
+    // Scroll immediately and also after a short timeout to ensure correct layout rendering
+    scrollTabToCenter();
+    const timeoutId = setTimeout(scrollTabToCenter, 60);
+    return () => clearTimeout(timeoutId);
+  }, [activeDay, totalDays]);
 
   useEffect(() => {
     if (activeCommentDrawerId) {
@@ -392,7 +436,7 @@ export default function ItineraryPlanner({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* List Itineraries */}
-      <div className="lg:col-span-2 space-y-4">
+      <div className={`${isSidebarOpen ? "lg:col-span-2" : "lg:col-span-3"} space-y-4 transition-all duration-300`}>
         {backupItineraries && backupItineraries.length > 0 && (
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between text-xs animate-fadeIn text-amber-200 gap-2.5 shadow-md">
             <div className="flex items-center gap-2">
@@ -417,76 +461,115 @@ export default function ItineraryPlanner({
         <div id="itinerary-timeline-container" className="glass-container rounded-2xl p-5 shadow-lg flex flex-col h-full min-h-[500px]">
           
           {/* Header Controls */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-5 border-b border-white/10 pb-4 text-xs">
-            {/* Days Tabs */}
-            <div className="flex flex-wrap items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 backdrop-blur-md">
-              {daysToShow.map((dayIdx) => (
-                <button
-                  key={dayIdx}
-                  id={`day-tab-${dayIdx}`}
-                  onClick={() => {
-                    setActiveDay(dayIdx);
-                    setActiveCommentDrawerId(null);
-                  }}
-                  className={`px-3 py-1.5 font-bold rounded-lg cursor-pointer transition-all ${
-                    activeDay === dayIdx
-                      ? "bg-white/10 text-white border border-white/10 shadow-sm"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  {t.day} {dayIdx + 1} {lang === "zh" ? "天" : ""}
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setTotalDays(prev => prev + 1)}
-                className="px-2.5 py-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1.5 border border-transparent hover:border-blue-500/20"
-                title={lang === "zh" ? "增加日數" : "Add Day"}
-              >
-                <Plus size={13} />
-                <span>{lang === "zh" ? "增加天數" : "Add Day"}</span>
-              </button>
-
-              {totalDays > 1 && (
+          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3.5 mb-5 border-b border-white/10 pb-4">
+            
+            {/* Day Management Group (Tabs & Buttons) */}
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              
+              {/* Day Scroll Tabs (Constrained and Scrollable) */}
+              <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 backdrop-blur-md min-w-0 max-w-[280px] xs:max-w-[320px] sm:max-w-[360px] relative">
+                {/* Left Scroll Arrow */}
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (onDeleteItineraryItem) {
-                      // Delete all items that fall into the activeDay index
-                      const itemsOnDay = itineraries.filter(item => item.dayIndex === activeDay);
-                      for (const item of itemsOnDay) {
-                        await onDeleteItineraryItem(item.id);
-                      }
-                      // Shift all items on subsequent days down by 1 day index
-                      const subsequentItems = itineraries.filter(item => item.dayIndex > activeDay);
-                      for (const item of subsequentItems) {
-                        if (onUpdateItineraryItem) {
-                          await onUpdateItineraryItem({
-                            ...item,
-                            dayIndex: item.dayIndex - 1
-                          });
-                        }
-                      }
-                    }
-                    // Decrement days count safely 
-                    setTotalDays(prev => Math.max(1, prev - 1));
-                    setActiveDay(prev => Math.max(0, Math.min(totalDays - 2, prev)));
+                  onClick={() => scrollDayTabs("left")}
+                  className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                  title={lang === "zh" ? "向左滾動" : "Scroll left"}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+
+                {/* Scrollable Day Number Buttons */}
+                <div 
+                  ref={dayTabsScrollRef}
+                  className="relative flex items-center gap-1 overflow-x-auto scrollbar-none scroll-smooth whitespace-nowrap flex-1 py-0.5"
+                >
+                  {daysToShow.map((dayIdx) => (
+                    <button
+                      key={dayIdx}
+                      id={`day-tab-${dayIdx}`}
+                      onClick={() => {
+                        setActiveDay(dayIdx);
+                        setActiveCommentDrawerId(null);
+                      }}
+                      className={`px-3 py-1.5 font-bold rounded-lg cursor-pointer transition-all text-xs shrink-0 ${
+                        activeDay === dayIdx
+                          ? "bg-blue-600 text-white shadow-sm font-extrabold"
+                          : "text-slate-400 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      {t.day} {dayIdx + 1} {lang === "zh" ? "天" : ""}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Right Scroll Arrow */}
+                <button
+                  type="button"
+                  onClick={() => scrollDayTabs("right")}
+                  className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                  title={lang === "zh" ? "向右滾動" : "Scroll right"}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+
+              {/* Day Management Actions (Add/Remove) - ALWAYS VISIBLE, OUT OF SCROLL CONTAINER */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newDayIdx = totalDays;
+                    setTotalDays(prev => prev + 1);
+                    setActiveDay(newDayIdx);
                     setActiveCommentDrawerId(null);
                   }}
-                  className="px-2.5 py-1.5 text-rose-450 hover:text-rose-400 hover:bg-rose-500/10 font-bold rounded-lg cursor-pointer transition-all flex items-center gap-1 border border-transparent hover:border-rose-500/15"
-                  title={lang === "zh" ? "刪除此天所有行程 & 移除這天" : "Delete active day and shift schedule"}
+                  className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-blue-600/10 hover:bg-blue-600/25 border border-blue-500/20 hover:border-blue-500/35 text-blue-300 font-bold rounded-xl cursor-pointer transition-all text-xs shadow-md shrink-0"
+                  title={lang === "zh" ? "增加天數" : "Add Day"}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                  <span>{lang === "zh" ? "刪除此天" : "Remove Day"}</span>
+                  <Plus size={14} className="shrink-0" />
+                  <span>{lang === "zh" ? "增加天數" : "Add Day"}</span>
                 </button>
-              )}
+
+                {totalDays > 1 && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (onDeleteItineraryItem) {
+                        const itemsOnDay = itineraries.filter(item => item.dayIndex === activeDay);
+                        for (const item of itemsOnDay) {
+                          await onDeleteItineraryItem(item.id);
+                        }
+                        const subsequentItems = itineraries.filter(item => item.dayIndex > activeDay);
+                        for (const item of subsequentItems) {
+                          if (onUpdateItineraryItem) {
+                            await onUpdateItineraryItem({
+                              ...item,
+                              dayIndex: item.dayIndex - 1
+                            });
+                          }
+                        }
+                      }
+                      setTotalDays(prev => Math.max(1, prev - 1));
+                      setActiveDay(prev => Math.max(0, Math.min(totalDays - 2, prev)));
+                      setActiveCommentDrawerId(null);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/15 hover:border-rose-500/25 text-rose-400 font-bold rounded-xl cursor-pointer transition-all text-xs shadow-md shrink-0"
+                    title={lang === "zh" ? "刪除目前這一天所有行程並移除此天" : "Delete active day and shift schedule"}
+                  >
+                    <Trash2 size={13} className="shrink-0" />
+                    <span>{lang === "zh" ? "刪除此天" : "Remove Day"}</span>
+                  </button>
+                )}
+              </div>
+
             </div>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            {/* Other Actions Group (Map, TSP, Sidebar, Add Activity) */}
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full xl:w-auto xl:justify-end">
               <button
                 type="button"
                 onClick={() => setShowMap(!showMap)}
-                className={`flex items-center gap-1.5 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-md ${
+                className={`flex items-center gap-1.5 font-semibold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-md shrink-0 ${
                   showMap 
                     ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25" 
                     : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
@@ -502,22 +585,37 @@ export default function ItineraryPlanner({
                   type="button"
                   onClick={handleTSPOptimization}
                   disabled={tspOptimizing}
-                  className="flex items-center gap-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 hover:border-indigo-500/45 text-indigo-300 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md"
+                  className="flex items-center gap-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 hover:border-indigo-500/45 text-indigo-300 font-semibold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-xl cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shrink-0"
                   title={lang === "zh" ? "計算這天所有景點的最短路徑與搭乘時間" : "Find the shortest circular route among all activities"}
                 >
-                  <Route size={14} className={tspOptimizing ? "animate-spin" : ""} />
+                  <Route size={14} className={tspOptimizing ? "animate-spin shrink-0" : "shrink-0"} />
                   <span>{tspOptimizing ? (lang === "zh" ? "計算中..." : "Optimizing...") : (lang === "zh" ? "AI 順路優化 (TSP)" : "AI Route (TSP)")}</span>
                 </button>
               )}
 
               <button
+                type="button"
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className={`flex items-center gap-1.5 font-semibold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-md shrink-0 ${
+                  isSidebarOpen 
+                    ? "bg-blue-500/15 text-blue-300 border-blue-500/30 hover:bg-blue-500/25" 
+                    : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
+                }`}
+                title={lang === "zh" ? "顯示或隱藏 AI 與討論板側邊欄" : "Toggle AI & Chat sidebar"}
+              >
+                <span>{isSidebarOpen ? "➡️" : "⬅️"}</span>
+                <span>{lang === "zh" ? "AI 與討論" : "AI & Chat"}</span>
+              </button>
+
+              <button
                 id="add-itinerary-trigger"
                 onClick={() => setShowAddForm(!showAddForm)}
-                className="flex items-center gap-1.5 glass-button-primary text-white font-semibold py-2 px-3.5 rounded-xl cursor-pointer shrink-0"
+                className="flex items-center gap-1.5 glass-button-primary text-white font-semibold py-1.5 px-3 sm:py-2 sm:px-3.5 rounded-xl cursor-pointer shrink-0 text-xs shadow-md"
               >
                 <Plus size={14} /> {t.addDailyActivity}
               </button>
             </div>
+
           </div>
 
           {/* Add Activity Form */}
@@ -944,337 +1042,378 @@ export default function ItineraryPlanner({
       </div>
 
       {/* Slide Drawer comments & AI assistant sidebar */}
-      <div className="lg:col-span-1">
-        <div className="glass-container rounded-2xl p-5 shadow-lg h-full min-h-[500px] flex flex-col justify-between">
-          <div className="flex-grow flex flex-col justify-between h-full">
-            <div className="flex flex-col flex-1 h-full">
-              {/* Tab selector */}
-              <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 backdrop-blur-md text-[11px] font-bold leading-none mb-4 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setSidebarTab("ai")}
-                  className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    sidebarTab === "ai" 
-                      ? "bg-blue-600 text-white shadow font-black" 
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  <Sparkles size={12} className="text-blue-200" />
-                  <span>🤖 OdyShareSmart AI</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSidebarTab("discussion")}
-                  className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    sidebarTab === "discussion" 
-                      ? "bg-blue-600 text-white shadow font-black" 
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  <MessageSquare size={12} />
-                  <span>💬 {t.discussionSidebar}</span>
-                  {activeCommentDrawerId ? (
-                    <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping"></span>
-                  ) : null}
-                </button>
-              </div>
-
-              {/* Tab Contents: AI Side */}
-              {sidebarTab === "ai" ? (
-                <div className="flex-1 flex flex-col justify-between h-full space-y-4">
-                  {/* Optimizer input */}
-                  <div className="bg-white/3 border border-white/5 p-3.5 rounded-xl space-y-3 shrink-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="p-0.5 px-1.5 bg-blue-500/15 text-blue-300 rounded border border-blue-500/25 text-[9px] font-mono font-bold leading-none flex items-center">
-                        {t.geminiEngine}
-                      </span>
-                      <h4 className="font-extrabold text-white text-xs">{t.optimizerTitle}</h4>
-                    </div>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                      {t.optimizerDesc}
-                    </p>
-                    
-                    <div className="space-y-2 pt-1 text-xs">
-                      <label className="block text-[10px] font-bold text-slate-300 uppercase tracking-widest">{t.groupVibe}</label>
-                      <input
-                        id="ai-preferences-input"
-                        type="text"
-                        value={prefInput}
-                        onChange={(e) => setPrefInput(e.target.value)}
-                        placeholder="e.g. Sushi crawl, cultural shrines..."
-                        className="w-full text-xs px-2.5 py-1.5 glass-input rounded-lg text-white font-medium"
-                      />
-                      
-                      <button
-                        id="ai-optimize-btn"
-                        onClick={handleOptimize}
-                        disabled={optimizing || !onApplyAIOptimization}
-                        className="w-full py-1.5 glass-button-primary text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 mt-1"
-                      >
-                        {optimizing ? (
-                          <>
-                            <RefreshCw size={12} className="animate-spin text-white" />
-                            <span>{t.generatingPath}</span>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles size={12} className="text-blue-200" />
-                            <span>{t.rebuildItinerary}</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Voice / Natural Language Scheduling Bar */}
-                  <div className="bg-white/3 border border-white/5 p-3.5 rounded-xl space-y-2 shrink-0">
-                    <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-300">
-                      <span>🎙️</span>
-                      <span>{lang === "zh" ? "AI 語音/自然語言排班" : "AI Voice / Natural Schedule"}</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      {lang === "zh" 
-                        ? "輸入自然口語（如：「幫我把下午 3 點加進明治神宮，順便推薦附近預算 1500 日圓內的咖啡廳」），系統會自動拆分並寫入對應的日程表！" 
-                        : "Type or speak naturally (e.g. 'Add Meiji Shrine at 3 PM and recommend a cafe nearby under 1500 JPY'). System parses and schedules directly!"}
-                    </p>
-                    <form onSubmit={handleVoiceScheduleSubmit} className="space-y-1.5 text-xs">
-                      <textarea
-                        value={voiceInput}
-                        onChange={(e) => setVoiceInput(e.target.value)}
-                        placeholder={lang === "zh" ? "輸入語音指令或文字..." : "Enter voice command or text schedule..."}
-                        className="w-full text-xs p-2.5 bg-slate-900/80 border border-white/10 rounded-lg text-white font-medium h-12 resize-none focus:border-indigo-500/50 focus:ring-0"
-                      />
-                      <div className="flex gap-1">
-                        <button
-                          type="submit"
-                          disabled={voiceParsing || !voiceInput.trim()}
-                          className="flex-1 py-1.5 bg-indigo-600/90 hover:bg-indigo-600 border border-indigo-500/20 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shadow-md"
-                        >
-                          {voiceParsing ? (
-                            <>
-                              <RefreshCw size={11} className="animate-spin text-white" />
-                              <span>{lang === "zh" ? "解析中..." : "Parsing..."}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>⚡</span>
-                              <span>{lang === "zh" ? "一鍵智慧排程" : "Generate Schedule"}</span>
-                            </>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setVoiceInput(lang === "zh" ? "幫我把第三天下午 3 點加進淺草寺，順便推薦附近步行 10 分鐘內、預算在 2000 日圓內的拉麵店" : "Add Sensoji temple on Day 3 afternoon, and recommend a ramen shop nearby under 2000 JPY")}
-                          className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0"
-                          title={lang === "zh" ? "載入語音範例" : "Load Example"}
-                        >
-                          💡
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* Email Confirmation Parser Card */}
-                  <div className="bg-white/3 border border-white/5 p-3.5 rounded-xl space-y-2 shrink-0">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-300">
-                      <span>📥</span>
-                      <span>{lang === "zh" ? "一鍵導入機票/酒店確認信" : "Import Flight/Hotel confirmation"}</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                      {lang === "zh" 
-                        ? "直接貼上航空公司、Booking.com 或 Airbnb 的訂單/確認信內文，由 AI 自動解析並建立對應日程！" 
-                        : "Directly paste confirmation email text from airlines, Booking.com or Airbnb. AI will parse and schedule!"}
-                    </p>
-                    <form onSubmit={handleEmailConfirmationSubmit} className="space-y-1.5 text-xs">
-                      <textarea
-                        value={emailInput}
-                        onChange={(e) => setEmailInput(e.target.value)}
-                        placeholder={lang === "zh" ? "貼上機票或酒店預約信內文..." : "Paste flight details or hotel reservation text..."}
-                        className="w-full text-[10.5px] p-2 bg-slate-900/80 border border-white/10 rounded-lg text-white font-medium h-14 resize-none focus:border-teal-500/50 focus:ring-0"
-                      />
-                      <div className="flex gap-1">
-                        <button
-                          type="submit"
-                          disabled={emailParsing || !emailInput.trim()}
-                          className="flex-1 py-1.5 bg-teal-600/90 hover:bg-teal-650 border border-teal-500/20 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shadow-md"
-                        >
-                          {emailParsing ? (
-                            <>
-                              <RefreshCw size={11} className="animate-spin text-white" />
-                              <span>{lang === "zh" ? "解析中..." : "Parsing..."}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>🚀</span>
-                              <span>{lang === "zh" ? "智慧一鍵導入" : "Import & Parse"}</span>
-                            </>
-                          )}
-                        </button>
-                        
-                        {/* Custom loaded sample button */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEmailInput(
-                              lang === "zh"
-                                ? `【機票確認】全日空 ANA NH811\n起飛：香港國際機場 HKG 09:30 AM\n抵達：東京成田機場 NRT 02:45 PM\n機型：Boeing 787-9\n訂位代號：#ANA-74D389\n備註：請準備好電子護照辦理入境登記。`
-                                : `Booking.com confirmation:\nReservation: #BK-1849102\nHotel: Ginza Grand Hotel Tokyo\nCheck-in Date: Day 1 at 15:00\nRoom Type: Standard Queen Non-Smoking\nBreakfast: Included\nLocation: 8-6-15 Ginza, Chuo, Tokyo`
-                            );
-                          }}
-                          className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0"
-                          title={lang === "zh" ? "載入機票預約範例" : "Load Booking Example"}
-                        >
-                          📋
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* Conversation Box */}
-                  <div className="flex-1 flex flex-col justify-between pb-1 min-h-[160px]">
-                    <div>
-                      <h5 className="font-extrabold text-white text-[11px] mb-2 flex items-center gap-1">
-                        <MessageSquare size={13} className="text-blue-400" />
-                        <span>{t.OdyShareSmartConc}</span>
-                      </h5>
-
-                      <div className="overflow-y-auto mb-2 space-y-2 p-2.5 bg-white/3 border border-white/5 rounded-xl h-[120px] scrollbar-thin text-xs">
-                        {chatLog.map((log, idx) => (
-                          <div
-                            key={idx}
-                            className={`flex flex-col max-w-[90%] animate-fadeIn ${
-                              log.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"
-                            }`}
-                          >
-                            <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5 font-mono">
-                              {log.sender === "user" ? (lang === "zh" ? "您" : "You") : "OdyShareSmart AI"}
-                            </span>
-                            <div
-                              className={`p-2 rounded-xl text-[11px] ${
-                                log.sender === "user"
-                                  ? "bg-blue-600/95 border border-blue-500/30 text-white rounded-br-none"
-                                  : "bg-white/5 border border-white/5 text-slate-200 rounded-bl-none"
-                              }`}
-                            >
-                              {log.text}
-                            </div>
-                          </div>
-                        ))}
-                        {submittingChat && (
-                          <span className="text-[9px] text-slate-400 font-mono italic animate-pulse">{lang === "zh" ? "OdyShareSmart 智慧響應中..." : "Assistant mapping..."}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <form onSubmit={handleChatSubmit} className="flex gap-1.5 text-xs">
-                      <input
-                        id="ai-chat-input"
-                        type="text"
-                        placeholder={t.askAiPlaceholder}
-                        value={chatMsg}
-                        onChange={(e) => setChatMsg(e.target.value)}
-                        disabled={submittingChat}
-                        className="flex-1 px-2.5 py-1.5 glass-input rounded-lg text-[11px]"
-                      />
-                      <button
-                        id="submit-ai-chat"
-                        type="submit"
-                        disabled={submittingChat}
-                        className="p-1 px-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-lg transition-all cursor-pointer shrink-0 disabled:opacity-50"
-                      >
-                        <Send size={12} />
-                      </button>
-                    </form>
-                  </div>
+      {isSidebarOpen && (
+        <div className="lg:col-span-1">
+          <div className="glass-container rounded-2xl p-5 shadow-lg h-full min-h-[500px] flex flex-col justify-between">
+            <div className="flex-grow flex flex-col justify-between h-full">
+              <div className="flex flex-col flex-1 h-full">
+                {/* Tab selector */}
+                <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 backdrop-blur-md text-[11px] font-bold leading-none mb-4 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab("ai")}
+                    className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      sidebarTab === "ai" 
+                        ? "bg-blue-600 text-white shadow font-black" 
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Sparkles size={12} className="text-blue-200" />
+                    <span>🤖 OdyShareSmart AI</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarTab("discussion")}
+                    className={`flex-1 py-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      sidebarTab === "discussion" 
+                        ? "bg-blue-600 text-white shadow font-black" 
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <MessageSquare size={12} />
+                    <span>💬 {t.discussionSidebar}</span>
+                    {activeCommentDrawerId ? (
+                      <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping"></span>
+                    ) : null}
+                  </button>
                 </div>
-              ) : activeCommentDrawerId ? (
-                (() => {
-                  const selectedItem = itineraries.find(i => i.id === activeCommentDrawerId);
-                  if (!selectedItem) {
+
+                {/* Tab Contents: AI Side */}
+                {sidebarTab === "ai" ? (
+                  <div className="flex-1 flex flex-col justify-between h-full space-y-3">
+                    {/* Optimizer input */}
+                    <div className="bg-white/3 border border-white/5 p-3 rounded-xl space-y-2 shrink-0">
+                      <div 
+                        className="flex items-center justify-between cursor-pointer select-none"
+                        onClick={() => setIsOptimizerCollapsed(!isOptimizerCollapsed)}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="p-0.5 px-1.5 bg-blue-500/15 text-blue-300 rounded border border-blue-500/25 text-[9px] font-mono font-bold leading-none flex items-center">
+                            {t.geminiEngine}
+                          </span>
+                          <h4 className="font-extrabold text-white text-xs">{t.optimizerTitle}</h4>
+                        </div>
+                        <span className="text-slate-400 text-[10px] font-bold">{isOptimizerCollapsed ? "＋" : "－"}</span>
+                      </div>
+                      
+                      {!isOptimizerCollapsed && (
+                        <div className="space-y-2 pt-1 animate-fadeIn">
+                          <p className="text-[10.5px] text-slate-400 leading-relaxed">
+                            {t.optimizerDesc}
+                          </p>
+                          <div className="space-y-1.5 text-xs">
+                            <label className="block text-[9px] font-bold text-slate-300 uppercase tracking-widest">{t.groupVibe}</label>
+                            <input
+                              id="ai-preferences-input"
+                              type="text"
+                              value={prefInput}
+                              onChange={(e) => setPrefInput(e.target.value)}
+                              placeholder="e.g. Sushi crawl, cultural shrines..."
+                              className="w-full text-xs px-2.5 py-1.5 glass-input rounded-lg text-white font-medium"
+                            />
+                            <button
+                              id="ai-optimize-btn"
+                              onClick={handleOptimize}
+                              disabled={optimizing || !onApplyAIOptimization}
+                              className="w-full py-1.5 glass-button-primary text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                            >
+                              {optimizing ? (
+                                <>
+                                  <RefreshCw size={12} className="animate-spin text-white" />
+                                  <span>{t.generatingPath}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles size={12} className="text-blue-200" />
+                                  <span>{t.rebuildItinerary}</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Voice / Natural Language Scheduling Bar */}
+                    <div className="bg-white/3 border border-white/5 p-3 rounded-xl space-y-2 shrink-0">
+                      <div 
+                        className="flex items-center justify-between cursor-pointer select-none"
+                        onClick={() => setIsVoiceCollapsed(!isVoiceCollapsed)}
+                      >
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-300">
+                          <span>🎙️</span>
+                          <span>{lang === "zh" ? "AI 語音/自然語言排班" : "AI Voice / Natural Schedule"}</span>
+                        </div>
+                        <span className="text-slate-400 text-[10px] font-bold">{isVoiceCollapsed ? "＋" : "－"}</span>
+                      </div>
+                      
+                      {!isVoiceCollapsed && (
+                        <div className="space-y-1.5 pt-1 animate-fadeIn">
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            {lang === "zh" 
+                              ? "輸入口語（例如：『幫我把第三天下午 3 點加進淺草寺』），系統自動拆分日程！" 
+                              : "Type naturally (e.g. 'Add Sensoji at 3 PM on Day 3'). AI parses and schedules directly!"}
+                          </p>
+                          <form onSubmit={handleVoiceScheduleSubmit} className="space-y-1.5 text-xs">
+                            <textarea
+                              value={voiceInput}
+                              onChange={(e) => setVoiceInput(e.target.value)}
+                              placeholder={lang === "zh" ? "輸入語音指令或文字..." : "Enter voice command or text schedule..."}
+                              className="w-full text-xs p-2.5 bg-slate-900/80 border border-white/10 rounded-lg text-white font-medium h-12 resize-none focus:border-indigo-500/50 focus:ring-0"
+                            />
+                            <div className="flex gap-1">
+                              <button
+                                type="submit"
+                                disabled={voiceParsing || !voiceInput.trim()}
+                                className="flex-1 py-1.5 bg-indigo-600/90 hover:bg-indigo-600 border border-indigo-500/20 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shadow-md"
+                              >
+                                {voiceParsing ? (
+                                  <>
+                                    <RefreshCw size={11} className="animate-spin text-white" />
+                                    <span>{lang === "zh" ? "解析中..." : "Parsing..."}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>⚡</span>
+                                    <span>{lang === "zh" ? "一鍵智慧排程" : "Generate Schedule"}</span>
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setVoiceInput(lang === "zh" ? "幫我把第三天下午 3 點加進淺草寺，順便推薦附近步行 10 分鐘內、預算在 2000 日圓內的拉麵店" : "Add Sensoji temple on Day 3 afternoon, and recommend a ramen shop nearby under 2000 JPY")}
+                                className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0"
+                                title={lang === "zh" ? "載入語音範例" : "Load Example"}
+                              >
+                                💡
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Email Confirmation Parser Card */}
+                    <div className="bg-white/3 border border-white/5 p-3 rounded-xl space-y-2 shrink-0">
+                      <div 
+                        className="flex items-center justify-between cursor-pointer select-none"
+                        onClick={() => setIsEmailCollapsed(!isEmailCollapsed)}
+                      >
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-300">
+                          <span>📥</span>
+                          <span>{lang === "zh" ? "一鍵導入機票/酒店確認信" : "Import Flight/Hotel confirmation"}</span>
+                        </div>
+                        <span className="text-slate-400 text-[10px] font-bold">{isEmailCollapsed ? "＋" : "－"}</span>
+                      </div>
+
+                      {!isEmailCollapsed && (
+                        <div className="space-y-1.5 pt-1 animate-fadeIn">
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            {lang === "zh" 
+                              ? "貼上預約確認信，AI 自動解析並匯入日程！" 
+                              : "Paste confirmation text, and AI automatically maps to schedule!"}
+                          </p>
+                          <form onSubmit={handleEmailConfirmationSubmit} className="space-y-1.5 text-xs">
+                            <textarea
+                              value={emailInput}
+                              onChange={(e) => setEmailInput(e.target.value)}
+                              placeholder={lang === "zh" ? "貼上機票或酒店預約信內文..." : "Paste flight details or hotel reservation text..."}
+                              className="w-full text-[10.5px] p-2 bg-slate-900/80 border border-white/10 rounded-lg text-white font-medium h-12 resize-none focus:border-teal-500/50 focus:ring-0"
+                            />
+                            <div className="flex gap-1">
+                              <button
+                                type="submit"
+                                disabled={emailParsing || !emailInput.trim()}
+                                className="flex-1 py-1.5 bg-teal-600/90 hover:bg-teal-650 border border-teal-500/20 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shadow-md"
+                              >
+                                {emailParsing ? (
+                                  <>
+                                    <RefreshCw size={11} className="animate-spin text-white" />
+                                    <span>{lang === "zh" ? "解析中..." : "Parsing..."}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>🚀</span>
+                                    <span>{lang === "zh" ? "智慧一鍵導入" : "Import & Parse"}</span>
+                                  </>
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEmailInput(
+                                    lang === "zh"
+                                      ? `【機票確認】全日空 ANA NH811\n起飛：香港國際機場 HKG 09:30 AM\n抵達：東京成田機場 NRT 02:45 PM\n機型：Boeing 787-9\n訂位代號：#ANA-74D389\n備註：請準備好電子護照辦理入境登記。`
+                                      : `Booking.com confirmation:\nReservation: #BK-1849102\nHotel: Ginza Grand Hotel Tokyo\nCheck-in Date: Day 1 at 15:00\nRoom Type: Standard Queen Non-Smoking\nBreakfast: Included\nLocation: 8-6-15 Ginza, Chuo, Tokyo`
+                                  );
+                                }}
+                                className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0"
+                                title={lang === "zh" ? "載入機票預約範例" : "Load Booking Example"}
+                              >
+                                📋
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Conversation Box */}
+                    <div className="flex-1 flex flex-col justify-between pb-1 min-h-[160px] bg-white/3 border border-white/5 p-3 rounded-xl">
+                      <div 
+                        className="flex items-center justify-between cursor-pointer select-none mb-2"
+                        onClick={() => setIsChatCollapsed(!isChatCollapsed)}
+                      >
+                        <h5 className="font-extrabold text-white text-[11px] flex items-center gap-1">
+                          <MessageSquare size={13} className="text-blue-400" />
+                          <span>{t.OdyShareSmartConc}</span>
+                        </h5>
+                        <span className="text-slate-400 text-[10px] font-bold">{isChatCollapsed ? "＋" : "－"}</span>
+                      </div>
+
+                      {!isChatCollapsed ? (
+                        <>
+                          <div className="overflow-y-auto mb-2 space-y-2 p-2.5 bg-slate-900/60 border border-white/5 rounded-xl h-[120px] scrollbar-thin text-xs">
+                            {chatLog.map((log, idx) => (
+                              <div
+                                key={idx}
+                                className={`flex flex-col max-w-[90%] animate-fadeIn ${
+                                  log.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"
+                                }`}
+                              >
+                                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5 font-mono">
+                                  {log.sender === "user" ? (lang === "zh" ? "您" : "You") : "OdyShareSmart AI"}
+                                </span>
+                                <div
+                                  className={`p-2 rounded-xl text-[11px] ${
+                                    log.sender === "user"
+                                      ? "bg-blue-600/95 border border-blue-500/30 text-white rounded-br-none"
+                                      : "bg-white/5 border border-white/5 text-slate-200 rounded-bl-none"
+                                  }`}
+                                >
+                                  {log.text}
+                                </div>
+                              </div>
+                            ))}
+                            {submittingChat && (
+                              <span className="text-[9px] text-slate-400 font-mono italic animate-pulse">{lang === "zh" ? "OdyShareSmart 智慧響應中..." : "Assistant mapping..."}</span>
+                            )}
+                          </div>
+
+                          <form onSubmit={handleChatSubmit} className="flex gap-1.5 text-xs">
+                            <input
+                              id="ai-chat-input"
+                              type="text"
+                              placeholder={t.askAiPlaceholder}
+                              value={chatMsg}
+                              onChange={(e) => setChatMsg(e.target.value)}
+                              disabled={submittingChat}
+                              className="flex-1 px-2.5 py-1.5 glass-input rounded-lg text-[11px]"
+                            />
+                            <button
+                              id="submit-ai-chat"
+                              type="submit"
+                              disabled={submittingChat}
+                              className="p-1 px-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-lg transition-all cursor-pointer shrink-0 disabled:opacity-50"
+                            >
+                              <Send size={12} />
+                            </button>
+                          </form>
+                        </>
+                      ) : (
+                        <p className="text-[10px] text-slate-500 italic text-center py-2">{lang === "zh" ? "對話框已收合" : "Chat log collapsed"}</p>
+                      )}
+                    </div>
+                  </div>
+                ) : activeCommentDrawerId ? (
+                  (() => {
+                    const selectedItem = itineraries.find(i => i.id === activeCommentDrawerId);
+                    if (!selectedItem) {
+                      return (
+                        <div className="text-center py-12 text-slate-400 text-xs flex-1">
+                          Activity item not found
+                        </div>
+                      );
+                    }
+
                     return (
-                      <div className="text-center py-12 text-slate-400 text-xs flex-1">
-                        Activity item not found
+                      <div className="flex-1 flex flex-col justify-between h-full">
+                        <div className="flex-1 flex flex-col">
+                          <div className="pb-2 border-b border-white/10 mb-3 text-xs">
+                            <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">{t.discussionSidebar}</span>
+                            <h4 className="font-extrabold text-white text-[13px] mt-0.5 leading-snug">{selectedItem.title}</h4>
+                            <p className="text-[10px] text-slate-400 mt-0.5">
+                              {selectedItem.comments.length} {t.commentsCount}
+                            </p>
+                          </div>
+
+                          <div className="flex-grow overflow-y-auto space-y-3.5 pr-1 max-h-[220px] scrollbar-thin text-[11px] mb-3">
+                            {selectedItem.comments.length === 0 ? (
+                              <div className="py-8 text-center bg-white/3 rounded-xl border border-dashed border-white/10 flex flex-col items-center p-3">
+                                <MessageSquare size={16} className="text-slate-500 mb-1" />
+                                <p className="text-[10px] text-slate-400 leading-relaxed px-1">{t.noCustomPosts}</p>
+                              </div>
+                            ) : (
+                              selectedItem.comments.map((comm) => {
+                                const author = participants.find(p => p.id === comm.authorId);
+                                return (
+                                  <div key={comm.id} className="p-2.5 bg-white/3 border border-white/5 rounded-xl flex items-start gap-2 animate-fadeIn">
+                                    <div
+                                      style={{ backgroundColor: author?.avatarColor || "#475569" }}
+                                      className="w-[20px] h-[20px] text-[9px] rounded-full font-bold text-white flex items-center justify-center shrink-0 border border-white/15"
+                                    >
+                                      {comm.authorName[0]}
+                                    </div>
+                                    <div className="space-y-0.5">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-bold text-white text-[11px]">{comm.authorName}</span>
+                                        <span className="text-[8px] text-slate-500">
+                                          {new Date(comm.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                      </div>
+                                      <p className="text-slate-300 leading-relaxed text-[11px]">{comm.text}</p>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+
+                        <form onSubmit={(e) => handlePostCommentSubmit(e, selectedItem.id)} className="flex gap-1.5 text-xs pt-2.5 border-t border-white/10 shrink-0">
+                          <input
+                            id="itinerary-comment-input"
+                            type="text"
+                            placeholder={t.postComment}
+                            value={newCommentInput}
+                            onChange={(e) => setNewCommentInput(e.target.value)}
+                            className="flex-1 glass-input px-2.5 py-1.5 rounded-lg text-[11px]"
+                          />
+                          <button
+                            id="submit-comment-btn"
+                            type="submit"
+                            className="p-1 px-2 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all cursor-pointer border border-white/10 shrink-0"
+                          >
+                            <Send size={11} />
+                          </button>
+                        </form>
                       </div>
                     );
-                  }
-
-                  return (
-                    <div className="flex-1 flex flex-col justify-between h-full">
-                      <div className="flex-1 flex flex-col">
-                        <div className="pb-2 border-b border-white/10 mb-3 text-xs">
-                          <span className="text-[10px] text-blue-400 font-bold uppercase tracking-wider">{t.discussionSidebar}</span>
-                          <h4 className="font-extrabold text-white text-[13px] mt-0.5 leading-snug">{selectedItem.title}</h4>
-                          <p className="text-[10px] text-slate-400 mt-0.5">
-                            {selectedItem.comments.length} {t.commentsCount}
-                          </p>
-                        </div>
-
-                        <div className="flex-grow overflow-y-auto space-y-3.5 pr-1 max-h-[220px] scrollbar-thin text-[11px] mb-3">
-                          {selectedItem.comments.length === 0 ? (
-                            <div className="py-8 text-center bg-white/3 rounded-xl border border-dashed border-white/10 flex flex-col items-center p-3">
-                              <MessageSquare size={16} className="text-slate-500 mb-1" />
-                              <p className="text-[10px] text-slate-400 leading-relaxed px-1">{t.noCustomPosts}</p>
-                            </div>
-                          ) : (
-                            selectedItem.comments.map((comm) => {
-                              const author = participants.find(p => p.id === comm.authorId);
-                              return (
-                                <div key={comm.id} className="p-2.5 bg-white/3 border border-white/5 rounded-xl flex items-start gap-2 animate-fadeIn">
-                                  <div
-                                    style={{ backgroundColor: author?.avatarColor || "#475569" }}
-                                    className="w-[20px] h-[20px] text-[9px] rounded-full font-bold text-white flex items-center justify-center shrink-0 border border-white/15"
-                                  >
-                                    {comm.authorName[0]}
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    <div className="flex items-center gap-1.5">
-                                      <span className="font-bold text-white text-[11px]">{comm.authorName}</span>
-                                      <span className="text-[8px] text-slate-500">
-                                        {new Date(comm.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                      </span>
-                                    </div>
-                                    <p className="text-slate-300 leading-relaxed text-[11px]">{comm.text}</p>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      </div>
-
-                      <form onSubmit={(e) => handlePostCommentSubmit(e, selectedItem.id)} className="flex gap-1.5 text-xs pt-2.5 border-t border-white/10 shrink-0">
-                        <input
-                          id="itinerary-comment-input"
-                          type="text"
-                          placeholder={t.postComment}
-                          value={newCommentInput}
-                          onChange={(e) => setNewCommentInput(e.target.value)}
-                          className="flex-1 glass-input px-2.5 py-1.5 rounded-lg text-[11px]"
-                        />
-                        <button
-                          id="submit-comment-btn"
-                          type="submit"
-                          className="p-1 px-2 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-all cursor-pointer border border-white/10 shrink-0"
-                        >
-                          <Send size={11} />
-                        </button>
-                      </form>
-                    </div>
-                  );
-                })()
-              ) : (
-                <div className="flex-grow flex flex-col items-center justify-center text-center p-5 bg-white/3 border border-dashed border-white/5 rounded-2xl">
-                  <Eye size={20} className="text-indigo-400 mb-1.5" />
-                  <h4 className="font-semibold text-slate-200 text-xs">{t.discussionSidebar}</h4>
-                  <p className="text-slate-400 text-[10.5px] leading-relaxed mt-1 max-w-[180px]">
-                    {t.commentSidebarDesc}
-                  </p>
-                </div>
-              )}
+                  })()
+                ) : (
+                  <div className="flex-grow flex flex-col items-center justify-center text-center p-5 bg-white/3 border border-dashed border-white/5 rounded-2xl">
+                    <Eye size={20} className="text-indigo-400 mb-1.5" />
+                    <h4 className="font-semibold text-slate-200 text-xs">{t.discussionSidebar}</h4>
+                    <p className="text-slate-400 text-[10.5px] leading-relaxed mt-1 max-w-[180px]">
+                      {t.commentSidebarDesc}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

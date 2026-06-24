@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Users, ChevronRight, AlertCircle, CheckSquare, Square, DollarSign } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Plus, Trash2, Users, ChevronRight, AlertCircle, CheckSquare, Square, DollarSign, Upload, Camera, X, Image } from "lucide-react";
 import { ExpenseItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 import SettlementModal from "./SettlementModal";
@@ -45,6 +45,9 @@ export default function ExpenseTracker({
   const [category, setCategory] = useState<ExpenseItem["category"]>("food");
   const [ocrInput, setOcrInput] = useState<string>("");
   const [ocrParsing, setOcrParsing] = useState<boolean>(false);
+  const [receiptImage, setReceiptImage] = useState<string>("");
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Collapsible state metrics for the right-column auxiliary elements
   const [isBudgetCollapsed, setIsBudgetCollapsed] = useState<boolean>(false);
@@ -171,14 +174,27 @@ export default function ExpenseTracker({
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setReceiptImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleReceiptOcrSubmit = async () => {
-    if (!ocrInput.trim()) return;
+    if (!ocrInput.trim() && !receiptImage) return;
     setOcrParsing(true);
     try {
       const res = await fetch("/api/ai/ocr-receipt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ receiptText: ocrInput })
+        body: JSON.stringify({ 
+          receiptText: ocrInput,
+          receiptImage: receiptImage || undefined
+        })
       });
       const data = await res.json();
       if (data && data.amount != null) {
@@ -186,6 +202,7 @@ export default function ExpenseTracker({
         setAmount(data.amount.toString());
         setCategory(data.category || "food");
         setOcrInput("");
+        setReceiptImage("");
       }
     } catch (err) {
       console.error("Receipt OCR failed:", err);
@@ -324,14 +341,84 @@ export default function ExpenseTracker({
                 </div>
                 <p className="text-[10.5px] text-slate-400 leading-relaxed">
                   {lang === "zh" 
-                    ? "在國外拿到實體紙本發票時，可在此貼上收據明細、貼上 base64 圖片，AI 將自動辨識總金額、品項、消費類別，快速完成記帳！" 
-                    : "When you get physical receipts in Japan or Europe, paste details or mock-upload below. AI will auto-extract total amount, currency, and category!"}
+                    ? "在國外拿到實體紙本發票時，可選擇相片上傳、即時拍照，或直接貼上/輸入明細，AI 將自動辨識總金額、品項、消費類別，快速完成記帳！" 
+                    : "When you get physical receipts, upload a photo, take a real-time picture, or paste text. AI will auto-extract total amount, currency, and category!"}
                 </p>
+
+                {/* Hidden input elements for camera capture and file selection */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={uploadInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  ref={cameraInputRef}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                {/* Image upload triggers and preview status */}
+                <div className="flex flex-wrap items-center gap-2 mt-0.5 pb-0.5">
+                  <button
+                    type="button"
+                    onClick={() => uploadInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg text-[10.5px] cursor-pointer transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{lang === "zh" ? "選擇收據相片" : "Select Receipt"}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg text-[10.5px] cursor-pointer transition-colors"
+                  >
+                    <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{lang === "zh" ? "手機即時拍照" : "Take Photo"}</span>
+                  </button>
+
+                  {receiptImage && (
+                    <div className="relative group flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg animate-fadeIn">
+                      <Image className="w-3.5 h-3.5 text-emerald-400" />
+                      <span className="text-[10px] text-emerald-400 font-medium truncate max-w-[120px]">
+                        {lang === "zh" ? "📸 已載入發票圖片" : "📸 Loaded Image"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReceiptImage("")}
+                        className="p-0.5 hover:bg-red-500/20 rounded text-slate-400 hover:text-red-400 cursor-pointer transition-colors"
+                        title={lang === "zh" ? "移除圖片" : "Remove Image"}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Image Thumbnail Preview */}
+                {receiptImage && (
+                  <div className="mt-0.5 relative w-24 h-24 rounded-lg overflow-hidden border border-emerald-500/30 group animate-fadeIn shadow-lg shadow-black/30">
+                    <img src={receiptImage} alt="Receipt Preview" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setReceiptImage("")}
+                      className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-600 rounded-full text-white cursor-pointer transition-colors shadow-md"
+                      title={lang === "zh" ? "移除圖片" : "Remove Image"}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
 
                 <div className="flex flex-col sm:flex-row gap-2 mt-1">
                   <input
                     type="text"
-                    placeholder={lang === "zh" ? "貼上收據文字或簡介..." : "Paste receipt text details..."}
+                    placeholder={lang === "zh" ? "手動貼上收據文字/備註（選填）..." : "Manual receipt text/memo (optional)..."}
                     value={ocrInput}
                     onChange={(e) => setOcrInput(e.target.value)}
                     className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1.5 text-[11px] text-white outline-none"
@@ -341,7 +428,7 @@ export default function ExpenseTracker({
                     <button
                       type="button"
                       onClick={handleReceiptOcrSubmit}
-                      disabled={ocrParsing || !ocrInput.trim()}
+                      disabled={ocrParsing || (!ocrInput.trim() && !receiptImage)}
                       className="py-1.5 px-3 bg-emerald-600/90 hover:bg-emerald-650 border border-emerald-500/15 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shrink-0"
                     >
                       {ocrParsing ? (
