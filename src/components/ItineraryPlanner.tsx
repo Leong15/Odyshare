@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Clock, MapPin, MessageSquare, ThumbsUp, Plus, Eye, Send, Landmark, ShoppingBag, Utensils, Route, Bed, Sparkles, RefreshCw, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { Clock, MapPin, MessageSquare, ThumbsUp, Plus, Eye, Send, Landmark, ShoppingBag, Utensils, Route, Bed, Sparkles, RefreshCw, ChevronLeft, ChevronRight, Trash2, Map, Zap, Train, Bus, Footprints, Pencil, HelpCircle, Calendar } from "lucide-react";
 import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 import ItineraryMap from "./ItineraryMap";
@@ -26,23 +26,23 @@ const getTransitIconAndDetails = (itemA: ItineraryItem, itemB: ItineraryItem, la
   const rawDist = Math.sqrt(dx * dx + dy * dy);
   
   let timeMins = Math.max(5, Math.floor(rawDist * 1.5));
-  let icon = "🚶";
+  let modeType: "walk" | "subway" | "bus" = "walk";
   let mode = lang === "zh" ? "步行" : "Walk";
   let line = "";
 
   if (timeMins > 25) {
-    icon = "🚇";
+    modeType = "subway";
     mode = lang === "zh" ? "搭乘地鐵" : "MTR Subway";
     const subways = lang === "zh" ? ["東鐵綫", "丸之內線", "銀座線", "山手線", "新宿線"] : ["East Rail Line", "Marunouchi Line", "Ginza Line", "Yamanote Line", "Shinjuku Line"];
     line = " " + subways[Math.abs(itemA.title.length - itemB.title.length) % subways.length];
   } else if (timeMins > 12) {
-    icon = "🚌";
+    modeType = "bus";
     mode = lang === "zh" ? "搭乘巴士" : "Bus Connection";
     line = " No." + (Math.abs(itemA.title.length + itemB.title.length) % 80 + 1);
   }
 
   return {
-    icon,
+    modeType,
     label: lang === "zh" ? `${mode}${line} — ${timeMins}分鐘` : `${mode}${line} — ${timeMins} mins`,
     distText: lang === "zh" ? `距離約 ${(rawDist * 0.15).toFixed(1)} 公里` : `dist approx ${(rawDist * 0.15).toFixed(1)} km`
   };
@@ -122,6 +122,7 @@ export default function ItineraryPlanner({
   const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(false);
 
   const dayTabsScrollRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef<boolean>(true);
   const scrollDayTabs = (direction: "left" | "right") => {
     if (dayTabsScrollRef.current) {
       const scrollAmount = 180;
@@ -158,6 +159,17 @@ export default function ItineraryPlanner({
     const timeoutId = setTimeout(scrollTabToCenter, 60);
     return () => clearTimeout(timeoutId);
   }, [activeDay, totalDays]);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const container = document.getElementById("itinerary-timeline-container");
+    if (container) {
+      container.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [activeDay]);
 
   useEffect(() => {
     if (activeCommentDrawerId) {
@@ -207,8 +219,8 @@ export default function ItineraryPlanner({
         if (onPostAISystemMessage) {
           onPostAISystemMessage(
             lang === "zh"
-              ? `🤖 OdyShareSmart AI 行程智慧升級！套用偏好： "${prefInput}"`
-              : `🤖 OdyShareSmart AI optimized schedule for: "${prefInput}"`
+              ? `[AI] OdyShareSmart AI 行程智慧升級！套用偏好： "${prefInput}"`
+              : `[AI] OdyShareSmart AI optimized schedule for: "${prefInput}"`
           );
         }
       }
@@ -239,8 +251,8 @@ export default function ItineraryPlanner({
           const namesFlow = data.optimized.map((it: any) => `「${it.title}」(${it.time})`).join(" ➡️ ");
           onPostAISystemMessage(
             lang === "zh"
-              ? `🤖 OdyShareSmart AI 順路優化完成！已規劃最短順路路徑，減少折返跑交通時間：\n${namesFlow}`
-              : `🤖 OdyShareSmart AI Route (TSP) optimization complete! Rearranged Day ${activeDay + 1} attractions to minimize round-trip travel time:\n${namesFlow}`
+              ? `[AI] OdyShareSmart AI 順路優化完成！已規劃最短順路路徑，減少折返跑交通時間：\n${namesFlow}`
+              : `[AI] OdyShareSmart AI Route (TSP) optimization complete! Rearranged Day ${activeDay + 1} attractions to minimize round-trip travel time:\n${namesFlow}`
           );
         }
       }
@@ -444,77 +456,119 @@ export default function ItineraryPlanner({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
               </span>
-              <span>
-                {lang === "zh"
-                  ? "🤖 OdyShareSmart AI 已成功進行網關日程智慧優化！如果您或其他組員不滿意，可隨時還原至優化前的項目配置。"
-                  : "🤖 OdyShareSmart AI has optimized details! If you or others dislike this setup, feel free to restore original elements."}
+              <span className="flex items-center gap-1.5 flex-wrap">
+                <Sparkles size={13} className="text-amber-300 animate-pulse shrink-0" />
+                <span>
+                  {lang === "zh"
+                    ? "OdyShareSmart AI 已成功進行網關日程智慧優化！如果您或其他組員不滿意，可隨時還原至優化前的項目配置。"
+                    : "OdyShareSmart AI has optimized details! If you or others dislike this setup, feel free to restore original elements."}
+                </span>
               </span>
             </div>
             <button
               onClick={onRestoreItineraries}
               className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold rounded-lg border border-amber-500/30 transition cursor-pointer flex items-center gap-1 shrink-0 text-xs"
             >
-              <span>↩️ {lang === "zh" ? "還原至舊版行程" : "Restore original"}</span>
+              <RefreshCw size={11} className="shrink-0" />
+              <span>{lang === "zh" ? "還原至舊版行程" : "Restore original"}</span>
             </button>
           </div>
         )}
-        <div id="itinerary-timeline-container" className="glass-container rounded-2xl p-5 shadow-lg flex flex-col h-full min-h-[500px]">
-          
-          {/* Header Controls */}
-          <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3.5 mb-5 border-b border-white/10 pb-4">
+        <div id="itinerary-timeline-container" className="glass-container rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col h-full min-h-[500px]">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             
-            {/* Day Management Group (Tabs & Buttons) */}
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
+            {/* Left Sidebar: Day Management Column */}
+            <div className="col-span-12 md:col-span-3 flex flex-col gap-5 md:sticky md:top-24">
               
-              {/* Day Scroll Tabs (Constrained and Scrollable) */}
-              <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10 backdrop-blur-md min-w-0 max-w-[280px] xs:max-w-[320px] sm:max-w-[360px] relative">
-                {/* Left Scroll Arrow */}
+              {/* Title / Heading */}
+              <div className="hidden md:block pb-2.5 border-b border-white/10 text-left">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <Calendar size={13} className="text-slate-400" />
+                  <span>{lang === "zh" ? "旅程日程" : "Trip Days"}</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  {totalDays} {lang === "zh" ? "天計畫" : "Days Planned"} • {itineraries.length} {lang === "zh" ? "個活動" : "Activities"}
+                </p>
+              </div>
+
+              {/* Mobile: Horizontal Scrollable Tabs */}
+              <div className="flex md:hidden items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-md min-w-0 relative">
                 <button
                   type="button"
                   onClick={() => scrollDayTabs("left")}
-                  className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                  className="p-1.5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
                   title={lang === "zh" ? "向左滾動" : "Scroll left"}
                 >
                   <ChevronLeft size={14} />
                 </button>
 
-                {/* Scrollable Day Number Buttons */}
                 <div 
                   ref={dayTabsScrollRef}
-                  className="relative flex items-center gap-1 overflow-x-auto scrollbar-none scroll-smooth whitespace-nowrap flex-1 py-0.5"
+                  className="relative flex items-center gap-1.5 overflow-x-auto scroller-none scrollbar-none scroll-smooth whitespace-nowrap flex-1 py-1"
                 >
-                  {daysToShow.map((dayIdx) => (
-                    <button
-                      key={dayIdx}
-                      id={`day-tab-${dayIdx}`}
-                      onClick={() => {
-                        setActiveDay(dayIdx);
-                        setActiveCommentDrawerId(null);
-                      }}
-                      className={`px-3 py-1.5 font-bold rounded-lg cursor-pointer transition-all text-xs shrink-0 ${
-                        activeDay === dayIdx
-                          ? "bg-blue-600 text-white shadow-sm font-extrabold"
-                          : "text-slate-400 hover:text-white hover:bg-white/5"
-                      }`}
-                    >
-                      {t.day} {dayIdx + 1} {lang === "zh" ? "天" : ""}
-                    </button>
-                  ))}
+                  {daysToShow.map((dayIdx) => {
+                    const itemCount = itineraries.filter(item => item.dayIndex === dayIdx).length;
+                    return (
+                      <button
+                        key={dayIdx}
+                        id={`day-tab-${dayIdx}`}
+                        onClick={() => {
+                          setActiveDay(dayIdx);
+                          setActiveCommentDrawerId(null);
+                        }}
+                        className={`px-3.5 py-2 font-bold rounded-xl cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 text-xs shrink-0 flex items-center gap-1.5 h-12 md:h-auto ${
+                          activeDay === dayIdx
+                            ? "bg-blue-600 text-white shadow-sm font-extrabold"
+                            : "text-slate-400 hover:text-white hover:bg-white/5"
+                        }`}
+                      >
+                        <span>{t.day} {dayIdx + 1}</span>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${activeDay === dayIdx ? "bg-white/20 text-white" : "bg-white/5 text-slate-400"}`}>
+                          {itemCount}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
 
-                {/* Right Scroll Arrow */}
                 <button
                   type="button"
                   onClick={() => scrollDayTabs("right")}
-                  className="p-1 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+                  className="p-1.5 hover:bg-white/10 rounded-xl text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
                   title={lang === "zh" ? "向右滾動" : "Scroll right"}
                 >
                   <ChevronRight size={14} />
                 </button>
               </div>
 
-              {/* Day Management Actions (Add/Remove) - ALWAYS VISIBLE, OUT OF SCROLL CONTAINER */}
-              <div className="flex items-center gap-1.5 shrink-0">
+              {/* Desktop: Vertical Sidebar List */}
+              <div className="hidden md:flex flex-col gap-2 max-h-[350px] overflow-y-auto pr-1 scrollbar-thin">
+                {daysToShow.map((dayIdx) => {
+                  const itemCount = itineraries.filter(item => item.dayIndex === dayIdx).length;
+                  return (
+                    <button
+                      key={dayIdx}
+                      onClick={() => {
+                        setActiveDay(dayIdx);
+                        setActiveCommentDrawerId(null);
+                      }}
+                      className={`w-full px-4 py-3.5 rounded-xl cursor-pointer transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 text-left flex items-center justify-between border ${
+                        activeDay === dayIdx
+                          ? "bg-blue-600/10 text-blue-300 border-blue-500/40 shadow-sm font-bold"
+                          : "border-transparent text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                      }`}
+                    >
+                      <span className="text-xs font-semibold">{t.day} {dayIdx + 1} {lang === "zh" ? "天" : ""}</span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${activeDay === dayIdx ? "bg-blue-500/20 text-blue-300" : "bg-white/5 text-slate-400"}`}>
+                        {itemCount} {lang === "zh" ? "項目" : "items"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Add/Remove Day Buttons */}
+              <div className="flex items-center gap-2 w-full">
                 <button
                   type="button"
                   onClick={() => {
@@ -523,11 +577,11 @@ export default function ItineraryPlanner({
                     setActiveDay(newDayIdx);
                     setActiveCommentDrawerId(null);
                   }}
-                  className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-blue-600/10 hover:bg-blue-600/25 border border-blue-500/20 hover:border-blue-500/35 text-blue-300 font-bold rounded-xl cursor-pointer transition-all text-xs shadow-md shrink-0"
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/20 hover:border-blue-500/30 text-blue-300 font-bold rounded-xl cursor-pointer transition-all text-xs shadow-sm h-11"
                   title={lang === "zh" ? "增加天數" : "Add Day"}
                 >
                   <Plus size={14} className="shrink-0" />
-                  <span>{lang === "zh" ? "增加天數" : "Add Day"}</span>
+                  <span>{lang === "zh" ? "加天" : "Add"}</span>
                 </button>
 
                 {totalDays > 1 && (
@@ -553,490 +607,517 @@ export default function ItineraryPlanner({
                       setActiveDay(prev => Math.max(0, Math.min(totalDays - 2, prev)));
                       setActiveCommentDrawerId(null);
                     }}
-                    className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-1.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/15 hover:border-rose-500/25 text-rose-400 font-bold rounded-xl cursor-pointer transition-all text-xs shadow-md shrink-0"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/15 hover:border-rose-500/25 text-rose-400 font-bold rounded-xl cursor-pointer transition-all text-xs shadow-sm h-11"
                     title={lang === "zh" ? "刪除目前這一天所有行程並移除此天" : "Delete active day and shift schedule"}
                   >
                     <Trash2 size={13} className="shrink-0" />
-                    <span>{lang === "zh" ? "刪除此天" : "Remove Day"}</span>
+                    <span>{lang === "zh" ? "刪天" : "Del"}</span>
                   </button>
                 )}
               </div>
-
             </div>
 
-            {/* Other Actions Group (Map, TSP, Sidebar, Add Activity) */}
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full xl:w-auto xl:justify-end">
-              <button
-                type="button"
-                onClick={() => setShowMap(!showMap)}
-                className={`flex items-center gap-1.5 font-semibold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-md shrink-0 ${
-                  showMap 
-                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25" 
-                    : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
-                }`}
-                title={lang === "zh" ? "切換地圖檢視模式" : "Toggle Split Map View"}
-              >
-                <span>🗺️</span>
-                <span>{lang === "zh" ? "行程地圖" : "Map View"} {showMap ? (lang === "zh" ? "開啟" : "ON") : (lang === "zh" ? "關閉" : "OFF")}</span>
-              </button>
-
-              {filteredItems.length > 1 && (
-                <button
-                  type="button"
-                  onClick={handleTSPOptimization}
-                  disabled={tspOptimizing}
-                  className="flex items-center gap-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 hover:border-indigo-500/45 text-indigo-300 font-semibold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-xl cursor-pointer transition-all disabled:opacity-50 text-xs shadow-md shrink-0"
-                  title={lang === "zh" ? "計算這天所有景點的最短路徑與搭乘時間" : "Find the shortest circular route among all activities"}
-                >
-                  <Route size={14} className={tspOptimizing ? "animate-spin shrink-0" : "shrink-0"} />
-                  <span>{tspOptimizing ? (lang === "zh" ? "計算中..." : "Optimizing...") : (lang === "zh" ? "AI 順路優化 (TSP)" : "AI Route (TSP)")}</span>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                className={`flex items-center gap-1.5 font-semibold py-1.5 px-2.5 sm:py-2 sm:px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-md shrink-0 ${
-                  isSidebarOpen 
-                    ? "bg-blue-500/15 text-blue-300 border-blue-500/30 hover:bg-blue-500/25" 
-                    : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
-                }`}
-                title={lang === "zh" ? "顯示或隱藏 AI 與討論板側邊欄" : "Toggle AI & Chat sidebar"}
-              >
-                <span>{isSidebarOpen ? "➡️" : "⬅️"}</span>
-                <span>{lang === "zh" ? "AI 與討論" : "AI & Chat"}</span>
-              </button>
-
-              <button
-                id="add-itinerary-trigger"
-                onClick={() => setShowAddForm(!showAddForm)}
-                className="flex items-center gap-1.5 glass-button-primary text-white font-semibold py-1.5 px-3 sm:py-2 sm:px-3.5 rounded-xl cursor-pointer shrink-0 text-xs shadow-md"
-              >
-                <Plus size={14} /> {t.addDailyActivity}
-              </button>
-            </div>
-
-          </div>
-
-          {/* Add Activity Form */}
-          {showAddForm && (
-            <form
-              onSubmit={handleCreateActivity}
-              className="mb-5 p-4 bg-white/5 border border-white/10 rounded-2xl space-y-3.5 text-xs animate-fadeIn"
-            >
-              <h4 className="font-bold text-slate-200 flex justify-between items-center border-b border-white/5 pb-2">
-                <span>{t.configureActivityCard} — {t.day} {activeDay + 1} {lang === "zh" ? "天" : ""}</span>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="text-slate-400 hover:text-white font-semibold cursor-pointer"
-                >
-                  {lang === "zh" ? "關閉" : "Close"}
-                </button>
-              </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Right Panel: Itinerary Main Contents */}
+            <div className="col-span-12 md:col-span-9 space-y-6">
+              
+              {/* Controls Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-4 border-b border-white/5 text-left">
                 <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.activityTitle}</label>
-                  <input
-                    id="itinerary-title-input"
-                    type="text"
-                    required
-                    placeholder="e.g. Asakusa Tsukiji Sushi Roll Tasting"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    className="w-full glass-input px-3 py-2 rounded-xl text-white"
-                  />
+                  <h2 className="text-lg font-bold text-white tracking-tight leading-none">
+                    {lang === "zh" ? `第 ${activeDay + 1} 天 行程清單` : `Day ${activeDay + 1} Timeline`}
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1.5">
+                    {filteredItems.length} {lang === "zh" ? "個選定活動景點" : "selected activities"}
+                  </p>
                 </div>
 
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.placeName}</label>
-                  <input
-                    id="itinerary-location-input"
-                    type="text"
-                    required
-                    placeholder="e.g. Sukiyabashi Jiro Ginza"
-                    value={locationName}
-                    onChange={(e) => setLocationName(e.target.value)}
-                    className="w-full glass-input px-3 py-2 rounded-xl text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.timeSchedule}</label>
-                  <input
-                    id="itinerary-time-input"
-                    type="time"
-                    value={time}
-                    onChange={(e) => setTime(e.target.value)}
-                    className="w-full glass-input px-3 py-2 rounded-xl text-white font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.categoryType}</label>
-                  <select
-                    id="itinerary-category-select"
-                    value={category}
-                    onChange={(e: any) => setCategory(e.target.value)}
-                    className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900"
-                  >
-                    <option value="sight" className="bg-slate-900">🏛️ {getLocalizedCategoryName("sight")}</option>
-                    <option value="restaurant" className="bg-slate-900">🍱 {getLocalizedCategoryName("restaurant")}</option>
-                    <option value="shop" className="bg-slate-900">🛍️ {getLocalizedCategoryName("shop")}</option>
-                    <option value="transit" className="bg-slate-900">🚇 {getLocalizedCategoryName("transit")}</option>
-                    <option value="hotel" className="bg-slate-900">🏨 {getLocalizedCategoryName("hotel")}</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">{t.estimatedCost}</label>
-                  <input
-                    id="itinerary-cost-input"
-                    type="number"
-                    placeholder="e.g. 15.00"
-                    value={cost}
-                    onChange={(e) => setCost(e.target.value)}
-                    className="w-full glass-input px-3 py-2 rounded-xl text-white"
-                  />
-                </div>
-
-                <div className="flex items-end">
+                {/* Other Actions Group (Map, TSP, Sidebar, Add Activity) */}
+                <div className="flex flex-wrap items-center gap-2">
                   <button
-                    id="submit-itinerary-btn"
-                    type="submit"
-                    className="w-full py-2.5 glass-button-primary text-white font-semibold rounded-xl text-xs"
+                    type="button"
+                    onClick={() => setShowMap(!showMap)}
+                    className={`flex items-center gap-1.5 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-sm shrink-0 h-10 ${
+                      showMap 
+                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25" 
+                        : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
+                    }`}
+                    title={lang === "zh" ? "切換地圖檢視模式" : "Toggle Split Map View"}
                   >
-                    {t.addScheduleCard}
+                    <Map size={13} className="shrink-0" />
+                    <span>{lang === "zh" ? "地圖" : "Map"}</span>
+                  </button>
+
+                  {filteredItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={handleTSPOptimization}
+                      disabled={tspOptimizing}
+                      className="flex items-center gap-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 hover:border-indigo-500/45 text-indigo-300 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all disabled:opacity-50 text-xs shadow-sm shrink-0 h-10"
+                      title={lang === "zh" ? "計算這天所有景點的最短路徑與搭乘時間" : "Find the shortest circular route among all activities"}
+                    >
+                      <Route size={13} className={tspOptimizing ? "animate-spin shrink-0" : "shrink-0"} />
+                      <span>{tspOptimizing ? (lang === "zh" ? "優化中..." : "Optimizing...") : (lang === "zh" ? "AI 順路" : "AI Route")}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                    className={`flex items-center gap-1.5 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-sm shrink-0 h-10 ${
+                      isSidebarOpen 
+                        ? "bg-blue-500/15 text-blue-300 border-blue-500/30 hover:bg-blue-500/25" 
+                        : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
+                    }`}
+                    title={lang === "zh" ? "顯示或隱藏 AI 與討論板側邊欄" : "Toggle AI & Chat sidebar"}
+                  >
+                    {isSidebarOpen ? <ChevronRight size={13} className="shrink-0" /> : <ChevronLeft size={13} className="shrink-0" />}
+                    <span>{lang === "zh" ? "討論" : "Chat"}</span>
+                  </button>
+
+                  <button
+                    id="add-itinerary-trigger"
+                    onClick={() => setShowAddForm(!showAddForm)}
+                    className="flex items-center gap-1.5 glass-button-primary text-white font-semibold py-2 px-3.5 rounded-xl cursor-pointer shrink-0 text-xs shadow-sm h-10"
+                  >
+                    <Plus size={14} /> {t.addDailyActivity}
                   </button>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">{t.briefDesc}</label>
-                <textarea
-                  id="itinerary-desc-input"
-                  placeholder="Incorporate local traffic guidelines, ticket information..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full glass-input px-3 py-2 rounded-xl text-white h-14 resize-none"
-                />
-              </div>
-            </form>
-          )}
-
-          {/* Timeline View & Map Split Wrapper */}
-          <div className={`flex-grow ${showMap ? "grid grid-cols-1 lg:grid-cols-12 gap-5 min-h-[400px]" : "flex flex-col"}`}>
-            {/* Timeline List Column */}
-            <div className={`flex flex-col justify-between ${showMap ? "lg:col-span-7 h-[460px]" : "flex-grow"}`}>
-              <div className="flex-grow space-y-3 pr-1 h-full overflow-y-auto overflow-x-hidden scrollbar-thin">
-                {filteredItems.length === 0 ? (
-                  <div className="py-20 text-center flex flex-col items-center justify-center p-6 bg-white/3 border border-white/5 rounded-2xl border-dashed">
-                    <Clock className="text-indigo-400 mb-2" size={24} />
-                    <p className="text-xs text-slate-400 max-w-md">{t.vacantMessage}</p>
-                  </div>
-                ) : (
-                  filteredItems.map((item, idx) => {
-                const voterMetas = getVoterMeta(item.votes);
-                const userVoted = item.votes.includes(currentUser);
-
-                if (editingItemId === item.id) {
-                  return (
-                    <form
-                      key={item.id}
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (onUpdateItineraryItem) {
-                          onUpdateItineraryItem({
-                            ...item,
-                            title: editTitle,
-                            locationName: editLocationName || editTitle,
-                            description: editDescription,
-                            time: editTime,
-                            category: editCategory,
-                            cost: parseFloat(editCost) || 0
-                          });
-                        }
-                        setEditingItemId(null);
-                      }}
-                      onClick={(e) => e.stopPropagation()}
-                      className="p-4 rounded-xl border border-blue-500/50 bg-blue-500/10 space-y-3.5 text-xs animate-fadeIn text-left"
+              {/* Add Activity Form */}
+              {showAddForm && (
+                <form
+                  onSubmit={handleCreateActivity}
+                  className="mb-6 p-6 md:p-8 bg-white/10 dark:bg-black/20 backdrop-blur-xl border border-white/10 dark:border-white/5 rounded-3xl space-y-5 text-xs animate-fadeIn shadow-lg text-left"
+                >
+                  <h4 className="font-bold text-slate-200 flex justify-between items-center border-b border-white/5 pb-2">
+                    <span>{t.configureActivityCard} — {t.day} {activeDay + 1} {lang === "zh" ? "天" : ""}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddForm(false)}
+                      className="text-slate-400 hover:text-white font-semibold cursor-pointer"
                     >
-                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                        <span className="font-bold text-blue-400">📝 {lang === "zh" ? "編輯行程項目細節" : "Edit Itinerary Activity"}</span>
-                        <button
-                          type="button"
-                          onClick={() => setEditingItemId(null)}
-                          className="text-slate-400 hover:text-white font-semibold cursor-pointer"
-                        >
-                          {lang === "zh" ? "取消" : "Cancel"}
-                        </button>
-                      </div>
+                      {lang === "zh" ? "關閉" : "Close"}
+                    </button>
+                  </h4>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-slate-300 font-medium mb-1">{t.activityTitle}</label>
-                          <input
-                            type="text"
-                            required
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-medium mb-1">{t.placeName}</label>
-                          <input
-                            type="text"
-                            required
-                            value={editLocationName}
-                            onChange={(e) => setEditLocationName(e.target.value)}
-                            className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-slate-300 font-medium mb-1">{t.timeSchedule}</label>
-                          <input
-                            type="time"
-                            required
-                            value={editTime}
-                            onChange={(e) => setEditTime(e.target.value)}
-                            className="w-full glass-input px-3 py-2 rounded-xl text-white font-mono bg-slate-900 border border-white/10"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-medium mb-1">{t.categoryType}</label>
-                          <select
-                            value={editCategory}
-                            onChange={(e: any) => setEditCategory(e.target.value)}
-                            className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
-                          >
-                            <option value="sight">🏛️ {getLocalizedCategoryName("sight")}</option>
-                            <option value="restaurant">🍱 {getLocalizedCategoryName("restaurant")}</option>
-                            <option value="shop">🛍️ {getLocalizedCategoryName("shop")}</option>
-                            <option value="transit">🚇 {getLocalizedCategoryName("transit")}</option>
-                            <option value="hotel">🏨 {getLocalizedCategoryName("hotel")}</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-slate-300 font-medium mb-1">{t.estimatedCost}</label>
-                          <input
-                            type="number"
-                            value={editCost}
-                            onChange={(e) => setEditCost(e.target.value)}
-                            className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-slate-300 font-medium mb-1">{t.briefDesc}</label>
-                        <textarea
-                          value={editDescription}
-                          onChange={(e) => setEditDescription(e.target.value)}
-                          className="w-full glass-input px-3 py-2 rounded-xl text-white h-14 resize-none bg-slate-900 border border-white/10"
-                        />
-                      </div>
-
-                      <div className="flex justify-end gap-2.5 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setEditingItemId(null)}
-                          className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition cursor-pointer text-[11px] font-semibold text-slate-300"
-                        >
-                          {lang === "zh" ? "取消" : "Cancel"}
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-[11px] font-semibold text-white cursor-pointer"
-                        >
-                          {lang === "zh" ? "儲存修改" : "Save Changes"}
-                        </button>
-                      </div>
-                    </form>
-                  );
-                }
-
-                return (
-                  <div
-                    key={item.id}
-                    id={`itinerary-card-${item.id}`}
-                    onClick={() => setActiveCommentDrawerId(item.id)}
-                    className={`p-4 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer transition-all border ${
-                      activeCommentDrawerId === item.id
-                        ? "border-blue-500 bg-blue-500/10 shadow-md"
-                        : "border-white/5 bg-white/3 hover:bg-white/6 hover:border-white/10"
-                    }`}
-                  >
-                    {/* Event item details block */}
-                    <div className="flex items-start gap-3.5">
-                      <div className="flex flex-col items-center justify-center bg-white/5 px-3 py-2.5 rounded-xl border border-white/5 text-slate-200 font-mono text-xs font-bold leading-none select-none">
-                        <Clock size={11} className="text-blue-400 mb-1" />
-                        <span>{item.time}</span>
-                      </div>
-
-                      <div className="space-y-1 text-left">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <h4 className="font-bold text-white text-[13.5px] tracking-tight">{item.title}</h4>
-                          <span className={`text-[9.5px] font-bold border rounded-md px-2 py-0.5 uppercase tracking-wider flex items-center gap-1 ${getCategoryBadgeColor(item.category)}`}>
-                            {getCategoryIcon(item.category)}
-                            <span>{getLocalizedCategoryName(item.category)}</span>
-                          </span>
-                        </div>
-
-                        <p className="text-slate-350 text-xs leading-relaxed max-w-xl">{item.description}</p>
-
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-1 text-[11px] text-slate-400">
-                          <span className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-2 py-0.5 rounded-lg">
-                            <MapPin size={11} className="text-blue-400" />
-                            <span className="text-slate-300 font-medium leading-none">{item.locationName}</span>
-                          </span>
-                          {item.cost > 0 && (
-                            <span className="font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded-lg font-bold">
-                              ${item.cost}
-                            </span>
-                          )}
-
-                          {item.trafficStatus && (
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${
-                              item.trafficStatus === "smooth"
-                                ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20"
-                                : item.trafficStatus === "moderate"
-                                ? "bg-amber-500/15 text-amber-300 border border-amber-500/20"
-                                : "bg-rose-500/15 text-rose-300 border border-rose-500/20"
-                            }`}>
-                              ⚡ {item.trafficStatus === "smooth" ? t.trafficSmooth : item.trafficStatus === "moderate" ? t.trafficModerate : t.trafficCongested}
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">{t.activityTitle}</label>
+                      <input
+                        id="itinerary-title-input"
+                        type="text"
+                        required
+                        placeholder="e.g. Asakusa Tsukiji Sushi Roll Tasting"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-white"
+                      />
                     </div>
 
-                    {/* Preference Votings line */}
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3.5 pt-3 sm:pt-0 border-t sm:border-0 border-white/5 shrink-0">
-                      <div className="flex items-center gap-2">
-                        {/* Vote Action */}
-                        <button
-                          id={`vote-activity-${item.id}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onVoteItinerary(item.id);
-                          }}
-                          className={`p-2 px-3 rounded-xl transition-all border cursor-pointer flex items-center justify-center gap-1.5 text-[11px] font-semibold ${
-                            userVoted
-                              ? "bg-blue-600 text-white border-blue-500"
-                              : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
-                          }`}
-                        >
-                          <ThumbsUp size={11} />
-                          <span>{item.votes.length}</span>
-                        </button>
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">{t.placeName}</label>
+                      <input
+                        id="itinerary-location-input"
+                        type="text"
+                        required
+                        placeholder="e.g. Sukiyabashi Jiro Ginza"
+                        value={locationName}
+                        onChange={(e) => setLocationName(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-white"
+                      />
+                    </div>
+                  </div>
 
-                        {/* Comments button indicator tooltip */}
-                        <div className="p-2 px-3 bg-white/3 text-slate-300 border border-white/5 rounded-xl flex items-center gap-1.5 font-semibold text-[11px] leading-none">
-                          <MessageSquare size={11} className="text-slate-400" />
-                          <span>{item.comments.length}</span>
-                        </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">{t.timeSchedule}</label>
+                      <input
+                        id="itinerary-time-input"
+                        type="time"
+                        value={time}
+                        onChange={(e) => setTime(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-white font-mono"
+                      />
+                    </div>
 
-                        {/* Edit Activity Action Button */}
-                        {onUpdateItineraryItem && (
-                          <button
-                            id={`edit-activity-${item.id}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingItemId(item.id);
-                              setEditTitle(item.title);
-                              setEditDescription(item.description || "");
-                              setEditLocationName(item.locationName || item.title);
-                              setEditTime(item.time);
-                              setEditCategory(item.category);
-                              setEditCost(item.cost.toString());
-                            }}
-                            className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/10 hover:border-blue-500/20 rounded-xl transition cursor-pointer flex items-center justify-center shrink-0"
-                            title={lang === "zh" ? "編輯此日程" : "Edit active itinerary"}
-                          >
-                            ✏️
-                          </button>
-                        )}
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">{t.categoryType}</label>
+                      <select
+                        id="itinerary-category-select"
+                        value={category}
+                        onChange={(e: any) => setCategory(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900"
+                      >
+                        <option value="sight" className="bg-slate-900">{getLocalizedCategoryName("sight")}</option>
+                        <option value="restaurant" className="bg-slate-900">{getLocalizedCategoryName("restaurant")}</option>
+                        <option value="shop" className="bg-slate-900">{getLocalizedCategoryName("shop")}</option>
+                        <option value="transit" className="bg-slate-900">{getLocalizedCategoryName("transit")}</option>
+                        <option value="hotel" className="bg-slate-900">{getLocalizedCategoryName("hotel")}</option>
+                      </select>
+                    </div>
 
-                        {/* Delete Activity Action Button */}
-                        {onDeleteItineraryItem && (
-                          <button
-                            id={`delete-activity-${item.id}`}
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              await onDeleteItineraryItem(item.id);
-                              if (activeCommentDrawerId === item.id) {
-                                setActiveCommentDrawerId(null);
-                              }
-                            }}
-                            className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-xl transition cursor-pointer flex items-center justify-center shrink-0"
-                            title={lang === "zh" ? "刪除此日程" : "Delete active itinerary"}
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                          </button>
-                        )}
+                    <div>
+                      <label className="block text-slate-300 font-medium mb-1">{t.estimatedCost}</label>
+                      <input
+                        id="itinerary-cost-input"
+                        type="number"
+                        placeholder="e.g. 15.00"
+                        value={cost}
+                        onChange={(e) => setCost(e.target.value)}
+                        className="w-full glass-input px-3 py-2 rounded-xl text-white"
+                      />
+                    </div>
+
+                    <div className="flex items-end">
+                      <button
+                        id="submit-itinerary-btn"
+                        type="submit"
+                        className="w-full py-2.5 glass-button-primary text-white font-semibold rounded-xl text-xs h-10"
+                      >
+                        {t.addScheduleCard}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-slate-300 font-medium mb-1">{t.briefDesc}</label>
+                    <textarea
+                      id="itinerary-desc-input"
+                      placeholder="Incorporate local traffic guidelines, ticket information..."
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="w-full glass-input px-3 py-2 rounded-xl text-white h-14 resize-none"
+                    />
+                  </div>
+                </form>
+              )}
+
+              {/* Timeline View & Map Split Wrapper */}
+              <div className={`flex-grow ${showMap ? "grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[400px]" : "flex flex-col"}`}>
+                
+                {/* Timeline List Column */}
+                <div className={`flex flex-col justify-between ${showMap ? "lg:col-span-6" : "flex-grow"}`}>
+                  <div className="flex-grow space-y-4 pr-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                    {filteredItems.length === 0 ? (
+                      <div className="py-20 text-center flex flex-col items-center justify-center p-6 bg-white/3 border border-white/5 rounded-2xl border-dashed">
+                        <Clock className="text-indigo-400 mb-2" size={24} />
+                        <p className="text-xs text-slate-400 max-w-md">{t.vacantMessage}</p>
                       </div>
+                    ) : (
+                      filteredItems.map((item, idx) => {
+                        const voterMetas = getVoterMeta(item.votes);
+                        const userVoted = item.votes.includes(currentUser);
 
-                      {/* Voter Avatars list */}
-                      {voterMetas.length > 0 && (
-                        <div className="flex -space-x-1.5 overflow-hidden">
-                          {voterMetas.slice(0, 3).map((voter) => (
-                            <div
-                              key={voter.id}
-                              style={{ backgroundColor: voter.avatarColor }}
-                              className="w-[18px] h-[18px] rounded-full border border-slate-900 text-[8px] font-bold text-white flex items-center justify-center shadow-xs"
-                              title={voter.name}
+                        if (editingItemId === item.id) {
+                          return (
+                            <form
+                              key={item.id}
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                if (onUpdateItineraryItem) {
+                                  onUpdateItineraryItem({
+                                    ...item,
+                                    title: editTitle,
+                                    locationName: editLocationName || editTitle,
+                                    description: editDescription,
+                                    time: editTime,
+                                    category: editCategory,
+                                    cost: parseFloat(editCost) || 0
+                                  });
+                                }
+                                setEditingItemId(null);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-6 md:p-8 rounded-3xl border border-blue-500/50 bg-blue-500/10 backdrop-blur-xl space-y-5 text-xs animate-fadeIn text-left shadow-lg"
                             >
-                              {voter.name[0]}
+                              <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                <span className="font-bold text-blue-400 flex items-center gap-1.5">
+                                  <Plus size={14} className="rotate-45 text-blue-400" />
+                                  <span>{lang === "zh" ? "編輯行程項目細節" : "Edit Itinerary Activity"}</span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingItemId(null)}
+                                  className="text-slate-400 hover:text-white font-semibold cursor-pointer"
+                                >
+                                  {lang === "zh" ? "取消" : "Cancel"}
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-slate-300 font-medium mb-1">{t.activityTitle}</label>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={editTitle}
+                                    onChange={(e) => setEditTitle(e.target.value)}
+                                    className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-slate-300 font-medium mb-1">{t.placeName}</label>
+                                  <input
+                                    type="text"
+                                    required
+                                    value={editLocationName}
+                                    onChange={(e) => setEditLocationName(e.target.value)}
+                                    className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <div>
+                                  <label className="block text-slate-300 font-medium mb-1">{t.timeSchedule}</label>
+                                  <input
+                                    type="time"
+                                    required
+                                    value={editTime}
+                                    onChange={(e) => setEditTime(e.target.value)}
+                                    className="w-full glass-input px-3 py-2 rounded-xl text-white font-mono bg-slate-900 border border-white/10"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-slate-300 font-medium mb-1">{t.categoryType}</label>
+                                  <select
+                                    value={editCategory}
+                                    onChange={(e: any) => setEditCategory(e.target.value)}
+                                    className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                                  >
+                                    <option value="sight">{getLocalizedCategoryName("sight")}</option>
+                                    <option value="restaurant">{getLocalizedCategoryName("restaurant")}</option>
+                                    <option value="shop">{getLocalizedCategoryName("shop")}</option>
+                                    <option value="transit">{getLocalizedCategoryName("transit")}</option>
+                                    <option value="hotel">{getLocalizedCategoryName("hotel")}</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="block text-slate-300 font-medium mb-1">{t.estimatedCost}</label>
+                                  <input
+                                    type="number"
+                                    value={editCost}
+                                    onChange={(e) => setEditCost(e.target.value)}
+                                    className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-slate-300 font-medium mb-1">{t.briefDesc}</label>
+                                <textarea
+                                  value={editDescription}
+                                  onChange={(e) => setEditDescription(e.target.value)}
+                                  className="w-full glass-input px-3 py-2 rounded-xl text-white h-14 resize-none bg-slate-900 border border-white/10"
+                                />
+                              </div>
+
+                              <div className="flex justify-end gap-2.5 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingItemId(null)}
+                                  className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition cursor-pointer text-[11px] font-semibold text-slate-300"
+                                >
+                                  {lang === "zh" ? "取消" : "Cancel"}
+                                </button>
+                                <button
+                                  type="submit"
+                                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-[11px] font-semibold text-white cursor-pointer"
+                                >
+                                  {lang === "zh" ? "儲存修改" : "Save Changes"}
+                                </button>
+                              </div>
+                            </form>
+                          );
+                        }
+
+                        return (
+                          <div
+                            key={item.id}
+                            id={`itinerary-card-${item.id}`}
+                            onClick={() => setActiveCommentDrawerId(item.id)}
+                            className={`p-6 md:p-8 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 cursor-pointer border transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 ${
+                              activeCommentDrawerId === item.id
+                                ? "border-blue-500 bg-blue-500/15 shadow-md backdrop-blur-xl"
+                                : "border-white/10 dark:border-white/5 bg-white/10 dark:bg-black/20 backdrop-blur-xl hover:bg-white/15 dark:hover:bg-black/30 hover:border-white/20 dark:hover:border-white/10 shadow-md"
+                            }`}
+                          >
+                            {/* Event item details block */}
+                            <div className="flex items-start gap-4">
+                              <div className="flex flex-col items-center justify-center bg-white/5 px-3.5 py-3 rounded-xl border border-white/5 text-slate-200 font-mono text-xs font-bold leading-none select-none">
+                                <Clock size={11} className="text-blue-400 mb-1" />
+                                <span>{item.time}</span>
+                              </div>
+
+                              <div className="space-y-1.5 text-left">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h4 className="font-bold text-white text-base tracking-tight">{item.title}</h4>
+                                  <span className={`text-[9.5px] font-bold border rounded-md px-2 py-0.5 uppercase tracking-wider flex items-center gap-1 ${getCategoryBadgeColor(item.category)}`}>
+                                    {getCategoryIcon(item.category)}
+                                    <span>{getLocalizedCategoryName(item.category)}</span>
+                                  </span>
+                                </div>
+
+                                <p className="text-slate-300 text-xs leading-relaxed max-w-xl">{item.description}</p>
+
+                                <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 pt-1 text-[11px] text-slate-400">
+                                  <span className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-2.5 py-0.5 rounded-lg">
+                                    <MapPin size={11} className="text-blue-400" />
+                                    <span className="text-slate-300 font-medium leading-none">{item.locationName}</span>
+                                  </span>
+                                  {item.cost > 0 && (
+                                    <span className="font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2.5 py-0.5 rounded-lg font-bold">
+                                      ${item.cost}
+                                    </span>
+                                  )}
+
+                                  {item.trafficStatus && (
+                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize flex items-center gap-1 shrink-0 ${
+                                      item.trafficStatus === "smooth"
+                                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20"
+                                        : item.trafficStatus === "moderate"
+                                        ? "bg-amber-500/15 text-amber-300 border-amber-500/20"
+                                        : "bg-rose-500/15 text-rose-300 border-rose-500/20"
+                                    }`}>
+                                      <Zap size={10} className="shrink-0 text-amber-300" />
+                                      <span>{item.trafficStatus === "smooth" ? t.trafficSmooth : item.trafficStatus === "moderate" ? t.trafficModerate : t.trafficCongested}</span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          ))}
-                          {voterMetas.length > 3 && (
-                            <div className="w-[18px] h-[18px] rounded-full bg-slate-800 border border-slate-900 text-[8px] text-slate-400 flex items-center justify-center font-bold">
-                              +{voterMetas.length - 3}
+
+                            {/* Preference Votings line */}
+                            <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3.5 pt-3 sm:pt-0 border-t sm:border-0 border-white/5 shrink-0">
+                              <div className="flex items-center gap-2">
+                                {/* Vote Action */}
+                                <button
+                                  id={`vote-activity-${item.id}`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onVoteItinerary(item.id);
+                                  }}
+                                  className={`px-3 h-12 sm:h-9 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 border cursor-pointer flex items-center justify-center gap-1.5 text-[11px] font-semibold ${
+                                    userVoted
+                                      ? "bg-blue-600 text-white border-blue-500"
+                                      : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                                  }`}
+                                >
+                                  <ThumbsUp size={11} />
+                                  <span>{item.votes.length}</span>
+                                </button>
+
+                                {/* Comments button indicator tooltip */}
+                                <div className="px-3 h-12 sm:h-9 bg-white/3 text-slate-300 border border-white/5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-[11px] leading-none">
+                                  <MessageSquare size={11} className="text-slate-400" />
+                                  <span>{item.comments.length}</span>
+                                </div>
+
+                                {/* Edit Activity Action Button */}
+                                {onUpdateItineraryItem && (
+                                  <button
+                                    id={`edit-activity-${item.id}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingItemId(item.id);
+                                      setEditTitle(item.title);
+                                      setEditDescription(item.description || "");
+                                      setEditLocationName(item.locationName || item.title);
+                                      setEditTime(item.time);
+                                      setEditCategory(item.category);
+                                      setEditCost(item.cost.toString());
+                                    }}
+                                    className="p-2 h-12 w-12 sm:h-9 sm:w-9 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/10 hover:border-blue-500/20 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 cursor-pointer flex items-center justify-center shrink-0"
+                                    title={lang === "zh" ? "編輯此日程" : "Edit active itinerary"}
+                                  >
+                                    <Pencil size={11} />
+                                  </button>
+                                )}
+
+                                {/* Delete Activity Action Button */}
+                                {onDeleteItineraryItem && (
+                                  <button
+                                    id={`delete-activity-${item.id}`}
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      await onDeleteItineraryItem(item.id);
+                                      if (activeCommentDrawerId === item.id) {
+                                        setActiveCommentDrawerId(null);
+                                      }
+                                    }}
+                                    className="p-2 h-12 w-12 sm:h-9 sm:w-9 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 cursor-pointer flex items-center justify-center shrink-0"
+                                    title={lang === "zh" ? "刪除此日程" : "Delete active itinerary"}
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Voter Avatars list */}
+                              {voterMetas.length > 0 && (
+                                <div className="flex -space-x-1.5 overflow-hidden">
+                                  {voterMetas.slice(0, 3).map((voter) => (
+                                    <div
+                                      key={voter.id}
+                                      style={{ backgroundColor: voter.avatarColor }}
+                                      className="w-[18px] h-[18px] rounded-full border border-slate-900 text-[8px] font-bold text-white flex items-center justify-center shadow-xs"
+                                      title={voter.name}
+                                    >
+                                      {voter.name[0]}
+                                    </div>
+                                  ))}
+                                  {voterMetas.length > 3 && (
+                                    <div className="w-[18px] h-[18px] rounded-full bg-slate-800 border border-slate-900 text-[8px] text-slate-400 flex items-center justify-center font-bold">
+                                      +{voterMetas.length - 3}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* 🚗 Transportation Connection Card */}
-                    {idx < filteredItems.length - 1 && (
-                      <div className="my-2 ml-7 pl-5 border-l border-dashed border-white/15 flex items-center gap-3 py-1 text-[11px] text-slate-400 select-none animate-fadeIn">
-                        <div className="flex items-center gap-2 bg-white/4 border border-white/5 hover:bg-white/8 px-2.5 py-0.5 rounded-xl text-slate-200">
-                          <span className="text-xs">{getTransitIconAndDetails(item, filteredItems[idx + 1], lang).icon}</span>
-                          <span className="font-semibold text-[9px]">{getTransitIconAndDetails(item, filteredItems[idx + 1], lang).label}</span>
-                        </div>
-                        <span className="text-[9px] text-slate-500 font-mono">
-                          {getTransitIconAndDetails(item, filteredItems[idx + 1], lang).distText}
-                        </span>
-                      </div>
+                            
+                            {/* Transportation Connection Card */}
+                            {idx < filteredItems.length - 1 && (
+                              <div className="my-2 ml-7 pl-5 border-l border-dashed border-white/15 flex items-center gap-3 py-1 text-[11px] text-slate-400 select-none animate-fadeIn">
+                                <div className="flex items-center gap-2 bg-white/4 border border-white/5 hover:bg-white/8 px-2.5 py-0.5 rounded-xl text-slate-200">
+                                  <span className="text-xs">
+                                    {getTransitIconAndDetails(item, filteredItems[idx + 1], lang).modeType === "subway" ? (
+                                      <Train size={11} className="text-indigo-400" />
+                                    ) : getTransitIconAndDetails(item, filteredItems[idx + 1], lang).modeType === "bus" ? (
+                                      <Bus size={11} className="text-indigo-400" />
+                                    ) : (
+                                      <Footprints size={11} className="text-indigo-400" />
+                                    )}
+                                  </span>
+                                  <span className="font-semibold text-[9px]">{getTransitIconAndDetails(item, filteredItems[idx + 1], lang).label}</span>
+                                </div>
+                                <span className="text-[9px] text-slate-500 font-mono">
+                                  {getTransitIconAndDetails(item, filteredItems[idx + 1], lang).distText}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
-                );
-              })
-            )}
+                </div>
+
+                {/* Live Interactive Itinerary Map Column */}
+                {showMap && (
+                  <div className="lg:col-span-6 w-full h-[360px] lg:h-[480px] min-h-[350px] lg:min-h-0 animate-fadeIn flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+                    <ItineraryMap
+                      destination={filteredItems[0]?.locationName || "Tokyo"}
+                      items={filteredItems}
+                      lang={lang}
+                    />
+                  </div>
+                )}
               </div>
             </div>
-
-            {/* Live Interactive Itinerary Map Column */}
-            {showMap && (
-              <div className="lg:col-span-5 w-full h-[360px] lg:h-[460px] min-h-[350px] lg:min-h-0 animate-fadeIn flex flex-col">
-                <ItineraryMap
-                  destination={filteredItems[0]?.locationName || "Tokyo"}
-                  items={filteredItems}
-                  lang={lang}
-                />
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1059,7 +1140,7 @@ export default function ItineraryPlanner({
                     }`}
                   >
                     <Sparkles size={12} className="text-blue-200" />
-                    <span>🤖 OdyShareSmart AI</span>
+                    <span>OdyShareSmart AI</span>
                   </button>
                   <button
                     type="button"
@@ -1071,7 +1152,7 @@ export default function ItineraryPlanner({
                     }`}
                   >
                     <MessageSquare size={12} />
-                    <span>💬 {t.discussionSidebar}</span>
+                    <span>{t.discussionSidebar}</span>
                     {activeCommentDrawerId ? (
                       <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-ping"></span>
                     ) : null}

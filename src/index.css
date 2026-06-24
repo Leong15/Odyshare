@@ -8,12 +8,10 @@
 /* Premium Dark Cosmic Glassmorphism Setup */
 @layer base {
   body {
-    background-color: #0b0e14;
+    background-color: #000000;
     background-image: 
-      radial-gradient(at 0% 0%, rgba(29, 38, 68, 0.6) 0, transparent 50%),
-      radial-gradient(at 50% 0%, rgba(42, 53, 93, 0.5) 0, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(15, 23, 42, 0.8) 0, transparent 50%),
-      radial-gradient(at 50% 100%, rgba(20, 30, 60, 0.5) 0, transparent 60%);
+      radial-gradient(at 0% 0%, rgba(20, 20, 35, 0.4) 0, transparent 40%),
+      radial-gradient(at 100% 0%, rgba(15, 15, 25, 0.4) 0, transparent 40%);
     background-attachment: fixed;
     min-height: 100vh;
     color: #e2e8f0;
@@ -40,11 +38,11 @@
 }
 
 .glass-card {
-  background: rgba(30, 41, 59, 0.45);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 4px 15px 0 rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
 }
 
 .glass-card-hover {
@@ -109,27 +107,29 @@
 
 /* Elegant Light Theme Overrides */
 body.light-theme {
-  background-color: #f8fafc;
+  background-color: #f8f9fa;
   background-image: 
-    radial-gradient(at 0% 0%, rgba(203, 213, 225, 0.4) 0, transparent 50%),
-    radial-gradient(at 50% 0%, rgba(186, 230, 253, 0.4) 0, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(226, 232, 240, 0.4) 0, transparent 50%),
-    radial-gradient(at 50% 100%, rgba(241, 245, 249, 0.6) 0, transparent 60%);
+    radial-gradient(at 0% 0%, rgba(220, 220, 230, 0.4) 0, transparent 40%),
+    radial-gradient(at 100% 0%, rgba(230, 230, 240, 0.4) 0, transparent 40%);
   color: #0f172a;
 }
 
 body.light-theme .glass-container {
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 10px 30px 0 rgba(15, 23, 42, 0.05);
-  color: #0f172a;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(9, 9, 11, 0.08);
+  box-shadow: 0 10px 30px 0 rgba(9, 9, 11, 0.02);
+  color: #18181b;
 }
 
 body.light-theme .glass-card {
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 4px 15px 0 rgba(15, 23, 42, 0.03);
-  color: #1e293b;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(9, 9, 11, 0.06);
+  box-shadow: 0 4px 15px 0 rgba(9, 9, 11, 0.01);
+  color: #18181b;
 }
 
 body.light-theme .glass-card-hover:hover {
@@ -156,39 +156,39 @@ body.light-theme .glass-badge {
 }
 
 body.light-theme .text-white {
-  color: #0f172a !important;
+  color: #18181b !important;
 }
 
 body.light-theme .text-slate-50,
 body.light-theme .text-slate-105,
 body.light-theme .text-slate-100 {
-  color: #0f172a !important;
+  color: #18181b !important;
 }
 
 body.light-theme .text-slate-205,
 body.light-theme .text-slate-200 {
-  color: #1e293b !important;
+  color: #27272a !important;
 }
 
 body.light-theme .text-slate-305,
 body.light-theme .text-slate-300 {
-  color: #334155 !important;
+  color: #3f3f46 !important;
 }
 
 body.light-theme .text-slate-350,
 body.light-theme .text-slate-400 {
-  color: #475569 !important;
+  color: #52525b !important;
 }
 
 body.light-theme .text-slate-455,
 body.light-theme .text-slate-450,
 body.light-theme .text-slate-500 {
-  color: #64748b !important;
+  color: #71717a !important;
 }
 
 body.light-theme option {
   background: #ffffff !important;
-  color: #0f172a !important;
+  color: #18181b !important;
 }
 
 /* Base dark wrappers map to solid white or near white cards */
@@ -196,11 +196,11 @@ body.light-theme .bg-slate-950,
 body.light-theme .bg-slate-900,
 body.light-theme .bg-slate-800,
 body.light-theme .bg-slate-850,
-body.light-theme .bg-[#0b0e14],
-body.light-theme .bg-[#0f111a],
+body.light-theme .bg-\[\#0b0e14\],
+body.light-theme .bg-\[\#0f111a\],
 body.light-theme select {
   background-color: #ffffff !important;
-  color: #0f172a !important;
+  color: #18181b !important;
   border-color: rgba(15, 23, 42, 0.12) !important;
 }
 

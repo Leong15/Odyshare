@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Users, ChevronRight, AlertCircle, CheckSquare, Square, DollarSign, Upload, Camera, X, Image } from "lucide-react";
+import { Plus, Trash2, Users, ChevronRight, AlertCircle, CheckSquare, Square, DollarSign, Upload, Camera, X, Image, Zap, Sparkles, Pencil, ShoppingBag, Utensils, Percent } from "lucide-react";
 import { ExpenseItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 import SettlementModal from "./SettlementModal";
@@ -262,13 +262,13 @@ export default function ExpenseTracker({
 
   const getLocalizedCategoryName = (cat: string) => {
     switch (cat) {
-      case "flight": return lang === "zh" ? "✈️ 機票航空" : "Flight";
-      case "lodging": return lang === "zh" ? "🏨 旅宿飯店" : "Lodging";
-      case "food": return lang === "zh" ? "🍱 餐飲美食" : "Food";
-      case "activities": return lang === "zh" ? "🎡 景點行程" : "Activity";
-      case "transit": return lang === "zh" ? "🚇 本地交通" : "Transit";
-      case "shopping": return lang === "zh" ? "🛍️ 本地商鋪" : "Shopping";
-      default: return lang === "zh" ? "📦 其他雜支" : "Other";
+      case "flight": return lang === "zh" ? "機票航空" : "Flight";
+      case "lodging": return lang === "zh" ? "旅宿飯店" : "Lodging";
+      case "food": return lang === "zh" ? "餐飲美食" : "Food";
+      case "activities": return lang === "zh" ? "景點行程" : "Activity";
+      case "transit": return lang === "zh" ? "本地交通" : "Transit";
+      case "shopping": return lang === "zh" ? "本地商鋪" : "Shopping";
+      default: return lang === "zh" ? "其他雜支" : "Other";
     }
   };
 
@@ -296,7 +296,7 @@ export default function ExpenseTracker({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Primary Action Panel: Transaction History & Ledger (Now on the left/top for perfect mobile hierarchy) */}
       <div className="lg:col-span-2 space-y-4">
-        <div className="glass-container rounded-2xl p-5 shadow-lg border border-white/10 h-full flex flex-col">
+        <div className="glass-container rounded-2xl p-6 md:p-8 shadow-lg border border-white/10 h-full flex flex-col">
           <div className="flex items-center justify-between mb-5 border-b border-white/5 pb-4">
             <div>
               <h3 className="font-extrabold text-white text-sm">{t.groupTransactionLedger}</h3>
@@ -307,7 +307,7 @@ export default function ExpenseTracker({
             <button
               id="add-expense-trigger"
               onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-1.5 glass-button-primary text-white font-semibold text-xs py-2 px-3.5 rounded-xl cursor-pointer"
+              className="flex items-center justify-center gap-1.5 glass-button-primary text-white font-semibold text-xs h-12 sm:h-9 px-3.5 rounded-xl cursor-pointer"
             >
               <Plus size={14} /> {t.addNewCost}
             </button>
@@ -429,16 +429,16 @@ export default function ExpenseTracker({
                       type="button"
                       onClick={handleReceiptOcrSubmit}
                       disabled={ocrParsing || (!ocrInput.trim() && !receiptImage)}
-                      className="py-1.5 px-3 bg-emerald-600/90 hover:bg-emerald-650 border border-emerald-500/15 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shrink-0"
+                      className="h-12 sm:h-auto px-3 bg-emerald-600/90 hover:bg-emerald-650 border border-emerald-500/15 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shrink-0"
                     >
                       {ocrParsing ? (
                         <>
-                          <span className="animate-spin text-white">⏳</span>
+                          <Sparkles size={11} className="animate-spin text-white shrink-0" />
                           <span>{lang === "zh" ? "辨識中..." : "Extracting..."}</span>
                         </>
                       ) : (
                         <>
-                          <span>⚡</span>
+                          <Zap size={11} className="text-amber-400 shrink-0" />
                           <span>{lang === "zh" ? "智慧一鍵辨識" : "Scan Receipt"}</span>
                         </>
                       )}
@@ -513,7 +513,10 @@ export default function ExpenseTracker({
                                 : 'bg-slate-950 border-white/5 hover:border-white/20 text-slate-400'
                             }`}
                           >
-                            {lang === "zh" ? "🍱 人頭等額平分" : "Equal Split"}
+                            <span className="flex items-center justify-center gap-1.5">
+                              <Users size={12} />
+                              <span>{lang === "zh" ? "人頭等額平分" : "Equal Split"}</span>
+                            </span>
                           </button>
                           <button
                             type="button"
@@ -524,7 +527,10 @@ export default function ExpenseTracker({
                                 : 'bg-slate-950 border-white/5 hover:border-white/20 text-slate-400'
                             }`}
                           >
-                            {lang === "zh" ? "🏷️ 個別消費自付" : "Individual Split"}
+                            <span className="flex items-center justify-center gap-1.5">
+                              <Percent size={12} />
+                              <span>{lang === "zh" ? "個別消費自付" : "Individual Split"}</span>
+                            </span>
                           </button>
                         </div>
                       </div>
@@ -551,7 +557,7 @@ export default function ExpenseTracker({
                     ) : (
                       <div className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-2">
                         <div className="font-bold text-slate-300 border-b border-white/5 pb-1 mb-2">
-                          {lang === "zh" ? "✍️ 請輸入各成員個人原始消費額" : "✍️ Input individual raw purchase amount for each:"}
+                          {lang === "zh" ? "請輸入各成員個人原始消費額" : "Input individual raw purchase amount for each:"}
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                           {participants.map(p => {
@@ -615,12 +621,12 @@ export default function ExpenseTracker({
                           onChange={(e: any) => setCategory(e.target.value)}
                           className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white bg-slate-900 outline-none"
                         >
-                          <option value="food" className="bg-slate-900">🍱 {getLocalizedCategoryName("food")}</option>
-                          <option value="activities" className="bg-slate-900">🎡 {getLocalizedCategoryName("activities")}</option>
-                          <option value="lodging" className="bg-slate-900">🏨 {getLocalizedCategoryName("lodging")}</option>
-                          <option value="transit" className="bg-slate-900">🚇 {getLocalizedCategoryName("transit")}</option>
-                          <option value="flight" className="bg-slate-900">✈️ {getLocalizedCategoryName("flight")}</option>
-                          <option value="shopping" className="bg-slate-900">🛍️ {getLocalizedCategoryName("shopping")}</option>
+                          <option value="food" className="bg-slate-900">{getLocalizedCategoryName("food")}</option>
+                          <option value="activities" className="bg-slate-900">{getLocalizedCategoryName("activities")}</option>
+                          <option value="lodging" className="bg-slate-900">{getLocalizedCategoryName("lodging")}</option>
+                          <option value="transit" className="bg-slate-900">{getLocalizedCategoryName("transit")}</option>
+                          <option value="flight" className="bg-slate-900">{getLocalizedCategoryName("flight")}</option>
+                          <option value="shopping" className="bg-slate-900">{getLocalizedCategoryName("shopping")}</option>
                         </select>
                       </div>
 
@@ -651,7 +657,8 @@ export default function ExpenseTracker({
                     {/* Tax Refund & Discount input area */}
                     <div className="p-3 bg-white/5 border border-white/5 rounded-xl space-y-3">
                       <div className="font-bold text-slate-300 flex items-center gap-1.5">
-                        <span>🛍️ {lang === "zh" ? "免稅退稅 & 折扣比例調整 (可填單項或不填)" : "Tax Refund & Discount Adjustment (Optional)"}</span>
+                        <ShoppingBag size={14} className="text-slate-300" />
+                        <span>{lang === "zh" ? "免稅退稅 & 折扣比例調整 (可填單項或不填)" : "Tax Refund & Discount Adjustment (Optional)"}</span>
                         <span className="bg-amber-500/10 text-amber-400 text-[9px] px-1.5 py-0.5 rounded border border-amber-500/10 font-mono">
                           {lang === "zh" ? "後續自動等比扣減" : "Proportional adjustment"}
                         </span>
@@ -756,7 +763,7 @@ export default function ExpenseTracker({
               <button
                 id="submit-expense-btn"
                 type="submit"
-                className="w-full py-2.5 glass-button-primary text-white font-bold rounded-xl transition-all cursor-pointer text-xs"
+                className="w-full h-12 sm:h-10 glass-button-primary text-white font-bold rounded-xl transition-all cursor-pointer text-xs flex items-center justify-center"
               >
                 {t.postSplitLedgerEntry}
               </button>
@@ -1123,7 +1130,7 @@ export default function ExpenseTracker({
                             title={lang === "zh" ? "點擊修改預算" : "Edit Budget limit"}
                           >
                             <span>${limit}</span>
-                            <span className="text-[10px] opacity-70">📝</span>
+                            <Pencil size={10} className="opacity-70 text-blue-400" />
                           </button>
                         )}
                       </div>
@@ -1201,7 +1208,7 @@ export default function ExpenseTracker({
                 <button
                   type="button"
                   onClick={() => setShowSettlementModal(true)}
-                  className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl transition-all cursor-pointer shadow-lg text-[10.5px] flex items-center gap-1 shrink-0 self-end sm:self-auto"
+                  className="h-12 sm:h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl transition-all cursor-pointer shadow-lg text-[10.5px] flex items-center justify-center gap-1 shrink-0 self-end sm:self-auto"
                 >
                   <Users size={12} />
                   <span>{lang === "zh" ? "匯出結算與繳費" : "Export & Repay"}</span>
