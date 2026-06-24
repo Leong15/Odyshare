@@ -2,6 +2,14 @@ import React, { useState, useEffect } from "react";
 import { Plus, Trash2, Users, ChevronRight, AlertCircle, CheckSquare, Square, DollarSign } from "lucide-react";
 import { ExpenseItem, Participant } from "../types";
 import { translations } from "../lib/translations";
+import {
+  getExpenseActualTotal,
+  getExpenseShareForUser,
+  calculateSettleMatrix,
+  calculatePersonalMetrics,
+  getParticipantAdjustedSpent,
+  getTotalSpent
+} from "../utils/expensecalculator";
 
 interface ExpenseTrackerProps {
   expenses: ExpenseItem[];
@@ -119,74 +127,6 @@ export default function ExpenseTracker({
   const [taxRefundPercent, setTaxRefundPercent] = useState<string>("");
   const [taxRefundTotalAmount, setTaxRefundTotalAmount] = useState<string>("");
 
-  // Helper to compute actual paid total (post-refund) for an expense item
-  const getExpenseActualTotal = (exp: ExpenseItem): number => {
-    const parsedAmt = Number(exp.amount) || 0;
-    const sType = exp.splitType || 'equal';
-    const splitAmongIds = exp.splitAmongIds || [];
-    
-    let rawTotal = parsedAmt;
-    if (sType === 'individual') {
-      const indAmts = exp.individualAmounts || {};
-      let specifiedSum = 0;
-      splitAmongIds.forEach(id => {
-        specifiedSum += Number(indAmts[id]) || 0;
-      });
-      if (specifiedSum > 0) {
-        rawTotal = specifiedSum;
-      }
-    }
-
-    let refundAmt = 0;
-    if (exp.taxRefundTotalAmount !== undefined && Number(exp.taxRefundTotalAmount) > 0) {
-      refundAmt = Number(exp.taxRefundTotalAmount);
-    } else if (exp.taxRefundPercent !== undefined && Number(exp.taxRefundPercent) > 0) {
-      refundAmt = rawTotal * (Number(exp.taxRefundPercent) / 100);
-    }
-    
-    return Math.max(0, rawTotal - refundAmt);
-  };
-
-  // Helper to compute specific user's shared portion
-  const getExpenseShareForUser = (exp: ExpenseItem, uid: string): number => {
-    const parsedAmt = Number(exp.amount) || 0;
-    const splitAmongIds = exp.splitAmongIds || [];
-    if (!splitAmongIds.includes(uid)) return 0;
-
-    const sType = exp.splitType || 'equal';
-    let rawTotal = parsedAmt;
-    let individualRawAmt = 0;
-
-    if (sType === 'individual') {
-      const indAmts = exp.individualAmounts || {};
-      let specifiedSum = 0;
-      splitAmongIds.forEach(id => {
-        specifiedSum += Number(indAmts[id]) || 0;
-      });
-      
-      if (specifiedSum > 0) {
-        rawTotal = specifiedSum;
-        individualRawAmt = Number(indAmts[uid]) || 0;
-      } else {
-        individualRawAmt = parsedAmt / splitAmongIds.length;
-      }
-    } else {
-      individualRawAmt = parsedAmt / splitAmongIds.length;
-    }
-
-    let refundAmt = 0;
-    if (exp.taxRefundTotalAmount !== undefined && Number(exp.taxRefundTotalAmount) > 0) {
-      refundAmt = Number(exp.taxRefundTotalAmount);
-    } else if (exp.taxRefundPercent !== undefined && Number(exp.taxRefundPercent) > 0) {
-      refundAmt = rawTotal * (Number(exp.taxRefundPercent) / 100);
-    }
-
-    const actualTotal = Math.max(0, rawTotal - refundAmt);
-    if (rawTotal <= 0) return 0;
-
-    return individualRawAmt * (actualTotal / rawTotal);
-  };
-
   // Derive evaluated expenses list
   const activeExpenses = expenses.filter(exp => !uncheckedExpenseIds.includes(exp.id));
 
@@ -194,99 +134,19 @@ export default function ExpenseTracker({
   const remainingBudget = editableBudget - totalSpent;
   const percentageSpent = Math.min((totalSpent / editableBudget) * 100, 100);
 
-  // Split calculations
-  const calculateSettleMatrix = () => {
-    const balances: { [key: string]: number } = {};
-    participants.forEach(p => {
-      balances[p.id] = 0;
-    });
+  // Split calculations via central utility
+  const { balances, transactions } = calculateSettleMatrix(expenses, participants, new Set(uncheckedExpenseIds));
 
-    activeExpenses.forEach(exp => {
-      const actualTotal = getExpenseActualTotal(exp);
-      if (actualTotal <= 0) return;
+  // Personal metrics logic via central utility
+  const { paidByMe, myOwedShare, netOwed, netSpentAdjusted } = calculatePersonalMetrics(
+    expenses,
+    activeUserId,
+    balances,
+    new Set(uncheckedExpenseIds)
+  );
 
-      balances[exp.paidById] = (balances[exp.paidById] || 0) + actualTotal;
-
-      exp.splitAmongIds.forEach(uid => {
-        const splitShare = getExpenseShareForUser(exp, uid);
-        balances[uid] = (balances[uid] || 0) - splitShare;
-      });
-    });
-
-    const creditors: { id: string; amount: number }[] = [];
-    const debtors: { id: string; amount: number }[] = [];
-
-    Object.keys(balances).forEach(uid => {
-      const bal = balances[uid];
-      if (bal > 0.01) {
-        creditors.push({ id: uid, amount: bal });
-      } else if (bal < -0.01) {
-        debtors.push({ id: uid, amount: Math.abs(bal) });
-      }
-    });
-
-    creditors.sort((a, b) => b.amount - a.amount);
-    debtors.sort((a, b) => b.amount - a.amount);
-
-    const transactions: { from: string; to: string; amount: number }[] = [];
-    let cIdx = 0;
-    let dIdx = 0;
-
-    const cList = creditors.map(c => ({ ...c }));
-    const dList = debtors.map(d => ({ ...d }));
-
-    while (cIdx < cList.length && dIdx < dList.length) {
-      const creditor = cList[cIdx];
-      const debtor = dList[dIdx];
-
-      const dealAmount = Math.min(creditor.amount, debtor.amount);
-      transactions.push({
-        from: debtor.id,
-        to: creditor.id,
-        amount: Math.round(dealAmount * 100) / 100
-      });
-
-      creditor.amount -= dealAmount;
-      debtor.amount -= dealAmount;
-
-      if (creditor.amount <= 0.01) cIdx++;
-      if (debtor.amount <= 0.01) dIdx++;
-    }
-
-    return { balances, transactions };
-  };
-
-  const { balances, transactions } = calculateSettleMatrix();
-
-  // Personal metrics logic: "合計支出總額要計上友人還錢後的數。"
-  const calculatePersonalMetrics = () => {
-    let paidByMe = 0;
-    let myOwedShare = 0;
-
-    activeExpenses.forEach(exp => {
-      const actualTotal = getExpenseActualTotal(exp);
-      const splitShare = getExpenseShareForUser(exp, activeUserId);
-
-      if (exp.paidById === activeUserId) {
-        paidByMe += actualTotal;
-      }
-      myOwedShare += splitShare;
-    });
-
-    const netOwed = balances[activeUserId] || 0; // if positive, Leo gets back; if negative, Leo pays.
-    const netSpentAdjusted = myOwedShare; // net consumption after repayments is exactly my owed share of what I truly consumed!
-
-    return { paidByMe, myOwedShare, netOwed, netSpentAdjusted };
-  };
-
-  const { paidByMe, myOwedShare, netOwed, netSpentAdjusted } = calculatePersonalMetrics();
-
-  const getParticipantAdjustedSpent = (userId: string) => {
-    let owedShare = 0;
-    activeExpenses.forEach(exp => {
-      owedShare += getExpenseShareForUser(exp, userId);
-    });
-    return owedShare;
+  const getParticipantAdjustedSpentLocal = (userId: string) => {
+    return getParticipantAdjustedSpent(expenses, userId, new Set(uncheckedExpenseIds));
   };
 
   const handleToggleSplit = (uid: string) => {
@@ -1029,7 +889,7 @@ export default function ExpenseTracker({
               
               <div className="space-y-3">
                 {participants.map(p => {
-                  const spent = getParticipantAdjustedSpent(p.id);
+                  const spent = getParticipantAdjustedSpentLocal(p.id);
                   const limit = typeof p.budgetLimit === 'number' ? p.budgetLimit : 1500;
                   const ratio = Math.min((spent / limit) * 100, 100);
                   const isOver = spent > limit;

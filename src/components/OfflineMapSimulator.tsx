@@ -479,15 +479,24 @@ export default function OfflineMapSimulator({
   const handleUpdateExistingItineraryPlan = async () => {
     if (!editTitle.trim() || !activeItem) return;
     if (onUpdateItineraryItem) {
+      const pinName = editLocation || editTitle;
+      // Pre-resolve coordinates client-side for immediate response
+      const localCoords = resolveLatLng(pinName, destination || "", 50, 50);
       const updated = {
         ...activeItem,
         title: editTitle,
-        locationName: editLocation || editTitle,
+        locationName: pinName,
         description: editDesc,
         time: editTime,
         dayIndex: Number(editDay) || 0,
-        category: editCategory === "food" ? "restaurant" : editCategory === "hotel" ? "hotel" : "sight",
-        cost: Number(editCost) || 0
+        category: editCategory === "food" ? ("restaurant" as const) : editCategory === "hotel" ? ("hotel" as const) : ("sight" as const),
+        cost: Number(editCost) || 0,
+        lat: localCoords.lat,
+        lng: localCoords.lng,
+        coordinates: {
+          x: Math.round(50 + (localCoords.lng - (tripLng || 139.6503)) / 0.0018),
+          y: Math.round(50 - (localCoords.lat - (tripLat || 35.6762)) / 0.0015)
+        }
       };
       await onUpdateItineraryItem(updated);
       setActiveItem(updated);

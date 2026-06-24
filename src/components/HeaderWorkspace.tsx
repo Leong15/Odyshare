@@ -198,11 +198,7 @@ export default function HeaderWorkspace({
           
           {/* Profile Display Box */}
           {currentUser && (
-            <div 
-              className="relative"
-              onMouseEnter={() => setShowUserDropdown(true)}
-              onMouseLeave={() => setShowUserDropdown(false)}
-            >
+            <div className="relative">
               <button
                 type="button"
                 onClick={() => setShowUserDropdown(!showUserDropdown)}

@@ -13,6 +13,8 @@ interface LoginTerminalProps {
   setAuthPassword: (p: string) => void;
   authName: string;
   setAuthName: (n: string) => void;
+  authEmail: string;
+  setAuthEmail: (e: string) => void;
   authError: string | null;
   setAuthError: (err: string | null) => void;
   onAuthSubmit: (e: React.FormEvent) => void;
@@ -31,6 +33,8 @@ export default function LoginTerminal({
   setAuthPassword,
   authName,
   setAuthName,
+  authEmail,
+  setAuthEmail,
   authError,
   setAuthError,
   onAuthSubmit,
@@ -40,9 +44,31 @@ export default function LoginTerminal({
   const [showForgotModal, setShowForgotModal] = React.useState(false);
   const [forgotStep, setForgotStep] = React.useState(1);
   const [recoveryUsername, setRecoveryUsername] = React.useState("");
-  const [recoveryAnswer, setRecoveryAnswer] = React.useState("");
+  const [recoveryEmail, setRecoveryEmail] = React.useState("");
   const [recoveryError, setRecoveryError] = React.useState("");
   const [recoverySuccess, setRecoverySuccess] = React.useState("");
+
+  // Simulated email inbox states for our sandbox simulator
+  const [simulatedEmails, setSimulatedEmails] = React.useState<any[]>([]);
+  const [showSandbox, setShowSandbox] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!showSandbox) return;
+    const fetchEmails = async () => {
+      try {
+        const res = await fetch("/api/auth/simulated-emails");
+        if (res.ok) {
+          const data = await res.json();
+          setSimulatedEmails(data);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch simulated emails:", err);
+      }
+    };
+    fetchEmails();
+    const interval = setInterval(fetchEmails, 2000);
+    return () => clearInterval(interval);
+  }, [showSandbox]);
 
   const handleStartRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,45 +78,30 @@ export default function LoginTerminal({
       setRecoveryError(lang === "zh" ? "請輸入帳號" : "Please input account ID");
       return;
     }
-    try {
-      const res = await fetch(`/api/auth/reset-question?username=${encodeURIComponent(recoveryUsername)}`);
-      if (!res.ok) {
-        const errData = await res.json();
-        setRecoveryError(errData.message || (lang === "zh" ? "帳號不存在" : "Account not found"));
-        return;
-      }
-      const data = await res.json();
-      setForgotStep(2);
-    } catch (err) {
-      setRecoveryError(lang === "zh" ? "連線連線錯誤，請稍後重試" : "Network error, please retry.");
+    if (!recoveryEmail.trim()) {
+      setRecoveryError(lang === "zh" ? "請輸入電子信箱" : "Please input email address");
+      return;
     }
-  };
-
-  const handleConfirmRecovery = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setRecoveryError("");
-    setRecoverySuccess("");
     try {
-      const res = await fetch(`/api/auth/reset-confirm`, {
+      const res = await fetch(`/api/auth/forget-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: recoveryUsername,
-          answer: recoveryAnswer
+          username: recoveryUsername.trim(),
+          email: recoveryEmail.trim()
         })
       });
       const data = await res.json();
       if (!res.ok) {
-        setRecoveryError(data.message || (lang === "zh" ? "答案不正確" : "Answer incorrect"));
+        setRecoveryError(data.error || (lang === "zh" ? "密碼重設失敗，帳號與信箱不符" : "Reset failed. Account and Email mismatched."));
         return;
       }
-      setRecoverySuccess(lang === "zh" 
-        ? `驗證成功！您的原密碼為：[ ${data.password} ]。請複製並妥善保管。` 
-        : `Success! Your password is: [ ${data.password} ]. Please save it safely.`
-      );
-      setForgotStep(3);
+      setRecoverySuccess(data.message);
+      setForgotStep(2);
+      // Automatically open the email sandbox so they can see the generated password immediately!
+      setShowSandbox(true);
     } catch (err) {
-      setRecoveryError(lang === "zh" ? "更新密碼錯誤，請稍後重試" : "Error resetting, please retry.");
+      setRecoveryError(lang === "zh" ? "連線連線錯誤，請稍後重試" : "Network error, please retry.");
     }
   };
 
@@ -154,23 +165,44 @@ export default function LoginTerminal({
         <form onSubmit={onAuthSubmit} className="space-y-4">
           {/* Display Name (Only for registration) */}
           {authMode === "register" && (
-            <div className="space-y-1">
-              <label className={`block text-[10.5px] font-black uppercase tracking-wider font-mono ${isLight ? "text-slate-600" : "text-slate-400"}`}>
-                {lang === "zh" ? "旅伴顯示名字 *" : "Display Traveler Name *"}
-              </label>
-              <input
-                type="text"
-                required
-                placeholder={lang === "zh" ? "e.g. 小明 / Leo Chen" : "e.g. Leo Chen"}
-                value={authName}
-                onChange={(e) => setAuthName(e.target.value)}
-                className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none transition-all ${
-                  isLight 
-                    ? "bg-slate-50 text-slate-900 border-slate-300 focus:border-blue-500/70" 
-                    : "bg-[#141b26] text-white border-white/10 focus:border-blue-500/60"
-                }`}
-              />
-            </div>
+            <>
+              <div className="space-y-1">
+                <label className={`block text-[10.5px] font-black uppercase tracking-wider font-mono ${isLight ? "text-slate-600" : "text-slate-400"}`}>
+                  {lang === "zh" ? "旅伴顯示名字 *" : "Display Traveler Name *"}
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder={lang === "zh" ? "e.g. 小明 / Leo Chen" : "e.g. Leo Chen"}
+                  value={authName}
+                  onChange={(e) => setAuthName(e.target.value)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none transition-all ${
+                    isLight 
+                      ? "bg-slate-50 text-slate-900 border-slate-300 focus:border-blue-500/70" 
+                      : "bg-[#141b26] text-white border-white/10 focus:border-blue-500/60"
+                  }`}
+                />
+              </div>
+
+              {/* Email Address */}
+              <div className="space-y-1">
+                <label className={`block text-[10.5px] font-black uppercase tracking-wider font-mono ${isLight ? "text-slate-600" : "text-slate-400"}`}>
+                  {lang === "zh" ? "電子信箱 (Email) *" : "Email Address *"}
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder={lang === "zh" ? "e.g. user@example.com" : "e.g. user@example.com"}
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none transition-all ${
+                    isLight 
+                      ? "bg-slate-50 text-slate-900 border-slate-300 focus:border-blue-500/70" 
+                      : "bg-[#141b26] text-white border-white/10 focus:border-blue-500/60"
+                  }`}
+                />
+              </div>
+            </>
           )}
 
           {/* Username / Login ID */}
@@ -204,7 +236,7 @@ export default function LoginTerminal({
                   setShowForgotModal(true);
                   setForgotStep(1);
                   setRecoveryUsername("");
-                  setRecoveryAnswer("");
+                  setRecoveryEmail("");
                   setRecoveryError("");
                   setRecoverySuccess("");
                 }}
@@ -304,79 +336,121 @@ export default function LoginTerminal({
               <form onSubmit={handleStartRecovery} className="space-y-3.5">
                 <p className="text-[11px] text-slate-400 leading-normal">
                   {lang === "zh" 
-                    ? "請輸入您註冊的帳號 (Login ID)，系統將為您調取密碼找回安全核驗問題：" 
-                    : "Please enter your Login ID / Username to fetch the backup recovery validation question:"}
+                    ? "請輸入您的登入帳號及註冊的電子信箱。確認符合後，系統將隨機生成一組符合安全規格的高強度新密碼發送給您：" 
+                    : "Enter your Login ID and registered Email. If verified, we will generate a secure random password and notify you via email:"}
                 </p>
-                <div className="space-y-1">
-                  <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">{lang === "zh" ? "帳號 (Login ID)" : "Login ID"}</span>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. leochau"
-                    value={recoveryUsername}
-                    onChange={(e) => setRecoveryUsername(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
-                      isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
-                    }`}
-                  />
+                <div className="space-y-2">
+                  <div className="space-y-1">
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">{lang === "zh" ? "帳號 (Login ID)" : "Login ID"}</span>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. leochau"
+                      value={recoveryUsername}
+                      onChange={(e) => setRecoveryUsername(e.target.value)}
+                      className={`w-full px-3.5 py-2 rounded-xl text-xs border focus:outline-none ${
+                        isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
+                      }`}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">{lang === "zh" ? "註冊的電子信箱 (Email)" : "Registered Email"}</span>
+                    <input
+                      type="email"
+                      required
+                      placeholder="e.g. user@example.com"
+                      value={recoveryEmail}
+                      onChange={(e) => setRecoveryEmail(e.target.value)}
+                      className={`w-full px-3.5 py-2 rounded-xl text-xs border focus:outline-none ${
+                        isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
+                      }`}
+                    />
+                  </div>
                 </div>
                 {recoveryError && <p className="text-[10px] text-rose-400 font-bold">⚠️ {recoveryError}</p>}
                 <button
                   type="submit"
                   className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
                 >
-                  {lang === "zh" ? "下一步：驗證安全問題" : "Next: Verify Security Question"}
+                  {lang === "zh" ? "送出並發送密碼信" : "Send Safe Password Notification"}
                 </button>
               </form>
             )}
 
             {forgotStep === 2 && (
-              <form onSubmit={handleConfirmRecovery} className="space-y-3.5">
-                <p className="text-[11px] text-slate-400 leading-normal">
-                  {lang === "zh"
-                    ? "【安全問題核驗】為了安全，所有協作客體重置默認安全問題答案為您的『登記顯示名字』。請輸入對應的登記顯示名字來解鎖密碼："
-                    : "【Security Check】To verify ownership, type your 'Display Name' to reveal your security password:"}
-                </p>
-                <div className="space-y-1">
-                  <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">
-                    {lang === "zh" ? "安全驗證答案 (登記名字)" : "Verification Answer (Display Name)"}
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    placeholder={lang === "zh" ? "請輸入您的登記顯示名字" : "Enter your Display Name"}
-                    value={recoveryAnswer}
-                    onChange={(e) => setRecoveryAnswer(e.target.value)}
-                    className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
-                      isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
-                    }`}
-                  />
-                </div>
-                {recoveryError && <p className="text-[10px] text-rose-400 font-bold">⚠️ {recoveryError}</p>}
-                <button
-                  type="submit"
-                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
-                >
-                  {lang === "zh" ? "驗證並找回密碼" : "Verify & Retrieve Password"}
-                </button>
-              </form>
-            )}
-
-            {forgotStep === 3 && (
               <div className="space-y-4">
-                <div className="p-3 bg-emerald-500/10 border border-emerald-500/15 rounded-2xl text-[11px] text-emerald-400 font-medium leading-relaxed">
+                <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/15 rounded-2xl text-[11px] text-emerald-400 font-medium leading-relaxed">
                   ✓ {recoverySuccess}
                 </div>
+                <p className="text-[10px] text-slate-400">
+                  {lang === "zh"
+                    ? "提示：若在測試環境，請直接點擊下方的「測試信箱模擬器」查看新生成的密碼信內容。"
+                    : "Tip: For preview sandbox testing, click 'Open Email Sandbox' below to inspect the generated password."}
+                </p>
                 <button
                   type="button"
                   onClick={() => setShowForgotModal(false)}
                   className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
                 >
-                  {lang === "zh" ? "登入帳號" : "Login Now"}
+                  {lang === "zh" ? "回登入頁面" : "Back to Login"}
                 </button>
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Sandbox Toggle Button */}
+      <div className="mt-4 z-10">
+        <button
+          type="button"
+          onClick={() => setShowSandbox(!showSandbox)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black tracking-wider uppercase border font-mono transition shadow-sm cursor-pointer ${
+            showSandbox
+              ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
+              : "bg-blue-600/10 border-blue-600/30 text-blue-500 hover:bg-blue-600/20"
+          }`}
+        >
+          📬 {showSandbox ? (lang === "zh" ? "關閉信箱模擬器" : "Close Email Sandbox") : (lang === "zh" ? "開啟測試信箱模擬器 ✉️" : "Open Email Sandbox ✉️")}
+        </button>
+      </div>
+
+      {/* Simulated Mailbox Panel */}
+      {showSandbox && (
+        <div className={`mt-4 w-full max-w-md rounded-3xl p-5 border z-10 animate-fadeIn space-y-4 ${
+          isLight ? "bg-white border-slate-200 shadow-md" : "bg-[#101520] border-white/5 shadow-2xl"
+        }`}>
+          <div className="flex justify-between items-center pb-2 border-b border-white/5">
+            <span className="text-xs font-black uppercase font-mono tracking-wider flex items-center gap-1.5 text-blue-400">
+              ✉️ {lang === "zh" ? "OdyShareSync 虛擬信箱調試器" : "Simulated Email Inbox"}
+            </span>
+            <span className="text-[9px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-mono">Sandbox Sandbox</span>
+          </div>
+
+          {simulatedEmails.length === 0 ? (
+            <p className="text-[11px] text-slate-450 text-center py-4 italic font-mono">
+              {lang === "zh" ? "（暫無任何系統發出的郵件。請進行註冊或忘記密碼操作）" : "(No simulated emails sent yet. Perform register or reset pass)"}
+            </p>
+          ) : (
+            <div className="space-y-3.5 max-h-[220px] overflow-y-auto pr-1">
+              {simulatedEmails.map((mail: any) => (
+                <div key={mail.id} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 space-y-2 text-left">
+                  <div className="flex justify-between text-[9px] font-mono text-slate-400">
+                    <span>收件人 (To): <strong className="text-slate-200">{mail.to}</strong></span>
+                    <span>{new Date(mail.createdAt).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="text-[11px] font-bold text-blue-300">
+                    主旨 (Subject): {mail.subject}
+                  </div>
+                  <div 
+                    className="p-2.5 rounded bg-slate-950/80 text-[11px] text-slate-300 leading-normal border border-white/5"
+                    dangerouslySetInnerHTML={{ __html: mail.html }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

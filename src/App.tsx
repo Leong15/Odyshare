@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { 
-  Calendar, Map, Plane, DollarSign, Lock, Users, Sparkles, RefreshCw, UserPlus, X
+  Calendar, Map, Plane, DollarSign, Lock, Users, RefreshCw, UserPlus, X
 } from "lucide-react";
-import { Trip, Participant, ItineraryItem, ExpenseItem, DocumentItem, ChatMessage } from "./types";
+import { Trip, ItineraryItem, ExpenseItem, DocumentItem, ChatMessage } from "./types";
 import { translations } from "./lib/translations";
 
 // Modular Subcomponents
@@ -19,44 +19,40 @@ import DocumentVault from "./components/DocumentVault";
 import FlightHub from "./components/FlightHub";
 import EncryptedWorkspaceChat from "./components/EncryptedWorkspaceChat";
 
-// Safe Base64 encoder helper supporting non-Latin1 character sets (like Chinese/emojis)
-const safeBtoa = (str: string): string => {
-  try {
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) => {
-      return String.fromCharCode(parseInt(p1, 16));
-    }));
-  } catch (err) {
-    return btoa(str);
-  }
-};
+// Custom Hooks for Modular Architecture
+import { useAuth } from "./hook/useAuth";
+import { useTripSync } from "./hook/useTripSync";
+import { useTripActions } from "./hook/useTripActions";
 
 export default function App() {
-  const [trip, setTrip] = useState<Trip | null>(null);
-  
-  const tripIdRef = useRef<string | undefined>(undefined);
-  tripIdRef.current = trip?.id;
-  const [loggedInUserId, setLoggedInUserId] = useState<string | null>(() => {
-    return localStorage.getItem("loggedInUserId") || null;
-  });
-  const [currentUser, setCurrentUser] = useState<Participant | null>(null);
   const [activeTab, setActiveTab] = useState<"dashboard" | "map" | "itinerary" | "flights" | "budget" | "vault" | "chat" | "ai">("dashboard");
-  const [syncing, setSyncing] = useState<boolean>(false);
-  const [errorState, setErrorState] = useState<string | null>(null);
   const [lang, setLang] = useState<"en" | "zh">("zh"); // Defaulting to zh (Traditional Chinese)
   
   // Theme Switching
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
+  const [theme, setTheme] = useState<"light" | "dark" | any>(() => {
     return (localStorage.getItem("theme") as "light" | "dark") || "dark";
   });
 
-  // Authentication Fields
-  const [authMode, setAuthMode] = useState<"login" | "register">("login");
-  const [authUsername, setAuthUsername] = useState("");
-  const [authPassword, setAuthPassword] = useState("");
-  const [authName, setAuthName] = useState("");
-  const [authError, setAuthError] = useState<string | null>(null);
+  // 1. Initialize Auth State Engine
+  const auth = useAuth(lang);
 
-  // Modal setup to create new trip projects
+  // 2. Initialize Trip Synchronization Engine (Interval polling, pending invitation notifications)
+  const sync = useTripSync({
+    loggedInUserId: auth.loggedInUserId,
+    onUserResolved: auth.setCurrentUser,
+  });
+
+  // 3. Initialize Trip Actions Engine (Shared trip level CRUD operations)
+  const actions = useTripActions({
+    fetchWithAuth: sync.fetchWithAuth,
+    postTripUpdate: sync.postTripUpdate,
+    fetchTripData: sync.fetchTripData,
+    setTrip: sync.setTrip,
+    currentUser: auth.currentUser,
+    lang,
+  });
+
+  // Modal overlays setup
   const [showCreateTripModal, setShowCreateTripModal] = useState<boolean>(false);
   const [newTripName, setNewTripName] = useState<string>("");
   const [newTripDestination, setNewTripDestination] = useState<string>("");
@@ -64,16 +60,13 @@ export default function App() {
   const [isCreatingTrip, setIsCreatingTrip] = useState<boolean>(false);
   const [createTripError, setCreateTripError] = useState<string | null>(null);
 
-  // Invite member modal states at root level for perfect viewport centering
   const [showInviteModal, setShowInviteModal] = useState<boolean>(false);
   const [inviteUsername, setInviteUsername] = useState<string>("");
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState<boolean>(false);
 
-  // Pending user project invitations state
-  const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
-
+  // Sync dark/light class on body
   useEffect(() => {
     if (theme === "light") {
       document.body.classList.add("light-theme");
@@ -83,475 +76,58 @@ export default function App() {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // 12-Hour Session Timeout Listener
-  useEffect(() => {
-    if (!loggedInUserId) return;
-
-    const checkSession = () => {
-      const loginTime = localStorage.getItem("loginTimestamp");
-      if (loginTime) {
-        const elapsed = Date.now() - Number(loginTime);
-        const twelveHours = 12 * 60 * 60 * 1000;
-        if (elapsed > twelveHours) {
-          console.warn("Session expired (12 hours limit reached). Logging out...");
-          setAuthError(lang === "zh" ? "您的工作階段已過期 (12 小時)，請重新登入。" : "Your session has expired (12 hours timeout), please log in again.");
-          handleLogout();
-        }
-      } else {
-        // Fallback: set timestamp if user is logged in but has no timestamp saved
-        localStorage.setItem("loginTimestamp", Date.now().toString());
-      }
-    };
-
-    checkSession();
-    const interval = setInterval(checkSession, 30000); // Check every 30 seconds
-    return () => clearInterval(interval);
-  }, [loggedInUserId, lang]);
-
-  // Request-scoper wrapper
-  const fetchWithAuth = async (url: string, options: RequestInit = {}) => {
-    const uId = localStorage.getItem("loggedInUserId") || loggedInUserId || "";
-    const activeId = localStorage.getItem("activeTripId") || trip?.id || "";
-    const headers = {
-      "x-trip-id": activeId,
-      ...options.headers,
-      "x-user-id": uId
-    } as Record<string, string>;
-
-    return fetch(url, {
-      ...options,
-      headers
-    });
-  };
-
-  const fetchInvitations = async () => {
-    const uId = localStorage.getItem("loggedInUserId") || loggedInUserId;
-    if (!uId) return;
-    try {
-      const res = await fetchWithAuth("/api/trip/invitations");
-      if (res.ok) {
-        const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          throw new Error("Server did not return JSON yet. It may be starting up.");
-        }
-        const invs = await res.json();
-        setPendingInvitations(invs);
-      }
-    } catch (err) {
-      console.error("Failed to fetch pending invitations:", err);
-    }
-  };
-
-  // 1. Initial State pull from server
-  const fetchTripData = async (showSyncIndicator = false, overrideTripId?: string) => {
-    const uId = localStorage.getItem("loggedInUserId") || loggedInUserId;
-    if (!uId) {
-      setCurrentUser(null);
-      return;
-    }
-    if (showSyncIndicator) setSyncing(true);
-    
-    if (overrideTripId) {
-      localStorage.setItem("activeTripId", overrideTripId);
-    }
-    
-    fetchInvitations();
-    try {
-      const activeId = overrideTripId || localStorage.getItem("activeTripId") || tripIdRef.current || "";
-      const res = await fetch("/api/trip", {
-        headers: {
-          "x-user-id": uId,
-          "x-trip-id": activeId
-        }
-      });
-      if (!res.ok) throw new Error("Server responded with error status");
-      
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Backend server is booting up or returned HTML instead of JSON.");
-      }
-
-      const data: Trip = await res.json();
-      setTrip(data);
-      if (data?.id) {
-        localStorage.setItem("activeTripId", data.id);
-      }
-      setErrorState(null);
-
-      const found = data.participants.find(p => p.id === uId);
-      if (found) {
-        setCurrentUser({
-          ...found,
-          username: localStorage.getItem("loggedInUserUsername") || found.username || ""
-        });
-      } else {
-        // Fallback or user was deleted from participants list
-        setCurrentUser({
-          id: uId,
-          name: localStorage.getItem("loggedInUserName") || "Traveler",
-          email: "traveler@example.com",
-          avatarColor: localStorage.getItem("loggedInUserColor") || "#3b82f6",
-          publicKey: "pub_key_sec_unresolved",
-          budgetLimit: 1500,
-          username: localStorage.getItem("loggedInUserUsername") || ""
-        });
-      }
-    } catch (err) {
-      console.error("Failed to sync trip data from server:", err);
-      setErrorState("Synchronization connection offline. Re-routing through local gateway...");
-    } finally {
-      if (showSyncIndicator) setSyncing(false);
-    }
-  };
-
-  useEffect(() => {
-    const uId = localStorage.getItem("loggedInUserId") || loggedInUserId;
-    if (uId) {
-      fetchTripData(true);
-    }
-
-    // Dynamic collaborative room sync polling interval every 4 seconds
-    const interval = setInterval(() => {
-      const currentUid = localStorage.getItem("loggedInUserId") || loggedInUserId;
-      if (currentUid) {
-        fetchTripData(false);
-      }
-    }, 4000);
-
-    return () => clearInterval(interval);
-  }, [loggedInUserId]);
-
-  // Post changes helper
-  const postTripUpdate = async (updatedFields: Partial<Trip>) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedFields)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // Auth form submit
-  const handleAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    if (!authUsername.trim() || !authPassword.trim()) {
-      setAuthError(lang === "zh" ? "請填寫所有欄位" : "Please fill in all fields");
-      return;
-    }
-    const endpoint = authMode === "login" ? "/api/auth/login" : "/api/auth/register";
-    const body: Record<string, string> = {
-      username: authUsername.trim().toLowerCase(),
-      password: authPassword.trim()
-    };
-    if (authMode === "register") {
-      if (!authName.trim()) {
-        setAuthError(lang === "zh" ? "請填寫旅伴顯示名稱" : "Please fill in display name");
-        return;
-      }
-      body.name = authName.trim();
-    }
-
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setAuthError(data.error || "Authentication failed");
-      } else {
-        // Successful login/register
-        const loggedUser = data.user;
-        localStorage.setItem("loggedInUserId", loggedUser.id);
-        localStorage.setItem("loggedInUserName", loggedUser.name);
-        localStorage.setItem("loggedInUserColor", loggedUser.avatarColor || "#3b82f6");
-        localStorage.setItem("loggedInUserUsername", loggedUser.username || "");
-        localStorage.setItem("loginTimestamp", Date.now().toString());
-        setLoggedInUserId(loggedUser.id);
-        setCurrentUser(loggedUser);
-        
-        // Reset auth state
-        setAuthUsername("");
-        setAuthPassword("");
-        setAuthName("");
-        setAuthError(null);
-      }
-    } catch (err) {
-      console.error(err);
-      setAuthError(lang === "zh" ? "連線伺服器失敗，請稍後再試" : "Connection failed, please try again");
-    }
-  };
-
-  const handleSelectTrip = async (id: string) => {
-    localStorage.setItem("activeTripId", id);
-    try {
-      const res = await fetch("/api/trip/select", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripId: id })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-        await fetchTripData(true, data.trip?.id);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleCreateTrip = async (e: React.FormEvent) => {
+  // Form Submission handlers
+  const handleCreateTripSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTripName.trim()) return;
     setIsCreatingTrip(true);
     setCreateTripError(null);
-    try {
-      const res = await fetchWithAuth("/api/trip/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newTripName.trim(),
-          destination: newTripDestination.trim() || undefined,
-          totalBudget: newTripBudget.trim() ? Number(newTripBudget) : undefined
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.trip?.id) {
-          localStorage.setItem("activeTripId", data.trip.id);
-        }
-        setTrip(data.trip);
-        setShowCreateTripModal(false);
-        setNewTripName("");
-        setNewTripDestination("");
-        setNewTripBudget("");
-        await fetchTripData(true, data.trip?.id);
-      } else {
-        const data = await res.json();
-        setCreateTripError(data.error || (lang === "zh" ? "創立專案失敗，請重試" : "Failed to create trip, please retry."));
-      }
-    } catch (err) {
-      console.error(err);
-      setCreateTripError(lang === "zh" ? "連線中斷或伺服器錯誤" : "Connection lost or server error.");
-    } finally {
-      setIsCreatingTrip(false);
+    const res = await actions.handleCreateTrip(newTripName, newTripDestination, newTripBudget);
+    setIsCreatingTrip(false);
+    if (res.success) {
+      setShowCreateTripModal(false);
+      setNewTripName("");
+      setNewTripDestination("");
+      setNewTripBudget("");
+    } else {
+      setCreateTripError(res.error || null);
     }
   };
 
-  const handleDeleteTrip = async (id: string) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripId: id })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.trip?.id) {
-          localStorage.setItem("activeTripId", data.trip.id);
-        } else {
-          localStorage.removeItem("activeTripId");
-        }
-        setTrip(data.trip);
-        await fetchTripData(true, data.trip?.id);
-      }
-    } catch (err) {
-      console.error(err);
+  const handleInviteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteUsername.trim()) return;
+    setInviteError(null);
+    setInviteSuccess(null);
+    setIsInviting(true);
+    const res = await actions.handleInviteUser(inviteUsername.trim());
+    setIsInviting(false);
+    if (res.success) {
+      setInviteSuccess(lang === "zh" ? "🎉 邀請成功送出！受邀人需接受邀請才能進入此專案。" : "🎉 Invite sent! Invitee must accept to access project.");
+      setInviteUsername("");
+      setTimeout(() => {
+        setShowInviteModal(false);
+        setInviteSuccess(null);
+      }, 3000);
+    } else {
+      setInviteError(res.error || (lang === "zh" ? "找不到此成員帳號" : "User not found"));
     }
   };
 
-  const handleEditTripMeta = async (updatedData: { name: string; destination: string; totalBudget: number; status?: "active" | "inactive" }) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/update-meta", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedData)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-        await fetchTripData(true, data.trip?.id);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAddItineraryItem = async (item: Omit<ItineraryItem, 'id' | 'votes' | 'comments'>) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/itinerary/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleUpdateItineraryItem = async (item: ItineraryItem) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/itinerary/edit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(item)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDeleteItineraryItem = async (itemId: string) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/itinerary/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: itemId })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleVote = async (targetType: "itinerary" | "flight", targetId: string) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/vote", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetType, targetId, userId: currentUser?.id })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAddComment = async (itemId: string, text: string) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/itinerary/comment", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId, userId: currentUser?.id, userName: currentUser?.name, text })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleAddExpense = async (expense: Omit<ExpenseItem, 'id'>) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/expense/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(expense)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleDeleteExpense = async (expenseId: string) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/expense/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expenseId })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleUploadDocument = async (doc: Omit<DocumentItem, 'id' | 'uploadedAt' | 'url' | 'accessKey'>) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/document/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(doc)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleSendChatMessage = async (msg: string) => {
-    const encryptedMsg = "U2FsdGVkX19" + safeBtoa(msg);
-    try {
-      const res = await fetchWithAuth("/api/trip/chat/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          senderId: currentUser?.id,
-          senderName: currentUser?.name,
-          avatarColor: currentUser?.avatarColor,
-          messageDecrypted: msg,
-          messageEncrypted: encryptedMsg
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleApplyAIOptimization = (items: ItineraryItem[]) => {
-    if (trip) {
-      postTripUpdate({
-        backupItineraries: [...trip.itineraries],
-        itineraries: items
-      });
+  const handleKickParticipant = async (userIdToKick: string) => {
+    const res = await actions.handleKickParticipant(userIdToKick);
+    if (res.success) {
+      setInviteSuccess(lang === "zh" ? "✔️ 成員已成功踢除/移除。" : "✔️ Member kicked successfully.");
+      setTimeout(() => setInviteSuccess(null), 2500);
+    } else {
+      setInviteError(res.error || "Failed to kick participant");
+      setTimeout(() => setInviteError(null), 3500);
     }
   };
 
   const handleRestoreItineraries = () => {
-    if (trip?.backupItineraries && trip.backupItineraries.length > 0) {
-      postTripUpdate({
-        itineraries: [...trip.backupItineraries],
-        backupItineraries: []
-      });
+    if (sync.trip?.backupItineraries && sync.trip.backupItineraries.length > 0) {
+      actions.handleRestoreItineraries(sync.trip.itineraries, sync.trip.backupItineraries);
       handlePostAISystemMessage(
         lang === "zh"
           ? "↩️ 行程已成功復原到優化前的原創配置！"
@@ -571,163 +147,42 @@ export default function App() {
       timestamp: new Date().toISOString(),
       isTripUpdate: true
     };
-    if (trip) {
-      postTripUpdate({ chats: [...trip.chats, systemMsg] });
+    if (sync.trip) {
+      sync.postTripUpdate({ chats: [...sync.trip.chats, systemMsg] });
     }
   };
 
-  const handleAIRecFlights = async (from: string, to: string, date: string, type?: string, returnDate?: string): Promise<void> => {
-    try {
-      const res = await fetchWithAuth("/api/ai/recommend-flights", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ from, to, date, type, returnDate })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const flights = data.flights || [];
-        const updatedEstimates = [...(trip?.flightEstimates || [])];
-        flights.forEach((f: any, idx: number) => {
-          updatedEstimates.push({
-            id: "fl-ai-" + idx + "-" + Date.now(),
-            carrier: f.carrier,
-            carrierLogo: "⭐",
-            from,
-            to,
-            price: f.price,
-            stops: f.stops,
-            duration: f.duration,
-            departureTime: f.departureTime,
-            rating: f.rating,
-            bookingUrl: f.bookingUrl,
-            currency: f.currency,
-            votes: []
-          });
-        });
-        postTripUpdate({ flightEstimates: updatedEstimates });
-      }
-    } catch (err) {
-      console.error(err);
-    }
+  const handleAIRecFlights = async (from: string, to: string, date: string, type?: string, returnDate?: string) => {
+    await actions.handleAIRecFlights(from, to, date, type, returnDate, sync.trip?.flightEstimates || []);
   };
 
-  const handleInviteUser = async (username: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const res = await fetchWithAuth("/api/trip/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        return { success: true };
-      } else {
-        return { success: false, error: data.error };
-      }
-    } catch (err) {
-      console.error(err);
-      return { success: false, error: "Connection error" };
-    }
-  };
-
-  const handleInviteSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteUsername.trim()) return;
-    setInviteError(null);
-    setInviteSuccess(null);
-    setIsInviting(true);
-    try {
-      const res = await handleInviteUser(inviteUsername.trim());
-      if (res.success) {
-        setInviteSuccess(lang === "zh" ? "🎉 邀請成功送出！受邀人需接受邀請才能進入此專案。" : "🎉 Invite sent! Invitee must accept to access project.");
-        setInviteUsername("");
-        setTimeout(() => {
-          setShowInviteModal(false);
-          setInviteSuccess(null);
-        }, 3000);
-      } else {
-        setInviteError(res.error || (lang === "zh" ? "找不到此成員帳號" : "User not found"));
-      }
-    } catch (err) {
-      setInviteError(lang === "zh" ? "連線失敗" : "Server error");
-    } finally {
-      setIsInviting(false);
-    }
-  };
-
-  const handleKickParticipant = async (userIdToKick: string) => {
-    try {
-      const res = await fetchWithAuth("/api/trip/kick", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userIdToKick })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        if (data.trip) {
-          setTrip(data.trip);
-        }
-        setInviteSuccess(lang === "zh" ? "✔️ 成員已成功踢除/移除。" : "✔️ Member kicked successfully.");
-        setTimeout(() => setInviteSuccess(null), 2500);
-      } else {
-        setInviteError(data.error || "Failed to kick participant");
-        setTimeout(() => setInviteError(null), 3500);
-      }
-    } catch (err) {
-      console.error(err);
-      setInviteError("Connection failure");
-    }
-  };
-
-  const handleRespondInvitation = async (invitationId: string, action: "accept" | "decline") => {
-    try {
-      const res = await fetchWithAuth("/api/trip/invitations/respond", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ invitationId, action })
-      });
-      if (res.ok) {
-        await fetchTripData(true);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("loggedInUserId");
-    localStorage.removeItem("loggedInUserName");
-    localStorage.removeItem("loggedInUserColor");
-    localStorage.removeItem("loggedInUserUsername");
-    localStorage.removeItem("loginTimestamp");
-    setLoggedInUserId(null);
-    setCurrentUser(null);
-  };
-
-  // 1. If not logged in, render authentication panel
-  if (!currentUser) {
+  // If not authenticated, render Login/Register Terminal
+  if (!auth.currentUser) {
     return (
       <LoginTerminal
         lang={lang}
         setLang={setLang}
         theme={theme}
         setTheme={setTheme}
-        authMode={authMode}
-        setAuthMode={setAuthMode}
-        authUsername={authUsername}
-        setAuthUsername={setAuthUsername}
-        authPassword={authPassword}
-        setAuthPassword={setAuthPassword}
-        authName={authName}
-        setAuthName={setAuthName}
-        authError={authError}
-        setAuthError={setAuthError}
-        onAuthSubmit={handleAuthSubmit}
+        authMode={auth.authMode}
+        setAuthMode={auth.setAuthMode}
+        authUsername={auth.authUsername}
+        setAuthUsername={auth.setAuthUsername}
+        authPassword={auth.authPassword}
+        setAuthPassword={auth.setAuthPassword}
+        authName={auth.authName}
+        setAuthName={auth.setAuthName}
+        authEmail={auth.authEmail}
+        setAuthEmail={auth.setAuthEmail}
+        authError={auth.authError}
+        setAuthError={auth.setAuthError}
+        onAuthSubmit={auth.handleAuthSubmit}
       />
     );
   }
 
   const isLight = theme === "light";
+  const { trip, syncing, errorState, pendingInvitations } = sync;
 
   return (
     <div className={`min-h-screen flex flex-col font-sans selection:bg-blue-600/35 antialiased overflow-x-hidden relative transition-colors duration-300 ${
@@ -739,7 +194,7 @@ export default function App() {
       
       <div className="z-10 flex flex-col min-h-screen">
         
-        {/* 1. Header workspace */}
+        {/* 1. Header Workspace */}
         {trip && (
           <HeaderWorkspace
             lang={lang}
@@ -748,11 +203,11 @@ export default function App() {
             setTheme={setTheme}
             syncing={syncing}
             trip={trip}
-            currentUser={currentUser}
-            onSelectTrip={handleSelectTrip}
+            currentUser={auth.currentUser}
+            onSelectTrip={sync.handleSelectTrip}
             onShowCreateTripModal={() => setShowCreateTripModal(true)}
-            onDeleteTrip={handleDeleteTrip}
-            onLogout={handleLogout}
+            onDeleteTrip={actions.handleDeleteTrip}
+            onLogout={auth.handleLogout}
             onOpenInviteModal={() => {
               setInviteError(null);
               setInviteSuccess(null);
@@ -772,7 +227,7 @@ export default function App() {
             setNewTripDestination={setNewTripDestination}
             newTripBudget={newTripBudget}
             setNewTripBudget={setNewTripBudget}
-            onSubmit={handleCreateTrip}
+            onSubmit={handleCreateTripSubmit}
             onClose={() => {
               setCreateTripError(null);
               setShowCreateTripModal(false);
@@ -783,7 +238,7 @@ export default function App() {
         )}
 
         {/* 2.5. Root-level Invitation Modal Dialog for perfect screen-centering */}
-        {showInviteModal && (
+        {showInviteModal && trip && (
           <div 
             onClick={(e) => {
               if (e.target === e.currentTarget) {
@@ -792,7 +247,7 @@ export default function App() {
             }}
             className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn"
           >
-            <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl relative">
+            <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl relative animate-scaleIn">
               
               {/* Close button */}
               <button
@@ -864,7 +319,7 @@ export default function App() {
                   </label>
                   <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 select-none">
                     {(trip.participants || []).map((p) => {
-                      const isSelf = currentUser && p.id === currentUser.id;
+                      const isSelf = auth.currentUser && p.id === auth.currentUser.id;
                       return (
                         <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/3 border border-white/5 text-xs">
                           <div className="flex items-center gap-2">
@@ -920,9 +375,7 @@ export default function App() {
                     {isInviting ? (
                       <span>{lang === "zh" ? "邀請中..." : "Inviting..."}</span>
                     ) : (
-                      <>
-                        <span>{lang === "zh" ? "確認加入" : "Add Member"}</span>
-                      </>
+                      <span>{lang === "zh" ? "確認加入" : "Add Member"}</span>
                     )}
                   </button>
                 </div>
@@ -937,7 +390,7 @@ export default function App() {
             <RefreshCw size={13} className="animate-spin text-rose-400" />
             <span>{errorState}</span>
             <button
-              onClick={() => fetchTripData(true)}
+              onClick={() => sync.fetchTripData(true)}
               className="ml-3 px-2.5 py-0.5 bg-rose-500/20 border border-rose-500/30 hover:bg-rose-500/35 text-white font-bold rounded cursor-pointer transition text-[10.5px]"
             >
               {translations[lang].retryGateway}
@@ -945,7 +398,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Pending Invitations Banner - Dynamic acceptance gate for collaborated projects */}
+        {/* Pending Invitations Banner */}
         {pendingInvitations.length > 0 && (
           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 mt-4">
             <div className="bg-gradient-to-r from-indigo-600/30 via-indigo-505/20 to-indigo-600/30 border border-indigo-500/20 rounded-2xl p-4 backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl animate-bounce">
@@ -966,13 +419,13 @@ export default function App() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => handleRespondInvitation(pendingInvitations[0].id, "decline")}
+                  onClick={() => sync.handleRespondInvitation(pendingInvitations[0].id, "decline")}
                   className="px-3.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 rounded-xl text-[10.5px] font-bold text-rose-300 transition cursor-pointer"
                 >
                   {lang === "zh" ? "拒絕" : "Decline"}
                 </button>
                 <button
-                  onClick={() => handleRespondInvitation(pendingInvitations[0].id, "accept")}
+                  onClick={() => sync.handleRespondInvitation(pendingInvitations[0].id, "accept")}
                   className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-550 border border-emerald-500/30 rounded-xl text-[10.5px] font-bold text-white shadow-lg shadow-emerald-600/20 transition cursor-pointer"
                 >
                   {lang === "zh" ? "接受邀請" : "Accept Group"}
@@ -1068,17 +521,17 @@ export default function App() {
 
         {/* 5. Main Panel Body */}
         <main className="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 text-sm">
-          {trip && currentUser && (
+          {trip && auth.currentUser && (
             <div className="space-y-6 animate-fadeIn">
               {activeTab === "dashboard" && (
                 <TripDashboard
                   trip={trip}
                   trips={trip.tripsList || []}
                   lang={lang}
-                  onSwitchTrip={handleSelectTrip}
+                  onSwitchTrip={sync.handleSelectTrip}
                   onCreateTrip={() => setShowCreateTripModal(true)}
-                  onEditTripMeta={handleEditTripMeta}
-                  onDeleteTrip={handleDeleteTrip}
+                  onEditTripMeta={actions.handleEditTripMeta}
+                  onDeleteTrip={actions.handleDeleteTrip}
                 />
               )}
 
@@ -1086,17 +539,17 @@ export default function App() {
                 <ItineraryPlanner
                   itineraries={trip.itineraries}
                   participants={trip.participants}
-                  currentUser={currentUser.id}
-                  onVoteItinerary={(itemId) => handleVote("itinerary", itemId)}
-                  onCommentItinerary={handleAddComment}
-                  onAddItineraryItem={handleAddItineraryItem}
+                  currentUser={auth.currentUser.id}
+                  onVoteItinerary={(itemId) => actions.handleVote("itinerary", itemId)}
+                  onCommentItinerary={actions.handleAddComment}
+                  onAddItineraryItem={actions.handleAddItineraryItem}
                   lang={lang}
-                  onApplyAIOptimization={handleApplyAIOptimization}
+                  onApplyAIOptimization={actions.handleApplyAIOptimization}
                   onPostAISystemMessage={handlePostAISystemMessage}
                   backupItineraries={trip.backupItineraries || []}
                   onRestoreItineraries={handleRestoreItineraries}
-                  onDeleteItineraryItem={handleDeleteItineraryItem}
-                  onUpdateItineraryItem={handleUpdateItineraryItem}
+                  onDeleteItineraryItem={actions.handleDeleteItineraryItem}
+                  onUpdateItineraryItem={actions.handleUpdateItineraryItem}
                 />
               )}
 
@@ -1105,14 +558,13 @@ export default function App() {
                   destination={trip.destination}
                   itineraries={trip.itineraries}
                   participants={trip.participants}
-                  currentUserId={currentUser.id}
+                  currentUserId={auth.currentUser.id}
                   onSelectLocation={(item) => {
-                    // Stay inside map tab! Let user explore landmarks smoothly without bouncing out.
                     console.log("Selected map checkpoint:", item);
                   }}
-                  onAddItineraryItem={handleAddItineraryItem}
-                  onUpdateItineraryItem={handleUpdateItineraryItem}
-                  onDeleteItineraryItem={handleDeleteItineraryItem}
+                  onAddItineraryItem={actions.handleAddItineraryItem}
+                  onUpdateItineraryItem={actions.handleUpdateItineraryItem}
+                  onDeleteItineraryItem={actions.handleDeleteItineraryItem}
                   lang={lang}
                   tripLat={trip.lat}
                   tripLng={trip.lng}
@@ -1124,8 +576,8 @@ export default function App() {
                   tripId={trip.id}
                   flightEstimates={trip.flightEstimates}
                   participants={trip.participants}
-                  currentUser={currentUser.id}
-                  onVoteFlight={(flightId) => handleVote("flight", flightId)}
+                  currentUser={auth.currentUser.id}
+                  onVoteFlight={(flightId) => actions.handleVote("flight", flightId)}
                   onFetchAIRec={handleAIRecFlights}
                   lang={lang}
                 />
@@ -1136,21 +588,21 @@ export default function App() {
                   expenses={trip.expenses}
                   participants={trip.participants}
                   totalBudget={trip.totalBudget}
-                  onAddExpense={handleAddExpense}
-                  onDeleteExpense={handleDeleteExpense}
-                  onUpdateBudget={(num) => postTripUpdate({ totalBudget: num })}
-                  onUpdateParticipants={(updatedParts) => postTripUpdate({ participants: updatedParts })}
-                  activeUserId={currentUser.id}
+                  onAddExpense={actions.handleAddExpense}
+                  onDeleteExpense={actions.handleDeleteExpense}
+                  onUpdateBudget={(num) => sync.postTripUpdate({ totalBudget: num })}
+                  onUpdateParticipants={(updatedParts) => sync.postTripUpdate({ participants: updatedParts })}
+                  activeUserId={auth.currentUser.id}
                   lang={lang}
-                  onInviteUser={handleInviteUser}
+                  onInviteUser={actions.handleInviteUser}
                 />
               )}
 
               {activeTab === "vault" && (
                 <DocumentVault
                   documents={trip.documents}
-                  currentUser={currentUser.name}
-                  onUploadDocument={handleUploadDocument}
+                  currentUser={auth.currentUser.name}
+                  onUploadDocument={actions.handleUploadDocument}
                   lang={lang}
                 />
               )}
@@ -1159,13 +611,11 @@ export default function App() {
                 <EncryptedWorkspaceChat
                   chats={trip.chats}
                   participants={trip.participants}
-                  currentUser={currentUser.id}
-                  onSendMessage={handleSendChatMessage}
+                  currentUser={auth.currentUser.id}
+                  onSendMessage={actions.handleSendChatMessage}
                   lang={lang}
                 />
               )}
-
-
             </div>
           )}
         </main>

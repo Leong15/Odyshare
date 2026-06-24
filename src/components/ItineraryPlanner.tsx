@@ -43,6 +43,15 @@ export default function ItineraryPlanner({
   const [category, setCategory] = useState<ItineraryItem["category"]>("restaurant");
   const [cost, setCost] = useState<string>("35");
 
+  // Edit states for modifying exist itinerary items
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState<string>("");
+  const [editDescription, setEditDescription] = useState<string>("");
+  const [editLocationName, setEditLocationName] = useState<string>("");
+  const [editTime, setEditTime] = useState<string>("");
+  const [editCategory, setEditCategory] = useState<ItineraryItem["category"]>("restaurant");
+  const [editCost, setEditCost] = useState<string>("");
+
   const maxItineraryDay = itineraries.reduce((max, item) => Math.max(max, item.dayIndex), 0);
   const [totalDays, setTotalDays] = useState<number>(() => Math.max(3, maxItineraryDay + 1));
 
@@ -454,6 +463,129 @@ export default function ItineraryPlanner({
                 const voterMetas = getVoterMeta(item.votes);
                 const userVoted = item.votes.includes(currentUser);
 
+                if (editingItemId === item.id) {
+                  return (
+                    <form
+                      key={item.id}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (onUpdateItineraryItem) {
+                          onUpdateItineraryItem({
+                            ...item,
+                            title: editTitle,
+                            locationName: editLocationName || editTitle,
+                            description: editDescription,
+                            time: editTime,
+                            category: editCategory,
+                            cost: parseFloat(editCost) || 0
+                          });
+                        }
+                        setEditingItemId(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-4 rounded-xl border border-blue-500/50 bg-blue-500/10 space-y-3.5 text-xs animate-fadeIn text-left"
+                    >
+                      <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                        <span className="font-bold text-blue-400">📝 {lang === "zh" ? "編輯行程項目細節" : "Edit Itinerary Activity"}</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditingItemId(null)}
+                          className="text-slate-400 hover:text-white font-semibold cursor-pointer"
+                        >
+                          {lang === "zh" ? "取消" : "Cancel"}
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-300 font-medium mb-1">{t.activityTitle}</label>
+                          <input
+                            type="text"
+                            required
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-medium mb-1">{t.placeName}</label>
+                          <input
+                            type="text"
+                            required
+                            value={editLocationName}
+                            onChange={(e) => setEditLocationName(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-slate-300 font-medium mb-1">{t.timeSchedule}</label>
+                          <input
+                            type="time"
+                            required
+                            value={editTime}
+                            onChange={(e) => setEditTime(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-white font-mono bg-slate-900 border border-white/10"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-medium mb-1">{t.categoryType}</label>
+                          <select
+                            value={editCategory}
+                            onChange={(e: any) => setEditCategory(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                          >
+                            <option value="sight">🏛️ {getLocalizedCategoryName("sight")}</option>
+                            <option value="restaurant">🍱 {getLocalizedCategoryName("restaurant")}</option>
+                            <option value="shop">🛍️ {getLocalizedCategoryName("shop")}</option>
+                            <option value="transit">🚇 {getLocalizedCategoryName("transit")}</option>
+                            <option value="hotel">🏨 {getLocalizedCategoryName("hotel")}</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-300 font-medium mb-1">{t.estimatedCost}</label>
+                          <input
+                            type="number"
+                            value={editCost}
+                            onChange={(e) => setEditCost(e.target.value)}
+                            className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-medium mb-1">{t.briefDesc}</label>
+                        <textarea
+                          value={editDescription}
+                          onChange={(e) => setEditDescription(e.target.value)}
+                          className="w-full glass-input px-3 py-2 rounded-xl text-white h-14 resize-none bg-slate-900 border border-white/10"
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2.5 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditingItemId(null)}
+                          className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition cursor-pointer text-[11px] font-semibold text-slate-300"
+                        >
+                          {lang === "zh" ? "取消" : "Cancel"}
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-[11px] font-semibold text-white cursor-pointer"
+                        >
+                          {lang === "zh" ? "儲存修改" : "Save Changes"}
+                        </button>
+                      </div>
+                    </form>
+                  );
+                }
+
                 return (
                   <div
                     key={item.id}
@@ -472,7 +604,7 @@ export default function ItineraryPlanner({
                         <span>{item.time}</span>
                       </div>
 
-                      <div className="space-y-1">
+                      <div className="space-y-1 text-left">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <h4 className="font-bold text-white text-[13.5px] tracking-tight">{item.title}</h4>
                           <span className={`text-[9.5px] font-bold border rounded-md px-2 py-0.5 uppercase tracking-wider flex items-center gap-1 ${getCategoryBadgeColor(item.category)}`}>
@@ -534,6 +666,27 @@ export default function ItineraryPlanner({
                           <MessageSquare size={11} className="text-slate-400" />
                           <span>{item.comments.length}</span>
                         </div>
+
+                        {/* Edit Activity Action Button */}
+                        {onUpdateItineraryItem && (
+                          <button
+                            id={`edit-activity-${item.id}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingItemId(item.id);
+                              setEditTitle(item.title);
+                              setEditDescription(item.description || "");
+                              setEditLocationName(item.locationName || item.title);
+                              setEditTime(item.time);
+                              setEditCategory(item.category);
+                              setEditCost(item.cost.toString());
+                            }}
+                            className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/10 hover:border-blue-500/20 rounded-xl transition cursor-pointer flex items-center justify-center shrink-0"
+                            title={lang === "zh" ? "編輯此日程" : "Edit active itinerary"}
+                          >
+                            ✏️
+                          </button>
+                        )}
 
                         {/* Delete Activity Action Button */}
                         {onDeleteItineraryItem && (
