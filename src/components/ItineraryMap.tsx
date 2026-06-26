@@ -228,15 +228,6 @@ export default function ItineraryMap({
   return (
     <div className="w-full h-full min-h-[350px] rounded-2xl overflow-hidden border border-white/10 shadow-xl relative bg-slate-950">
       <div ref={mapContainerRef} className="w-full h-full min-h-[350px] absolute inset-0 z-10" />
-      
-      {/* Absolute Header Indicator overlay */}
-      <div className="absolute top-2.5 left-2.5 z-20 bg-slate-900/90 border border-white/15 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] font-bold text-white flex items-center gap-1.5 shadow-md">
-        <span className="flex h-1.5 w-1.5 relative">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
-        </span>
-        <span>{lang === "zh" ? "⚡ 實時航跡地圖視窗" : "⚡ Real-time Air-Route Map"}</span>
-      </div>
     </div>
   );
 }

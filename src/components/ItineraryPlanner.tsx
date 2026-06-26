@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Clock, MapPin, MessageSquare, ThumbsUp, Plus, Eye, Send, Landmark, ShoppingBag, Utensils, Route, Bed, Sparkles, RefreshCw, ChevronLeft, ChevronRight, Trash2, Map, Zap, Train, Bus, Footprints, Pencil, HelpCircle, Calendar } from "lucide-react";
+import { Clock, MapPin, MessageSquare, ThumbsUp, Plus, Eye, Send, Landmark, ShoppingBag, Utensils, Route, Bed, Sparkles, RefreshCw, ChevronLeft, ChevronRight, Trash2, Map, Zap, Train, Bus, Footprints, Pencil, HelpCircle, Calendar, Volume2, Play, Square } from "lucide-react";
 import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 import ItineraryMap from "./ItineraryMap";
@@ -113,6 +113,76 @@ export default function ItineraryPlanner({
   const [emailInput, setEmailInput] = useState<string>("");
   const [emailParsing, setEmailParsing] = useState<boolean>(false);
   const [tspOptimizing, setTspOptimizing] = useState<boolean>(false);
+
+  // AI Voice states
+  const [lastAudioBase64, setLastAudioBase64] = useState<string | null>(null);
+  const [lastVoiceSummary, setLastVoiceSummary] = useState<string>("");
+  const [isAudioPlaying, setIsAudioPlaying] = useState<boolean>(false);
+  const [autoPlayAudio, setAutoPlayAudio] = useState<boolean>(true);
+  const [audioSource, setAudioSource] = useState<any>(null);
+  const [audioCtx, setAudioCtx] = useState<any>(null);
+
+  const stopAudio = () => {
+    if (audioSource) {
+      try {
+        audioSource.stop();
+      } catch (e) {}
+      setAudioSource(null);
+    }
+    setIsAudioPlaying(false);
+  };
+
+  const playAudio = (base64Str: string) => {
+    stopAudio();
+    if (!base64Str) return;
+
+    try {
+      const binary = atob(base64Str);
+      const len = binary.length;
+      const buffer = new ArrayBuffer(len);
+      const view = new DataView(buffer);
+      for (let i = 0; i < len; i++) {
+        view.setUint8(i, binary.charCodeAt(i));
+      }
+      
+      const numSamples = len / 2;
+      const float32Data = new Float32Array(numSamples);
+      for (let i = 0; i < numSamples; i++) {
+        const sample = view.getInt16(i * 2, true);
+        float32Data[i] = sample / 32768;
+      }
+
+      const context = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      const audioBuffer = context.createBuffer(1, numSamples, 24000);
+      audioBuffer.getChannelData(0).set(float32Data);
+
+      const source = context.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(context.destination);
+      
+      source.onended = () => {
+        setIsAudioPlaying(false);
+        setAudioSource(null);
+      };
+
+      source.start(0);
+      setAudioCtx(context);
+      setAudioSource(source);
+      setIsAudioPlaying(true);
+    } catch (err) {
+      console.error("Failed to play PCM audio:", err);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (audioSource) {
+        try {
+          audioSource.stop();
+        } catch (e) {}
+      }
+    };
+  }, [audioSource]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [isOptimizerCollapsed, setIsOptimizerCollapsed] = useState<boolean>(false);
@@ -293,6 +363,19 @@ export default function ItineraryPlanner({
               : `[AI] Voice Schedule Successful! Auto-parsed and scheduled: ${names}`
           );
         }
+
+        // Handle returned voice summary and audio
+        if (data.audio) {
+          setLastAudioBase64(data.audio);
+          setLastVoiceSummary(data.voiceSummary || "");
+          if (autoPlayAudio) {
+            playAudio(data.audio);
+          }
+        } else if (data.voiceSummary) {
+          setLastVoiceSummary(data.voiceSummary);
+          setLastAudioBase64(null);
+        }
+
         setVoiceInput("");
       }
     } catch (err) {
@@ -334,6 +417,19 @@ export default function ItineraryPlanner({
               : `[AI] Smart Confirmation Email Parsed! Automatically imported activities: ${names}`
           );
         }
+
+        // Handle returned voice summary and audio
+        if (data.audio) {
+          setLastAudioBase64(data.audio);
+          setLastVoiceSummary(data.voiceSummary || "");
+          if (autoPlayAudio) {
+            playAudio(data.audio);
+          }
+        } else if (data.voiceSummary) {
+          setLastVoiceSummary(data.voiceSummary);
+          setLastAudioBase64(null);
+        }
+
         setEmailInput("");
       }
     } catch (err) {
@@ -1387,6 +1483,90 @@ export default function ItineraryPlanner({
                         </div>
                       )}
                     </div>
+
+                    {/* Unified AI Voice Assistant Player Card */}
+                    {lastVoiceSummary && (
+                      <div className="bg-indigo-950/20 border border-indigo-500/20 p-3.5 rounded-xl space-y-2.5 shrink-0 animate-fadeIn">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-300">
+                            <Volume2 size={13} className="text-indigo-400 shrink-0" />
+                            <span>{lang === "zh" ? "OdyShareSmart AI 語音播報" : "AI Voice Broadcast"}</span>
+                          </div>
+                          
+                          {/* Pulsing state indicator */}
+                          <div className="flex items-center gap-1.5">
+                            <div className="relative flex h-2 w-2">
+                              {isAudioPlaying && (
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                              )}
+                              <span className={`relative inline-flex rounded-full h-2 w-2 ${isAudioPlaying ? "bg-indigo-400 animate-pulse" : "bg-slate-500"}`}></span>
+                            </div>
+                            <span className="text-[9px] text-slate-400 font-medium">
+                              {isAudioPlaying 
+                                ? (lang === "zh" ? "播音中" : "Playing") 
+                                : (lang === "zh" ? "已靜音" : "Idle")}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Speech content reader box */}
+                        <div className="p-2.5 bg-slate-900/50 border border-white/5 rounded-lg text-[10.5px] text-slate-200 leading-relaxed font-sans max-h-24 overflow-y-auto scrollbar-thin">
+                          {lastVoiceSummary}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-0.5">
+                          {/* Playback Controls */}
+                          <div className="flex items-center gap-1.5">
+                            {lastAudioBase64 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isAudioPlaying) {
+                                    stopAudio();
+                                  } else {
+                                    playAudio(lastAudioBase64);
+                                  }
+                                }}
+                                className={`flex items-center gap-1.5 py-1 px-2.5 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                                  isAudioPlaying 
+                                    ? "bg-amber-600/90 hover:bg-amber-700 text-white" 
+                                    : "bg-indigo-600/90 hover:bg-indigo-700 text-white"
+                                }`}
+                              >
+                                {isAudioPlaying ? (
+                                  <>
+                                    <Square size={10} fill="currentColor" />
+                                    <span>{lang === "zh" ? "停止" : "Stop"}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Play size={10} fill="currentColor" />
+                                    <span>{lang === "zh" ? "重新播放" : "Replay"}</span>
+                                  </>
+                                )}
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                                ⚠️ {lang === "zh" ? "未連接 API 金鑰" : "API Key Offline"}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Autoplay setting */}
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={autoPlayAudio}
+                              onChange={(e) => setAutoPlayAudio(e.target.checked)}
+                              className="rounded border-white/10 bg-slate-900 text-indigo-600 focus:ring-0 w-3 h-3 cursor-pointer"
+                            />
+                            <span className="text-[9px] text-slate-400 font-medium">
+                              {lang === "zh" ? "自動播報" : "Autoplay"}
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Conversation Box */}
                     <div className="flex-1 flex flex-col justify-between pb-1 min-h-[160px] bg-white/3 border border-white/5 p-3 rounded-xl">

@@ -66,6 +66,30 @@ async function generateContentWithRetry(ai: GoogleGenAI, params: { model: string
   }
 }
 
+// Helper to generate natural sounding TTS audio from a text summary using gemini-3.1-flash-tts-preview
+async function generateTTSAudio(ai: GoogleGenAI, text: string): Promise<string | null> {
+  try {
+    const ttsResponse = await ai.models.generateContent({
+      model: "gemini-3.1-flash-tts-preview",
+      contents: [{ parts: [{ text: `Say naturally, warmly and professionally: ${text}` }] }],
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' }
+          }
+        }
+      }
+    });
+
+    const base64Audio = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    return base64Audio || null;
+  } catch (err) {
+    console.error("Failed to generate TTS audio in route:", err);
+    return null;
+  }
+}
+
 // A. Chat Assistant for travel guidelines, hidden gems, transport
 router.post("/chat-assistant", async (req: Request, res: Response) => {
   const { message, chatHistory } = req.body;
@@ -516,7 +540,27 @@ router.post("/parse-voice-schedule", async (req: Request, res: Response) => {
     });
 
     const parsed = JSON.parse(response.text || "{}");
-    res.json(parsed);
+    
+    // Generate AI voice explanation for voice command schedule
+    let audio: string | null = null;
+    let voiceSummary = "";
+    if (parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
+      const isChinese = userQuery && /[\u4e00-\u9fa5]/.test(userQuery);
+      if (isChinese) {
+        const summary = parsed.items.map((it: any) => `第 ${it.dayIndex + 1} 天 ${it.time} 的 ${it.title}`).join("；");
+        voiceSummary = `好的，已為您成功排程：${summary}。已同步更新到日程表囉！`;
+      } else {
+        const summary = parsed.items.map((it: any) => `${it.title} at ${it.time} on Day ${it.dayIndex + 1}`).join(", and ");
+        voiceSummary = `Great! I have successfully scheduled: ${summary}. I've updated the itinerary for you!`;
+      }
+      audio = await generateTTSAudio(ai, voiceSummary);
+    }
+
+    res.json({
+      items: parsed.items || [],
+      audio,
+      voiceSummary
+    });
   } catch (err: any) {
     console.error("Error parsing voice schedule with Gemini API:", err);
     res.json({ items: getFallbackItems() });
@@ -749,7 +793,27 @@ router.post("/parse-email-confirmation", async (req: Request, res: Response) => 
     });
 
     const parsed = JSON.parse(response.text || "{}");
-    res.json(parsed);
+    
+    // Generate AI voice explanation for imported email confirmation
+    let audio: string | null = null;
+    let voiceSummary = "";
+    if (parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
+      const isChinese = emailText && /[\u4e00-\u9fa5]/.test(emailText);
+      if (isChinese) {
+        const summary = parsed.items.map((it: any) => `第 ${it.dayIndex + 1} 天 ${it.time} 的 ${it.title}`).join("，以及 ");
+        voiceSummary = `預訂確認信已導入成功！已自動排入行程：${summary}。`;
+      } else {
+        const summary = parsed.items.map((it: any) => `${it.title} at ${it.time} on Day ${it.dayIndex + 1}`).join(", and ");
+        voiceSummary = `Booking confirmation imported successfully! Added to your schedule: ${summary}.`;
+      }
+      audio = await generateTTSAudio(ai, voiceSummary);
+    }
+
+    res.json({
+      items: parsed.items || [],
+      audio,
+      voiceSummary
+    });
   } catch (err) {
     console.error("Gemini confirmation parser failed:", err);
     res.json({ items: getFallbackConfirmationItems() });
