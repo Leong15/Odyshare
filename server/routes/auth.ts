@@ -2,23 +2,9 @@ import { Router, Request, Response } from "express";
 import { getDB, writeDB } from "../db.js";
 import argon2 from "argon2";
 import crypto from "crypto";
+import { sendRealEmail } from "../utils/email.js";
 
 const router = Router();
-
-// Simulated inbox for verification and reset password notification emails
-interface SimulatedEmail {
-  id: string;
-  to: string;
-  subject: string;
-  html: string;
-  createdAt: string;
-}
-export const simulatedEmails: SimulatedEmail[] = [];
-
-// API to retrieve simulated emails for the frontend testing sandbox
-router.get("/simulated-emails", (req: Request, res: Response) => {
-  res.json(simulatedEmails);
-});
 
 // Safe hashing utility using Argon2 with automatic built-in Node.js scrypt fallback
 async function safeHash(password: string): Promise<string> {
@@ -149,30 +135,42 @@ router.post("/register", async (req: Request, res: Response) => {
     db.users.push(newUser);
     writeDB(db);
 
-    // Send verification link to simulated mailbox
-    const verifyLink = `/api/auth/verify-email?token=${verifyToken}&username=${encodeURIComponent(newUser.username)}`;
-    simulatedEmails.push({
-      id: "verify-" + Date.now(),
-      to: newUser.email,
-      subject: "OdyShareSync - 帳號啟用電子郵件驗證 (Email Verification)",
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #1e293b; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; max-width: 500px;">
-          <h2 style="color: #3b82f6; margin-top: 0; font-size: 20px; font-weight: 800; text-align: center;">OdyShareSync 旅伴協作平台</h2>
-          <p>親愛的 <strong>${newUser.name}</strong>，您好：</p>
-          <p>感謝您註冊 OdyShareSync 旅伴協作帳號！請點擊下方按鈕以驗證您的電子郵件地址並啟用帳號：</p>
-          <div style="margin: 24px 0; text-align: center;">
-            <a href="${verifyLink}" target="_blank" style="background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);">
-              確認驗證並啟用帳號 (Verify & Activate)
-            </a>
-          </div>
-          <p style="font-size: 11px; color: #64748b; line-height: 1.5;">如果上方連結無法直接點擊，請複製下方連結至網址列開啟：<br/>
-          <a href="${verifyLink}" target="_blank" style="color: #3b82f6; word-break: break-all;">${verifyLink}</a></p>
-          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
-          <p style="font-size: 10px; color: #94a3b8; text-align: center;">此信件為系統自動發送，請勿直接回覆。</p>
+    // Send verification link via real email
+    const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+    const verifyLink = `${appUrl}/api/auth/verify-email?token=${verifyToken}&username=${encodeURIComponent(newUser.username)}`;
+    const emailSubject = "OdyShareSync - 帳號啟用電子郵件驗證 (Email Verification)";
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #1e293b; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; max-width: 500px;">
+        <h2 style="color: #3b82f6; margin-top: 0; font-size: 20px; font-weight: 800; text-align: center;">OdyShareSync 旅伴協作平台</h2>
+        <p>親愛的 <strong>${newUser.name}</strong>，您好：</p>
+        <p>感謝您註冊 OdyShareSync 旅伴協作帳號！請點擊下方按鈕以驗證您的電子郵件地址並啟用帳號：</p>
+        <div style="margin: 24px 0; text-align: center;">
+          <a href="${verifyLink}" target="_blank" style="background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.2);">
+            確認驗證並啟用帳號 (Verify & Activate)
+          </a>
         </div>
-      `,
-      createdAt: new Date().toISOString()
-    });
+        <p style="font-size: 11px; color: #64748b; line-height: 1.5;">如果上方連結無法直接點擊，請複製下方連結至網址列開啟：<br/>
+        <a href="${verifyLink}" target="_blank" style="color: #3b82f6; word-break: break-all;">${verifyLink}</a></p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
+        <p style="font-size: 10px; color: #94a3b8; text-align: center;">此信件為系統自動發送，請勿直接回覆。</p>
+      </div>
+    `;
+
+    let emailSentSuccess = true;
+    let emailErrorMessage = "";
+    try {
+      await sendRealEmail({ to: newUser.email, subject: emailSubject, html: emailHtml });
+    } catch (sendErr: any) {
+      console.error("Real verification email sending failed:", sendErr);
+      emailSentSuccess = false;
+      emailErrorMessage = sendErr.message || "Email dispatch failed";
+    }
+
+    if (!emailSentSuccess) {
+      return res.status(400).json({
+        error: `帳號已註冊，但驗證信發送失敗。原因：${emailErrorMessage}。請聯絡管理員或至 Secrets 設定您的 SMTP 金鑰。`
+      });
+    }
 
     res.json({ 
       success: true, 
@@ -298,25 +296,24 @@ router.post("/forget-password", async (req: Request, res: Response) => {
   }
 
   try {
-    // Generate secure random password
+    // Generate secure but simpler random password with exactly 1 special character
     const uppers = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const lowers = "abcdefghijklmnopqrstuvwxyz";
     const digits = "0123456789";
-    const specials = "!@#$%^&*()_+-=[]{}|;:,.<>?";
+    const specials = "!@#$%^*"; // simple special characters, exactly 1 will be chosen
     
-    // Choose at least one of each to meet security criteria
-    const rUpper = uppers[Math.floor(Math.random() * uppers.length)];
-    const rLower = lowers[Math.floor(Math.random() * lowers.length)];
-    const rDigit = digits[Math.floor(Math.random() * digits.length)];
     const rSpecial = specials[Math.floor(Math.random() * specials.length)];
+    const rUpper = uppers[Math.floor(Math.random() * uppers.length)];
+    const rDigit1 = digits[Math.floor(Math.random() * digits.length)];
+    const rDigit2 = digits[Math.floor(Math.random() * digits.length)];
     
-    const allChars = uppers + lowers + digits + specials;
-    let remaining = "";
-    for (let i = 0; i < 8; i++) {
-      remaining += allChars[Math.floor(Math.random() * allChars.length)];
+    let rLowers = "";
+    for (let i = 0; i < 4; i++) {
+      rLowers += lowers[Math.floor(Math.random() * lowers.length)];
     }
     
-    const arr = (rUpper + rLower + rDigit + rSpecial + remaining).split("");
+    // Combine to exactly 8 characters with exactly 1 special character
+    const arr = (rUpper + rLowers + rDigit1 + rDigit2 + rSpecial).split("");
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       const temp = arr[i];
@@ -329,26 +326,37 @@ router.post("/forget-password", async (req: Request, res: Response) => {
     user.password = hashedPassword;
     writeDB(db);
 
-    // Send the password email notification to simulated inbox
-    simulatedEmails.push({
-      id: "forgot-" + Date.now(),
-      to: user.email,
-      subject: "OdyShareSync - 密碼重置與安全新密碼通知 (New Password)",
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #1e293b; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; max-width: 500px;">
-          <h2 style="color: #10b981; margin-top: 0; font-size: 20px; font-weight: 800; text-align: center;">OdyShareSync 安全中心</h2>
-          <p>親愛的 <strong>${user.name}</strong>，您好：</p>
-          <p>我們收到了您的密碼重置請求。為了保障帳號安全，系統已為您隨機生成一組符合安全規格的新密碼：</p>
-          <div style="margin: 20px 0; padding: 16px; background: #f1f5f9; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center; font-family: monospace; font-size: 18px; font-weight: bold; color: #0f172a; letter-spacing: 1.5px;">
-            ${newRandomPassword}
-          </div>
-          <p style="color: #e11d48; font-weight: bold; font-size: 11px;">⚠️ 安全提示：此密碼符合高強度安全規範。登入後，建議您前往「用戶選單」>「修改密碼」變更為您好記的密碼。</p>
-          <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
-          <p style="font-size: 10px; color: #94a3b8; text-align: center;">此信件為系統自動發送，請勿直接回覆。</p>
+    // Send the password email notification via real email
+    const emailSubject = "OdyShareSync - 密碼重置與安全新密碼通知 (New Password)";
+    const emailHtml = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #1e293b; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; max-width: 500px;">
+        <h2 style="color: #10b981; margin-top: 0; font-size: 20px; font-weight: 800; text-align: center;">OdyShareSync 安全中心</h2>
+        <p>親愛的 <strong>${user.name}</strong>，您好：</p>
+        <p>我們收到了您的密碼重置請求。為了保障帳號安全，系統已為您隨機生成一組符合安全規格的新密碼：</p>
+        <div style="margin: 20px 0; padding: 16px; background: #f1f5f9; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center; font-family: monospace; font-size: 18px; font-weight: bold; color: #0f172a; letter-spacing: 1.5px;">
+          ${newRandomPassword}
         </div>
-      `,
-      createdAt: new Date().toISOString()
-    });
+        <p style="color: #e11d48; font-weight: bold; font-size: 11px;">⚠️ 安全提示：此密碼符合高強度安全規範。登入後，建議您前往「用戶選單」>「修改密碼」變更為您好記的密碼。</p>
+        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
+        <p style="font-size: 10px; color: #94a3b8; text-align: center;">此信件為系統自動發送，請勿直接回覆。</p>
+      </div>
+    `;
+
+    let emailSentSuccess = true;
+    let emailErrorMessage = "";
+    try {
+      await sendRealEmail({ to: user.email, subject: emailSubject, html: emailHtml });
+    } catch (sendErr: any) {
+      console.error("Real password reset email sending failed:", sendErr);
+      emailSentSuccess = false;
+      emailErrorMessage = sendErr.message || "Email dispatch failed";
+    }
+
+    if (!emailSentSuccess) {
+      return res.status(400).json({
+        error: `密碼重設失敗：無法發送重設信。原因：${emailErrorMessage}。請聯絡管理員設定 SMTP。`
+      });
+    }
 
     res.json({ success: true, message: "A secure random password has been sent to your registered email address. Please check your inbox (安全新密碼已發送至您的註冊信箱，請查看您的信箱並使用其登入)。" });
   } catch (err) {

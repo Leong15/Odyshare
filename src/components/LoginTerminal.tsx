@@ -48,27 +48,6 @@ export default function LoginTerminal({
   const [recoveryError, setRecoveryError] = React.useState("");
   const [recoverySuccess, setRecoverySuccess] = React.useState("");
 
-  // Simulated email inbox states for our sandbox simulator
-  const [simulatedEmails, setSimulatedEmails] = React.useState<any[]>([]);
-  const [showSandbox, setShowSandbox] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!showSandbox) return;
-    const fetchEmails = async () => {
-      try {
-        const res = await fetch("/api/auth/simulated-emails");
-        if (res.ok) {
-          const data = await res.json();
-          setSimulatedEmails(data);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch simulated emails:", err);
-      }
-    };
-    fetchEmails();
-    const interval = setInterval(fetchEmails, 2000);
-    return () => clearInterval(interval);
-  }, [showSandbox]);
 
   const handleStartRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,8 +77,6 @@ export default function LoginTerminal({
       }
       setRecoverySuccess(data.message);
       setForgotStep(2);
-      // Automatically open the email sandbox so they can see the generated password immediately!
-      setShowSandbox(true);
     } catch (err) {
       setRecoveryError(lang === "zh" ? "連線連線錯誤，請稍後重試" : "Network error, please retry.");
     }
@@ -383,11 +360,6 @@ export default function LoginTerminal({
                 <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/15 rounded-2xl text-[11px] text-emerald-400 font-medium leading-relaxed">
                   ✓ {recoverySuccess}
                 </div>
-                <p className="text-[10px] text-slate-400">
-                  {lang === "zh"
-                    ? "提示：若在測試環境，請直接點擊下方的「測試信箱模擬器」查看新生成的密碼信內容。"
-                    : "Tip: For preview sandbox testing, click 'Open Email Sandbox' below to inspect the generated password."}
-                </p>
                 <button
                   type="button"
                   onClick={() => setShowForgotModal(false)}
@@ -401,58 +373,7 @@ export default function LoginTerminal({
         </div>
       )}
 
-      {/* Sandbox Toggle Button */}
-      <div className="mt-4 z-10">
-        <button
-          type="button"
-          onClick={() => setShowSandbox(!showSandbox)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-black tracking-wider uppercase border font-mono transition shadow-sm cursor-pointer ${
-            showSandbox
-              ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
-              : "bg-blue-600/10 border-blue-600/30 text-blue-500 hover:bg-blue-600/20"
-          }`}
-        >
-          📬 {showSandbox ? (lang === "zh" ? "關閉信箱模擬器" : "Close Email Sandbox") : (lang === "zh" ? "開啟測試信箱模擬器 ✉️" : "Open Email Sandbox ✉️")}
-        </button>
-      </div>
 
-      {/* Simulated Mailbox Panel */}
-      {showSandbox && (
-        <div className={`mt-4 w-full max-w-md rounded-3xl p-5 border z-10 animate-fadeIn space-y-4 ${
-          isLight ? "bg-white border-slate-200 shadow-md" : "bg-[#101520] border-white/5 shadow-2xl"
-        }`}>
-          <div className="flex justify-between items-center pb-2 border-b border-white/5">
-            <span className="text-xs font-black uppercase font-mono tracking-wider flex items-center gap-1.5 text-blue-400">
-              ✉️ {lang === "zh" ? "OdyShareSync 虛擬信箱調試器" : "Simulated Email Inbox"}
-            </span>
-            <span className="text-[9px] px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-mono">Sandbox Sandbox</span>
-          </div>
-
-          {simulatedEmails.length === 0 ? (
-            <p className="text-[11px] text-slate-450 text-center py-4 italic font-mono">
-              {lang === "zh" ? "（暫無任何系統發出的郵件。請進行註冊或忘記密碼操作）" : "(No simulated emails sent yet. Perform register or reset pass)"}
-            </p>
-          ) : (
-            <div className="space-y-3.5 max-h-[220px] overflow-y-auto pr-1">
-              {simulatedEmails.map((mail: any) => (
-                <div key={mail.id} className="p-3.5 rounded-2xl bg-white/5 border border-white/5 space-y-2 text-left">
-                  <div className="flex justify-between text-[9px] font-mono text-slate-400">
-                    <span>收件人 (To): <strong className="text-slate-200">{mail.to}</strong></span>
-                    <span>{new Date(mail.createdAt).toLocaleTimeString()}</span>
-                  </div>
-                  <div className="text-[11px] font-bold text-blue-300">
-                    主旨 (Subject): {mail.subject}
-                  </div>
-                  <div 
-                    className="p-2.5 rounded bg-slate-950/80 text-[11px] text-slate-300 leading-normal border border-white/5"
-                    dangerouslySetInnerHTML={{ __html: mail.html }}
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
