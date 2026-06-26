@@ -18,7 +18,7 @@ export default function EncryptedWorkspaceChat({
   onSendMessage,
   lang = "en"
 }: EncryptedWorkspaceChatProps) {
-  const [chatInput, setChatInput] = useState<string>("Lets confirm the sashimi tasting schedule on day 1 outer market tomorrow!");
+  const [chatInput, setChatInput] = useState<string>("");
   const [showEncryptedState, setShowEncryptedState] = useState<{ [key: string]: boolean }>({});
   const [securityStandard, setSecurityStandard] = useState<string>("ECDH + AESGCM-256");
   const chatScrollRef = useRef<HTMLDivElement | null>(null);

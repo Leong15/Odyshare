@@ -176,7 +176,7 @@ export default function LoginTerminal({
                   placeholder={lang === "zh" ? "e.g. 小明 / Leo Chen" : "e.g. Leo Chen"}
                   value={authName}
                   onChange={(e) => setAuthName(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none transition-all ${
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-base md:text-xs border focus:outline-none transition-all ${
                     isLight 
                       ? "bg-slate-50 text-slate-900 border-slate-300 focus:border-blue-500/70" 
                       : "bg-[#141b26] text-white border-white/10 focus:border-blue-500/60"
@@ -195,7 +195,7 @@ export default function LoginTerminal({
                   placeholder={lang === "zh" ? "e.g. user@example.com" : "e.g. user@example.com"}
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none transition-all ${
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-base md:text-xs border focus:outline-none transition-all ${
                     isLight 
                       ? "bg-slate-50 text-slate-900 border-slate-300 focus:border-blue-500/70" 
                       : "bg-[#141b26] text-white border-white/10 focus:border-blue-500/60"
@@ -216,7 +216,7 @@ export default function LoginTerminal({
               placeholder={lang === "zh" ? "請輸入帳號英文或數字..." : "Enter your username..."}
               value={authUsername}
               onChange={(e) => setAuthUsername(e.target.value)}
-              className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none transition-all font-mono ${
+              className={`w-full px-3.5 py-2.5 rounded-xl text-base md:text-xs border focus:outline-none transition-all font-mono ${
                 isLight 
                   ? "bg-slate-50 text-slate-900 border-slate-300 focus:border-blue-500/70" 
                   : "bg-[#141b26] text-white border-white/10 focus:border-blue-500/60"
@@ -251,7 +251,7 @@ export default function LoginTerminal({
               placeholder="••••••••"
               value={authPassword}
               onChange={(e) => setAuthPassword(e.target.value)}
-              className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none transition-all ${
+              className={`w-full px-3.5 py-2.5 rounded-xl text-base md:text-xs border focus:outline-none transition-all ${
                 isLight 
                   ? "bg-slate-50 text-slate-900 border-slate-300 focus:border-blue-500/70" 
                   : "bg-[#141b26] text-white border-white/10 focus:border-blue-500/60"
@@ -348,7 +348,7 @@ export default function LoginTerminal({
                       placeholder="e.g. leochau"
                       value={recoveryUsername}
                       onChange={(e) => setRecoveryUsername(e.target.value)}
-                      className={`w-full px-3.5 py-2 rounded-xl text-xs border focus:outline-none ${
+                      className={`w-full px-3.5 py-2 rounded-xl text-base md:text-xs border focus:outline-none ${
                         isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
                       }`}
                     />
@@ -362,7 +362,7 @@ export default function LoginTerminal({
                       placeholder="e.g. user@example.com"
                       value={recoveryEmail}
                       onChange={(e) => setRecoveryEmail(e.target.value)}
-                      className={`w-full px-3.5 py-2 rounded-xl text-xs border focus:outline-none ${
+                      className={`w-full px-3.5 py-2 rounded-xl text-base md:text-xs border focus:outline-none ${
                         isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
                       }`}
                     />

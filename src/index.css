@@ -372,8 +372,12 @@ body.light-theme .glass-input {
   color: #0f172a !important;
 }
 
-body.light-theme .glass-input:focus {
+body.light-theme .glass-input:focus,
+body.light-theme input:focus,
+body.light-theme textarea:focus,
+body.light-theme select:focus {
   background: #ffffff !important;
+  color: #0f172a !important;
   border-color: rgba(14, 165, 233, 0.6) !important;
   box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12) !important;
 }
