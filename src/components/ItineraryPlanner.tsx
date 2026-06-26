@@ -493,11 +493,11 @@ export default function ItineraryPlanner({
             </button>
           </div>
         )}
-        <div id="itinerary-timeline-container" className="glass-container rounded-3xl p-6 md:p-8 shadow-2xl flex flex-col h-full min-h-[500px]">
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+        <div id="itinerary-timeline-container" className="glass-container rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 shadow-2xl flex flex-col h-full min-h-[500px] w-full max-w-full overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-start w-full max-w-full overflow-hidden">
             
             {/* Left Sidebar: Day Management Column */}
-            <div className="col-span-12 md:col-span-3 flex flex-col gap-5 md:sticky md:top-24">
+            <div className="col-span-12 md:col-span-3 flex flex-col gap-5 md:sticky md:top-24 w-full max-w-full overflow-hidden">
               
               {/* Title / Heading */}
               <div className="hidden md:block pb-2.5 border-b border-white/10 text-left">
@@ -511,7 +511,7 @@ export default function ItineraryPlanner({
               </div>
 
               {/* Mobile: Horizontal Scrollable Tabs */}
-              <div className="flex md:hidden items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-md min-w-0 relative">
+              <div className="flex md:hidden items-center gap-1 bg-white/5 p-1 rounded-2xl border border-white/10 backdrop-blur-md min-w-0 relative w-full overflow-hidden">
                 <button
                   type="button"
                   onClick={() => scrollDayTabs("left")}
@@ -637,7 +637,7 @@ export default function ItineraryPlanner({
             </div>
 
             {/* Right Panel: Itinerary Main Contents */}
-            <div className="col-span-12 md:col-span-9 space-y-6">
+            <div className="col-span-12 md:col-span-9 space-y-6 w-full max-w-full overflow-hidden">
               
               {/* Controls Bar */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-4 border-b border-white/5 text-left">
@@ -713,7 +713,7 @@ export default function ItineraryPlanner({
               {showAddForm && (
                 <form
                   onSubmit={handleCreateActivity}
-                  className="mb-6 p-6 md:p-8 bg-white/10 dark:bg-black/20 backdrop-blur-xl border border-white/10 dark:border-white/5 rounded-3xl space-y-5 text-xs animate-fadeIn shadow-lg text-left"
+                  className="mb-6 p-4 sm:p-6 md:p-8 bg-white/10 dark:bg-black/20 backdrop-blur-xl border border-white/10 dark:border-white/5 rounded-2xl md:rounded-3xl space-y-5 text-xs animate-fadeIn shadow-lg text-left"
                 >
                   <h4 className="font-bold text-slate-200 flex justify-between items-center border-b border-white/5 pb-2">
                     <span>{t.configureActivityCard} — {t.day} {activeDay + 1} {lang === "zh" ? "天" : ""}</span>
@@ -855,7 +855,7 @@ export default function ItineraryPlanner({
                             setEditingItemId(null);
                           }}
                           onClick={(e) => e.stopPropagation()}
-                          className="p-6 md:p-8 rounded-3xl border border-blue-500/50 bg-blue-500/10 backdrop-blur-xl space-y-5 text-xs animate-fadeIn text-left shadow-lg w-full"
+                          className="p-4 sm:p-6 md:p-8 rounded-2xl md:rounded-3xl border border-blue-500/50 bg-blue-500/10 backdrop-blur-xl space-y-5 text-xs animate-fadeIn text-left shadow-lg w-full"
                         >
                           <div className="flex justify-between items-center border-b border-white/5 pb-2">
                             <span className="font-bold text-blue-400 flex items-center gap-1.5">
@@ -977,7 +977,7 @@ export default function ItineraryPlanner({
                         <div
                           id={`itinerary-card-${item.id}`}
                           onClick={() => setActiveCommentDrawerId(item.id)}
-                          className={`p-6 md:p-7 rounded-3xl border ${STYLE_CONFIG.transitions} cursor-pointer flex flex-col justify-between h-full min-h-[180px] ${
+                          className={`p-4 sm:p-5 md:p-6 rounded-2xl md:rounded-3xl border ${STYLE_CONFIG.transitions} cursor-pointer flex flex-col justify-between h-full min-h-[160px] ${
                             activeCommentDrawerId === item.id
                               ? STYLE_CONFIG.colors.cardBgActive
                               : STYLE_CONFIG.colors.cardBgInactive
@@ -985,16 +985,16 @@ export default function ItineraryPlanner({
                         >
                           <div className="space-y-4">
                             {/* Header: Category and Reorder buttons */}
-                            <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
                               <span className={`text-[10px] font-extrabold border rounded-lg px-2 py-0.5 uppercase tracking-wider flex items-center gap-1.5 ${getCategoryBadgeColor(item.category)}`}>
                                 {getCategoryIcon(item.category)}
                                 <span>{getLocalizedCategoryName(item.category)}</span>
                               </span>
 
-                              {/* Drag / Reorder Operations Panel (FAT FINGER SAFE: 44px buttons) */}
+                              {/* Drag / Reorder Operations Panel */}
                               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 {/* Grip Decorative Drag Indicator */}
-                                <div className="text-slate-500 hover:text-slate-300 transition-colors cursor-grab active:cursor-grabbing p-1.5 h-11 w-11 md:h-9 md:w-9 flex items-center justify-center shrink-0" title={lang === "zh" ? "拖曳排序佔位" : "Drag Handle"}>
+                                <div className="text-slate-500 hover:text-slate-300 transition-colors cursor-grab active:cursor-grabbing p-1 h-9 w-9 flex items-center justify-center shrink-0" title={lang === "zh" ? "拖曳排序佔位" : "Drag Handle"}>
                                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
                                 </div>
 
@@ -1003,7 +1003,7 @@ export default function ItineraryPlanner({
                                   type="button"
                                   disabled={idx === 0}
                                   onClick={() => handleMoveItem(idx, "up")}
-                                  className={`h-11 w-11 md:h-9 md:w-9 flex items-center justify-center rounded-xl transition-all border ${
+                                  className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all border ${
                                     idx === 0
                                       ? "text-slate-600 border-transparent cursor-not-allowed opacity-30"
                                       : "text-blue-400 border-white/5 hover:bg-white/5 hover:border-white/10 cursor-pointer"
@@ -1018,7 +1018,7 @@ export default function ItineraryPlanner({
                                   type="button"
                                   disabled={idx === filteredItems.length - 1}
                                   onClick={() => handleMoveItem(idx, "down")}
-                                  className={`h-11 w-11 md:h-9 md:w-9 flex items-center justify-center rounded-xl transition-all border ${
+                                  className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all border ${
                                     idx === filteredItems.length - 1
                                       ? "text-slate-600 border-transparent cursor-not-allowed opacity-30"
                                       : "text-blue-400 border-white/5 hover:bg-white/5 hover:border-white/10 cursor-pointer"
@@ -1033,12 +1033,12 @@ export default function ItineraryPlanner({
                             {/* Body content */}
                             <div className="space-y-3">
                               {/* Time & Title Row */}
-                              <div className="flex items-start gap-3">
+                              <div className="flex items-start gap-3 w-full min-w-0">
                                 <div className="flex flex-col items-center justify-center bg-white/5 px-2.5 py-2 rounded-xl border border-white/5 text-slate-200 font-mono text-[11px] font-bold leading-none select-none shrink-0">
                                   <Clock size={11} className="text-blue-400 mb-1" />
                                   <span>{item.time}</span>
                                 </div>
-                                <div className="space-y-1 min-w-0">
+                                <div className="space-y-1 min-w-0 flex-1">
                                   <h4 className="font-extrabold text-white text-base tracking-tight leading-tight truncate">{item.title}</h4>
                                   <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
                                     <MapPin size={11} className="text-blue-400 shrink-0" />
@@ -1068,7 +1068,7 @@ export default function ItineraryPlanner({
                               <button
                                 id={`vote-activity-${item.id}`}
                                 onClick={() => onVoteItinerary(item.id)}
-                                className={`px-3 h-11 sm:h-9 rounded-xl transition-all border cursor-pointer flex items-center justify-center gap-1.5 text-[11px] font-semibold ${
+                                className={`px-3 h-9 rounded-xl transition-all border cursor-pointer flex items-center justify-center gap-1.5 text-[11px] font-semibold ${
                                   userVoted
                                     ? "bg-blue-600 text-white border-blue-500 shadow-sm shadow-blue-500/20"
                                     : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
@@ -1079,11 +1079,11 @@ export default function ItineraryPlanner({
                                 <span>{item.votes.length}</span>
                               </button>
 
-                              {/* Comments button indicator tooltip */}
-                              <div className="px-3 h-11 sm:h-9 bg-white/3 text-slate-300 border border-white/5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-[11px] leading-none select-none">
-                                <MessageSquare size={11} className="text-slate-400 shrink-0" />
-                                <span>{item.comments.length}</span>
-                              </div>
+                               {/* Comments button indicator tooltip */}
+                               <div className="px-3 h-9 bg-white/3 text-slate-300 border border-white/5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-[11px] leading-none select-none">
+                                 <MessageSquare size={11} className="text-slate-400 shrink-0" />
+                                 <span>{item.comments.length}</span>
+                               </div>
                             </div>
 
                             <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
@@ -1100,7 +1100,7 @@ export default function ItineraryPlanner({
                                     setEditCategory(item.category);
                                     setEditCost(item.cost.toString());
                                   }}
-                                  className="p-2 h-11 w-11 md:h-9 md:w-9 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/10 hover:border-blue-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+                                  className="p-2 h-9 w-9 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/10 hover:border-blue-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
                                   title={lang === "zh" ? "編輯行程" : "Edit activity"}
                                 >
                                   <Pencil size={11} className="shrink-0" />
@@ -1117,7 +1117,7 @@ export default function ItineraryPlanner({
                                       setActiveCommentDrawerId(null);
                                     }
                                   }}
-                                  className="p-2 h-11 w-11 md:h-9 md:w-9 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+                                  className="p-2 h-9 w-9 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
                                   title={lang === "zh" ? "刪除行程" : "Delete activity"}
                                 >
                                   <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
