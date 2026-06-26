@@ -215,24 +215,24 @@ export default function SettlementModal({
                   {lang === "zh" ? "旅程費用結算明細收據" : "Official Expenditure Settlement Matrix"}
                 </p>
               </div>
-              <div className="text-left sm:text-right text-[11px] font-mono text-slate-400">
+              <div className="text-left sm:text-right text-xs font-mono text-slate-400">
                 <div>DATE: {new Date().toLocaleDateString()}</div>
                 <div>RECEIPT NO: #{Math.floor(100000 + Math.random() * 900000)}</div>
               </div>
             </div>
 
             {/* Financial Overview Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-[repeat(3,minmax(0,1fr))] gap-3 mb-6">
               <div className="bg-white/3 border border-white/5 p-3 rounded-lg text-center">
-                <span className="text-[10px] text-slate-400 font-bold block">{lang === "zh" ? "總花費金額" : "Total Spent"}</span>
+                <span className="text-xs text-slate-400 font-bold block">{lang === "zh" ? "總花費金額" : "Total Spent"}</span>
                 <span className="text-base font-extrabold text-emerald-400 font-mono">${totalSpent.toFixed(2)}</span>
               </div>
               <div className="bg-white/3 border border-white/5 p-3 rounded-lg text-center">
-                <span className="text-[10px] text-slate-400 font-bold block">{lang === "zh" ? "旅程總預算" : "Trip Budget"}</span>
+                <span className="text-xs text-slate-400 font-bold block">{lang === "zh" ? "旅程總預算" : "Trip Budget"}</span>
                 <span className="text-base font-extrabold text-indigo-400 font-mono">${totalBudget.toFixed(2)}</span>
               </div>
               <div className="bg-white/3 border border-white/5 p-3 rounded-lg text-center">
-                <span className="text-[10px] text-slate-400 font-bold block">{lang === "zh" ? "預算剩餘" : "Remaining"}</span>
+                <span className="text-xs text-slate-400 font-bold block">{lang === "zh" ? "預算剩餘" : "Remaining"}</span>
                 <span className="text-base font-extrabold text-white font-mono">${(totalBudget - totalSpent).toFixed(2)}</span>
               </div>
             </div>
@@ -298,8 +298,8 @@ export default function SettlementModal({
               <h4 className="font-bold text-white text-xs border-b border-white/5 pb-1">
                 {lang === "zh" ? "🧾 成員收支總覽" : "🧾 Individual Balances Reconciliation"}
               </h4>
-              <div className="border border-white/5 rounded-xl overflow-hidden font-mono text-[11px]">
-                <div className="grid grid-cols-3 bg-white/3 border-b border-white/5 p-2 font-bold text-slate-400">
+              <div className="border border-white/5 rounded-xl overflow-hidden font-mono text-xs">
+                <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] bg-white/3 border-b border-white/5 p-2 font-bold text-slate-400">
                   <div>MEMBER</div>
                   <div className="text-right">PAID / SPENT</div>
                   <div className="text-right">NET BALANCE</div>
@@ -311,7 +311,7 @@ export default function SettlementModal({
                     .reduce((s, e) => s + e.amount, 0);
                   
                   return (
-                    <div key={p.id} className="grid grid-cols-3 border-b border-white/5 p-2 text-slate-200">
+                    <div key={p.id} className="grid grid-cols-[repeat(3,minmax(0,1fr))] border-b border-white/5 p-2 text-slate-200">
                       <div className="font-bold truncate">{p.name}</div>
                       <div className="text-right text-slate-400">${totalPaidByP.toFixed(0)} paid</div>
                       <div className={`text-right font-bold ${

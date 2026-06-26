@@ -1079,13 +1079,13 @@ export default function OfflineMapSimulator({
             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">
               {lang === "zh" ? "📌 規劃路線上的航點" : t.locationsOnRoute}
             </span>
-            <span className="text-[9px] px-1.5 py-0.5 bg-slate-800 rounded text-slate-400 font-mono">
+            <span className="text-xs px-1.5 py-0.5 bg-slate-800 rounded text-slate-400 font-mono">
               {filteredObjects.length} pts
             </span>
           </div>
 
           {filteredObjects.length === 0 ? (
-            <div className="p-4 rounded-xl border border-dashed border-white/5 text-center text-[11px] text-slate-500">
+            <div className="p-4 rounded-xl border border-dashed border-white/5 text-center text-xs text-slate-500">
               {lang === "zh" ? "無符合地標。在地圖點擊可手動新增！" : "No nodes match query. Click anywhere on map canvas to plant one."}
             </div>
           ) : (
@@ -1096,17 +1096,17 @@ export default function OfflineMapSimulator({
                   key={i}
                   id={`hotspot-btn-${i}`}
                   onClick={() => handleSelectObject(spot)}
-                  className={`w-full text-left p-2.5 rounded-xl border transition-all duration-200 flex items-center justify-between cursor-pointer ${
+                  className={`w-full text-left p-2.5 rounded-xl border transition-all duration-200 flex items-center justify-between cursor-pointer min-w-0 overflow-hidden ${
                     isSpotActive
                       ? "bg-blue-600/15 border-blue-500/80 hover:bg-blue-600/20"
                       : "bg-white/3 border-white/5 hover:bg-white/6"
                   }`}
                 >
-                  <div className="flex items-center gap-2 max-w-[70%]">
+                  <div className="flex items-center gap-2 max-w-[70%] min-w-0 overflow-hidden">
                     <MapPin size={13} className={spot.isItinerary ? "text-amber-400" : isSpotActive ? "text-blue-400" : "text-slate-400"} />
-                    <div className="truncate">
+                    <div className="truncate min-w-0">
                       <h4 className="text-xs font-bold text-white leading-tight truncate">{spot.name}</h4>
-                      <span className="text-[9px] text-slate-400 font-mono capitalize">
+                      <span className="text-xs text-slate-400 font-mono capitalize truncate block">
                         {spot.isItinerary 
                           ? (lang === "zh" ? "★ 自行规划之日程" : "★ Itinerary Plan") 
                           : spot.isCustom 
@@ -1115,7 +1115,7 @@ export default function OfflineMapSimulator({
                       </span>
                     </div>
                   </div>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase leading-none shrink-0 ${
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full uppercase leading-none shrink-0 ${
                     spot.traffic === "smooth"
                       ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/15"
                       : spot.traffic === "moderate"
@@ -1131,7 +1131,7 @@ export default function OfflineMapSimulator({
         </div>
         
         {/* Instruction guide under left drawer */}
-        <div className="mt-2 text-[9.5px] leading-relaxed text-slate-500 italic border-t border-white/5 pt-2 select-none">
+        <div className="mt-2 text-xs leading-relaxed text-slate-500 italic border-t border-white/5 pt-2 select-none">
           {lang === "zh" ? "💡 提示：您可直接點擊右側地圖的任何角落，手動標記新的 GPS 自訂探路點！" : "💡 Pro Tip: Click any area on the map to manually register a new custom landing point."}
         </div>
       </div>
@@ -1222,23 +1222,23 @@ export default function OfflineMapSimulator({
                   {/* Google Routes API Live Routing Panel */}
                   <div className="bg-slate-950/60 rounded-xl p-3 border border-white/5 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[9.5px] text-slate-400 font-extrabold tracking-wider uppercase flex items-center gap-1">
+                      <span className="text-xs text-slate-400 font-extrabold tracking-wider uppercase flex items-center gap-1">
                         🗺️ {lang === "zh" ? "地圖實時路徑規劃 (Routes API)" : "Google Live Route Planning"}
                       </span>
                       {routeLoading && (
-                        <span className="text-[10px] text-blue-400 animate-pulse font-mono">
+                        <span className="text-xs text-blue-400 animate-pulse font-mono">
                           {lang === "zh" ? "計算中..." : "Calculating..."}
                         </span>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] gap-1.5">
                       {/* Shortest Walk Button */}
                       <button
                         type="button"
                         onClick={() => fetchGoogleRoute("WALKING")}
                         disabled={routeLoading || !currentGeoLocation}
-                        className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer border ${
+                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer border ${
                           routeMeta?.mode === "WALKING"
                             ? "bg-blue-600 text-white border-blue-450"
                             : "bg-slate-900 hover:bg-slate-800 text-slate-300 border-white/5 disabled:opacity-50"
@@ -1253,7 +1253,7 @@ export default function OfflineMapSimulator({
                         type="button"
                         onClick={() => fetchGoogleRoute("DRIVE")}
                         disabled={routeLoading || !currentGeoLocation}
-                        className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer border ${
+                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center justify-center gap-1 cursor-pointer border ${
                           routeMeta?.mode === "DRIVE"
                             ? "bg-emerald-600 text-white border-emerald-450"
                             : "bg-slate-900 hover:bg-slate-800 text-slate-300 border-white/5 disabled:opacity-50"
@@ -1268,7 +1268,7 @@ export default function OfflineMapSimulator({
                         href={currentGeoLocation ? getPublicTransitUrl() : "#"}
                         target={currentGeoLocation ? "_blank" : undefined}
                         rel="noreferrer"
-                        className={`py-1.5 px-2 rounded-lg text-[10px] font-bold transition flex flex-col items-center justify-center gap-1 border text-center ${
+                        className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex flex-col items-center justify-center gap-1 border text-center ${
                           currentGeoLocation
                             ? "bg-amber-600/20 hover:bg-amber-600/35 border-amber-500/30 text-amber-300 cursor-pointer"
                             : "bg-slate-900 text-slate-500 border-white/5 cursor-not-allowed pointer-events-none"
@@ -1281,7 +1281,7 @@ export default function OfflineMapSimulator({
 
                     {/* Display route duration & distance */}
                     {routeMeta && (
-                      <div className="flex justify-between items-center bg-blue-500/10 border border-blue-500/15 rounded-lg px-2.5 py-1.5 text-[10.5px]">
+                      <div className="flex justify-between items-center bg-blue-500/10 border border-blue-500/15 rounded-lg px-2.5 py-1.5 text-xs">
                         <span className="text-blue-300 font-bold flex items-center gap-1">
                           {routeMeta.mode === "WALKING" ? "🚶‍♂️ " : "🚗 "}
                           {routeMeta.mode === "WALKING" ? (lang === "zh" ? "步行路徑" : "Walk Path") : (lang === "zh" ? "自駕路徑" : "Drive Path")}

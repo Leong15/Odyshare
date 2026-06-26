@@ -120,15 +120,15 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
         <button
           id="upload-doc-trigger"
           onClick={() => setShowUploadSim(!showUploadSim)}
-          className="flex items-center gap-1.5 glass-button-primary text-white font-bold text-xs py-2 px-3.5 rounded-xl cursor-pointer"
+          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[13px] md:text-xs py-2 px-3.5 rounded-xl cursor-pointer shadow transition-all active:scale-[0.98]"
         >
           <Plus size={14} /> {t.uploadDocument}
         </button>
       </div>
 
       {showUploadSim && (
-        <div className="mb-6 p-4 bg-white/3 border border-white/10 rounded-xl space-y-4 text-xs animate-fadeIn">
-          <h4 className="font-black text-white">{lang === "zh" ? "模擬拖放憑證上傳" : "Simulate Document Drag & Drop"}</h4>
+        <div className="mb-6 p-5 bg-slate-900/60 border border-white/8 rounded-2xl space-y-4 text-xs animate-fadeIn">
+          <h4 className="font-semibold text-white text-[13px]">{lang === "zh" ? "模擬拖放憑證上傳" : "Simulate Document Drag & Drop"}</h4>
 
           <div
             onDragEnter={handleDrag}
@@ -136,16 +136,16 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
             onDragLeave={handleDrag}
             onDrop={handleDrop}
             className={`h-28 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${
-              dragActive ? "border-blue-500 bg-blue-500/20" : "border-white/10 bg-white/5"
+              dragActive ? "border-blue-500 bg-blue-500/20" : "border-white/10 bg-slate-950 hover:bg-slate-900"
             }`}
           >
             <FileUp size={24} className="text-slate-400 mb-1" />
-            <span className="text-[11px] text-slate-300 font-bold">{t.dragDropText}</span>
-            <span className="text-[9px] text-slate-500 mt-0.5">{lang === "zh" ? "或單擊下方快捷項目直接添加" : "Or tap select preset below"}</span>
+            <span className="text-[11.5px] text-slate-300 font-semibold">{t.dragDropText}</span>
+            <span className="text-[10px] text-slate-500 mt-0.5">{lang === "zh" ? "或單擊下方快捷項目直接添加" : "Or tap select preset below"}</span>
           </div>
 
           <div className="space-y-2">
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{t.quickMockUploads}</p>
+            <p className="text-[10.5px] text-slate-400 font-semibold uppercase tracking-wider">{t.quickMockUploads}</p>
             <div className="flex flex-wrap gap-2">
               {mockPredefinedFiles.map((file, idx) => (
                 <button
@@ -153,7 +153,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
                   id={`predef-file-btn-${idx}`}
                   type="button"
                   onClick={() => simulateSelectPredefined(file)}
-                  className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 text-slate-200 font-bold rounded-lg cursor-pointer transition-all text-[11px]"
+                  className="px-3 py-1.5 bg-slate-950 hover:bg-slate-900 border border-white/10 text-slate-200 font-semibold rounded-xl cursor-pointer transition-all text-xs"
                 >
                   📄 {file.name} ({file.size})
                 </button>
@@ -162,15 +162,15 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
           </div>
 
           {selectedFile && (
-            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-between animate-fadeIn text-slate-150">
+            <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-center justify-between animate-fadeIn text-slate-150">
               <div>
-                <span className="font-bold text-white block">{selectedFile.name}</span>
+                <span className="font-semibold text-white block text-xs">{selectedFile.name}</span>
                 <span className="text-[10px] text-slate-400 font-mono">Weight: {selectedFile.size} • Algorithm: AES-256</span>
               </div>
               <button
                 id="do-upload-btn"
                 onClick={handlePostFile}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1.5 px-3 rounded-lg leading-tight transition-all cursor-pointer text-xs"
+                className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-1.5 px-3.5 rounded-xl transition-all cursor-pointer text-xs h-9 flex items-center justify-center shadow"
               >
                 {t.uploadEncrypted}
               </button>
@@ -180,30 +180,30 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
       )}
 
       {/* Docs Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-[repeat(2,minmax(0,1fr))] gap-5">
         {documents.map((doc) => (
           <div
             key={doc.id}
             id={`doc-item-${doc.id}`}
-            className="p-4 bg-white/3 border border-white/5 rounded-2xl flex flex-col justify-between hover:bg-white/6 hover:shadow transition-all text-xs"
+            className="p-5 bg-slate-900/40 border border-white/8 rounded-2xl flex flex-col justify-between vault-card-hover hover:border-blue-500/30 hover:bg-slate-800/20 shadow-sm transition-all text-sm gap-4"
           >
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 bg-blue-500/15 text-blue-300 rounded-xl border border-blue-500/20 shrink-0">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 bg-blue-500/10 text-blue-400 rounded-xl border border-blue-500/15 shrink-0">
                 <FileText size={18} />
               </div>
-              <div className="space-y-0.5 flex-1 min-w-0">
-                <h4 className="font-extrabold text-white truncate text-[13.5px]" title={doc.name}>{doc.name}</h4>
-                <p className="text-[10px] text-slate-450">
+              <div className="space-y-1 flex-1 min-w-0">
+                <h4 className="font-semibold text-white truncate text-[14px]" title={doc.name}>{doc.name}</h4>
+                <p className="text-[11px] text-slate-400">
                   {lang === "zh" ? "上傳者：" : "By: "} {doc.uploadedBy} • {doc.size}
                 </p>
-                <div className="flex items-center gap-1 text-[9px] font-mono text-emerald-300 mt-2 bg-emerald-500/10 border border-emerald-500/15 px-2 py-0.5 rounded-md w-fit font-bold">
+                <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-emerald-300 mt-2 bg-emerald-500/10 border border-emerald-500/15 px-2 py-0.5 rounded-md w-fit font-bold">
                   <ShieldCheck size={11} /> {lang === "zh" ? "密碼安全金鑰驗證通過" : "Cryptographic Signature Verified"}
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-[11px] gap-2">
-              <div className="flex items-center gap-1 text-slate-455 font-mono text-[10px] truncate max-w-[140px]" title={doc.accessKey}>
+            <div className="pt-3 border-t border-white/5 flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-1 text-slate-400 font-mono text-[10px] truncate max-w-[140px]" title={doc.accessKey}>
                 <Key size={10} className="text-slate-500 shrink-0" />
                 <span className="truncate">{doc.accessKey}</span>
               </div>
@@ -212,14 +212,14 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
                 <button
                   id={`doc-verify-${doc.id}`}
                   onClick={() => showVerificationSim(doc.accessKey, doc.name)}
-                  className="text-slate-300 hover:text-white px-2.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-lg cursor-pointer transition-all font-semibold"
+                  className="text-slate-300 hover:text-white px-3 py-1.5 bg-slate-850 hover:bg-slate-800 border border-white/10 rounded-xl cursor-pointer transition-all font-medium text-xs h-9 flex items-center justify-center"
                 >
                   {t.verifyKey}
                 </button>
                 <button
                   id={`doc-download-${doc.id}`}
                   onClick={() => showDownloadSim(doc.name)}
-                  className="flex items-center gap-1.5 text-blue-200 hover:text-white font-bold cursor-pointer px-2.5 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/25 rounded-lg"
+                  className="flex items-center gap-1.5 text-white bg-blue-600 hover:bg-blue-500 font-medium cursor-pointer px-3 py-1.5 rounded-xl border border-blue-500/15 text-xs h-9 flex items-center justify-center transition-all shadow active:scale-[0.98]"
                 >
                   <Download size={11} /> {t.decryptPdf}
                 </button>

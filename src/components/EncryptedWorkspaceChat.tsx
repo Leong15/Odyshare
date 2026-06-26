@@ -47,9 +47,9 @@ export default function EncryptedWorkspaceChat({
   };
 
   return (
-    <div className="glass-container rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col h-[750px] md:h-[525px] border border-white/10 animate-fadeIn text-slate-100">
+    <div className="bg-slate-900/60 border border-white/8 rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col h-[750px] md:h-[525px] animate-fadeIn text-slate-100">
       {/* Top security status bar */}
-      <div className="p-4 bg-slate-950/70 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+      <div className="p-4 bg-slate-950/60 border-b border-white/8 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5">
           <div className="p-2 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/20">
             <Lock size={15} />
@@ -120,17 +120,17 @@ export default function EncryptedWorkspaceChat({
                     </div>
 
                     {/* Chat Bubble card */}
-                    <div className="relative group text-xs text-slate-100">
+                    <div className="relative group text-xs text-slate-100 font-sans">
                       <div
                         className={`p-3 rounded-2xl border leading-relaxed ${
                           isMe
-                            ? "bg-blue-600/95 border-blue-500/30 text-white rounded-tr-none shadow"
-                            : "bg-white/5 border-white/5 rounded-tl-none shadow"
+                            ? "bg-blue-600 border-blue-500/20 text-white rounded-tr-none shadow-sm"
+                            : "bg-slate-900/60 border-white/8 rounded-tl-none shadow-sm text-slate-200"
                         }`}
                       >
                         {viewEncrypted ? (
                           <div className="space-y-1">
-                            <span className="text-[10px] uppercase font-bold tracking-widest text-rose-300 block">
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-rose-300 block font-mono">
                               {lang === "zh" ? "AES-GCM 加密載荷" : "Encrypted Payload"}
                             </span>
                             <span className="font-mono text-[9.5px] break-all leading-tight opacity-90 block">
@@ -163,7 +163,7 @@ export default function EncryptedWorkspaceChat({
                           )}
                         </button>
 
-                        <div className="text-[9px] text-slate-500 font-mono flex items-center gap-0.5 select-none font-sans font-bold">
+                        <div className="text-[9px] text-slate-550 font-mono flex items-center gap-0.5 select-none font-sans font-bold">
                           <span>{isMe ? t.localHandshakeKey : t.peerKeysValidated}</span>
                         </div>
                       </div>
@@ -175,19 +175,19 @@ export default function EncryptedWorkspaceChat({
           </div>
 
           {/* Form Chat Inputs */}
-          <form onSubmit={handlePostChat} className="p-3 bg-white/3 border-t border-white/5 flex gap-2 text-xs">
+          <form onSubmit={handlePostChat} className="p-3.5 bg-slate-900/40 border-t border-white/5 flex gap-2 text-sm">
             <input
               id="group-chat-input"
               type="text"
               placeholder={t.sendSecuredUpdate}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              className="flex-1 px-3.5 py-2.5 glass-input rounded-xl text-white"
+              className="flex-1 px-4 py-2.5 bg-slate-950/80 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-500/50 text-[13px] font-sans h-11"
             />
             <button
               id="send-chat-btn"
               type="submit"
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition shadow flex items-center gap-1.5 shrink-0 cursor-pointer"
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-xl transition shadow flex items-center gap-1.5 shrink-0 cursor-pointer h-11 active:scale-[0.98]"
             >
               <Send size={11} />
               <span>{t.broadcast}</span>

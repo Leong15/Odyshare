@@ -284,9 +284,9 @@ export default function FlightHub({
       </div>
 
       {/* Flight Search Panel: support for full city name and codes */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-white/3 border border-white/5 p-4 rounded-xl mb-5 text-xs">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-5 bg-slate-900/60 border border-white/8 p-5 md:p-6 rounded-2xl mb-6 text-sm">
         <div className="md:col-span-3 relative">
-          <label className="block text-[11px] font-bold text-slate-300 mb-1">
+          <label className="block text-[12px] font-semibold text-slate-300 mb-2">
             {t.departureCity} {lang === "zh" ? "(全寫或縮寫，例如 LAX / 洛杉磯)" : "(Name / Airport code)"}
           </label>
           <input
@@ -300,10 +300,10 @@ export default function FlightHub({
             onFocus={() => setShowFromSuggestions(true)}
             onBlur={() => setTimeout(() => setShowFromSuggestions(false), 200)}
             placeholder="e.g. LAX / Tokyo"
-            className="w-full glass-input px-3 py-1.5 rounded-lg font-bold text-white uppercase"
+            className="w-full bg-slate-950 border border-white/10 hover:border-white/25 rounded-xl px-4 py-2.5 font-bold text-white uppercase outline-none focus:border-blue-500"
           />
           {showFromSuggestions && filteredFromSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-[150] divide-y divide-white/5 scrollbar-thin">
+            <div className="absolute left-0 right-0 mt-2 max-h-48 overflow-y-auto bg-slate-955 border border-white/10 rounded-xl shadow-2xl z-[150] divide-y divide-white/5 scrollbar-thin">
               {filteredFromSuggestions.map(code => {
                 const item = airportMap[code];
                 return (
@@ -314,7 +314,7 @@ export default function FlightHub({
                       setFromCode(code);
                       setShowFromSuggestions(false);
                     }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
+                    className="w-full text-left px-4 py-2.5 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
                   >
                     <span>{lang === "zh" ? item.zh : item.en}</span>
                     <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-bold uppercase">{code}</span>
@@ -326,7 +326,7 @@ export default function FlightHub({
         </div>
 
         <div className="md:col-span-3 relative">
-          <label className="block text-[11px] font-bold text-slate-300 mb-1">
+          <label className="block text-[12px] font-semibold text-slate-300 mb-2">
             {t.destinationCity} {lang === "zh" ? "(全寫或縮寫，例如 HND / 東京羽田)" : "(Name / Airport code)"}
           </label>
           <input
@@ -340,10 +340,10 @@ export default function FlightHub({
             onFocus={() => setShowToSuggestions(true)}
             onBlur={() => setTimeout(() => setShowToSuggestions(false), 200)}
             placeholder="e.g. HND / Osaka"
-            className="w-full glass-input px-3 py-1.5 rounded-lg font-bold text-white uppercase"
+            className="w-full bg-slate-955 border border-white/10 hover:border-white/25 rounded-xl px-4 py-2.5 font-bold text-white uppercase outline-none focus:border-blue-500"
           />
           {showToSuggestions && filteredToSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-[150] divide-y divide-white/5 scrollbar-thin">
+            <div className="absolute left-0 right-0 mt-2 max-h-48 overflow-y-auto bg-slate-950 border border-white/10 rounded-xl shadow-2xl z-[150] divide-y divide-white/5 scrollbar-thin">
               {filteredToSuggestions.map(code => {
                 const item = airportMap[code];
                 return (
@@ -354,7 +354,7 @@ export default function FlightHub({
                       setToCode(code);
                       setShowToSuggestions(false);
                     }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
+                    className="w-full text-left px-4 py-2.5 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
                   >
                     <span>{lang === "zh" ? item.zh : item.en}</span>
                     <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-bold uppercase">{code}</span>
@@ -366,7 +366,7 @@ export default function FlightHub({
         </div>
 
         <div className={tripType === "roundtrip" ? "md:col-span-2" : "md:col-span-3"}>
-          <label className="block text-[11px] font-bold text-slate-300 mb-1">
+          <label className="block text-[12px] font-semibold text-slate-300 mb-2">
             {lang === "zh" ? "📅 去程日期" : "📅 Outbound Date"}
           </label>
           <input
@@ -374,14 +374,14 @@ export default function FlightHub({
             type="date"
             value={dateStr}
             onChange={(e) => setDateStr(e.target.value)}
-            className="w-full glass-input px-3 py-1.5 rounded-lg font-bold font-mono text-white"
+            className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 px-4 py-2.5 rounded-xl font-bold font-mono text-white outline-none"
           />
         </div>
 
         {/* Conditional Return flight date selector */}
         {tripType === "roundtrip" && (
           <div className="md:col-span-2">
-            <label className="block text-[11px] font-bold text-slate-300 mb-1">
+            <label className="block text-[12px] font-semibold text-slate-300 mb-2">
               {lang === "zh" ? "📅 回程日期" : "📅 Return Date"}
             </label>
             <input
@@ -389,7 +389,7 @@ export default function FlightHub({
               type="date"
               value={returnDateStr}
               onChange={(e) => setReturnDateStr(e.target.value)}
-              className="w-full glass-input px-3 py-1.5 rounded-lg font-bold font-mono text-white"
+              className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 px-4 py-2.5 rounded-xl font-bold font-mono text-white outline-none"
             />
           </div>
         )}
@@ -399,16 +399,16 @@ export default function FlightHub({
             id="query-flights-btn"
             onClick={handleRecommendFlights}
             disabled={loading}
-            className="w-full py-2 glass-button-primary text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="w-full h-12 md:h-[45px] bg-blue-600 hover:bg-blue-505 text-white font-semibold rounded-xl text-[13px] md:text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow transition-all active:scale-[0.98]"
           >
             {loading ? (
               <>
-                <RefreshCw size={13} className="animate-spin text-white" />
+                <RefreshCw size={14} className="animate-spin text-white" />
                 <span>{t.aiAnalyzing}</span>
               </>
             ) : (
               <>
-                <Sparkles size={13} className="text-blue-200 animate-pulse" />
+                <Sparkles size={14} className="text-blue-200 animate-pulse" />
                 <span>{t.estimateAiRates}</span>
               </>
             )}
@@ -428,7 +428,7 @@ export default function FlightHub({
               <h4 className="font-extrabold text-white text-xs">
                 {lang === "zh" ? "✨ OdyShareSmart On-Demand 智能線路監控中" : "✨ OdyShareSmart On-Demand Flight Monitoring"}
               </h4>
-              <span className="text-[9.5px] px-1.5 py-0.5 bg-blue-500/20 text-blue-300 font-bold border border-blue-500/25 rounded-md font-mono">
+              <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-300 font-bold border border-blue-500/25 rounded-md font-mono">
                 {lang === "zh" ? "每天 2 次 (12:00 / 18:00)" : "Twice Daily (12:00 & 18:00)"}
               </span>
             </div>
@@ -436,25 +436,25 @@ export default function FlightHub({
             <button
               onClick={handleUnsubscribe}
               disabled={submittingSub}
-              className="text-[10px] text-rose-300 hover:text-rose-100 font-bold underline transition cursor-pointer"
+              className="text-xs text-rose-300 hover:text-rose-100 font-bold underline transition cursor-pointer"
             >
               {lang === "zh" ? "🔕 關閉線路監控" : "Unsubscribe monitoring"}
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono text-slate-300">
+          <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] sm:grid-cols-4 gap-4 text-xs font-mono text-slate-300">
             <div className="space-y-0.5">
-              <span className="block text-[10px] text-slate-400 uppercase tracking-widest">{lang === "zh" ? "監控航路" : "Route"}</span>
+              <span className="block text-xs text-slate-400 uppercase tracking-widest">{lang === "zh" ? "監控航路" : "Route"}</span>
               <span className="font-bold text-white text-[12px] flex items-center gap-1">
                 {flightSubscription.from} <ArrowRight size={10} className="text-slate-500" /> {flightSubscription.to}
               </span>
             </div>
             <div className="space-y-0.5">
-              <span className="block text-[10px] text-slate-400 uppercase tracking-widest">{lang === "zh" ? "最初基準價" : "Baseline Rate"}</span>
+              <span className="block text-xs text-slate-400 uppercase tracking-widest">{lang === "zh" ? "最初基準價" : "Baseline Rate"}</span>
               <span className="font-extrabold text-blue-300 text-[13px]">{flightSubscription.currency || "USD"} ${flightSubscription.baselinePrice}</span>
             </div>
             <div className="space-y-0.5">
-              <span className="block text-[10px] text-slate-400 uppercase tracking-widest">{lang === "zh" ? "當前報價" : "Current Checked"}</span>
+              <span className="block text-xs text-slate-400 uppercase tracking-widest">{lang === "zh" ? "當前報價" : "Current Checked"}</span>
               <span className="font-extrabold text-white text-[13px] flex items-center gap-1.5 flex-wrap">
                 {flightSubscription.currency || "USD"} ${flightSubscription.currentPrice}
                 {flightSubscription.currentPrice < flightSubscription.baselinePrice ? (
@@ -607,7 +607,7 @@ export default function FlightHub({
       </div>
 
       {/* Flight comparison entries */}
-      <div className="space-y-3.5 max-h-[350px] overflow-y-auto pr-1 scrollbar-thin">
+      <div className="space-y-5 max-h-[450px] overflow-y-auto pr-1 scrollbar-thin">
         {sortedEstimates.length === 0 ? (
           <div className="py-16 text-center bg-white/3 border border-white/5 rounded-2xl border-dashed">
             <p className="text-xs text-slate-400">
@@ -624,29 +624,29 @@ export default function FlightHub({
               <div
                 key={fl.id}
                 id={`flight-card-${fl.id}`}
-                className={`p-4 rounded-xl border transition-all text-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-                  isCheapest ? "border-emerald-500/30 bg-emerald-500/5 shadow-md" : "border-white/5 bg-white/3 hover:bg-white/6"
+                className={`p-5 rounded-2xl border transition-all text-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-5 flight-card-interactive ${
+                  isCheapest ? "border-emerald-500/35 bg-emerald-500/5 shadow-md" : "border-white/8 bg-slate-900/40 hover:bg-slate-800/20"
                 }`}
               >
                 {/* Airline details */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 w-full md:w-auto">
                   <div className="w-10 h-10 bg-white/5 rounded-xl border border-white/10 flex items-center justify-center text-lg shadow-inner select-none shrink-0 text-white">
                     {fl.carrierLogo || "✈️"}
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                       <span className="font-extrabold text-white text-[13px]">{fl.carrier}</span>
+                       <span className="font-extrabold text-white text-xs">{fl.carrier}</span>
                       {isCheapest && (
-                        <span className="text-[9px] font-extrabold tracking-widest uppercase px-2 py-0.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 rounded-md">
+                        <span className="text-xs font-extrabold tracking-widest uppercase px-2 py-0.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 rounded-md">
                           {t.cheapest}
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-400 font-mono mt-1">
+                    <p className="text-xs text-slate-400 font-mono mt-1">
                       {lang === "zh" ? "去程起飛：" : "Outbound: "} {fl.departureTime} • <span className="text-white font-bold">{getAirportDisplay(fl.from, lang)}</span> → <span className="text-white font-bold">{getAirportDisplay(fl.to, lang)}</span>
                     </p>
                     {fl.returnDepartureTime && (
-                      <p className="text-[11px] text-amber-300 font-bold font-mono mt-0.5 whitespace-nowrap">
+                      <p className="text-xs text-amber-300 font-bold font-mono mt-0.5 whitespace-nowrap">
                         🔄 {lang === "zh" ? "回程起飛：" : "Return: "} {fl.returnDepartureTime} • <span className="text-white font-bold">{getAirportDisplay(fl.to, lang)}</span> → <span className="text-white font-bold">{getAirportDisplay(fl.from, lang)}</span>
                       </p>
                     )}
@@ -654,12 +654,12 @@ export default function FlightHub({
                 </div>
 
                 {/* Transit duration metrics */}
-                <div className="grid grid-cols-2 md:grid-cols-1 gap-2 md:gap-1 text-slate-350 font-mono">
-                  <div className="flex items-center gap-1.5 text-[11px]">
+                <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] md:grid-cols-1 gap-2 md:gap-1 text-slate-350 font-mono w-full md:w-auto">
+                  <div className="flex items-center gap-1.5 text-xs">
                     <Clock size={12} className="text-blue-400" />
                     <span>{fl.duration}</span>
                   </div>
-                  <div className="text-[10px]">
+                  <div className="text-xs">
                     {fl.stops === 0 ? (
                       <span className="text-emerald-300 font-bold bg-emerald-500/10 border border-emerald-500/15 px-2 py-0.5 rounded-md">{t.directRoute}</span>
                     ) : (
@@ -669,14 +669,14 @@ export default function FlightHub({
                 </div>
 
                 {/* Comparative Pricing */}
-                <div className="flex flex-col md:items-end">
-                  <span className="text-[10.5px] text-slate-400">{lang === "zh" ? "預估全包價" : "Estimated Rate"}</span>
+                <div className="flex flex-col md:items-end w-full md:w-auto">
+                  <span className="text-xs text-slate-400">{lang === "zh" ? "預估全包價" : "Estimated Rate"}</span>
                   <span className="text-lg font-black text-white font-mono tracking-tight">
                     {fl.currency || "USD"} ${fl.price.toLocaleString()}
                   </span>
                   <div className="flex items-center gap-1 mt-0.5 text-amber-400">
                     <Star size={11} fill="currentColor" />
-                    <span className="text-[11px] font-bold text-slate-200 font-mono">{fl.rating}</span>
+                    <span className="text-xs font-bold text-slate-200 font-mono">{fl.rating}</span>
                   </div>
                 </div>
 

@@ -20,34 +20,6 @@ interface ItineraryPlannerProps {
   onUpdateItineraryItem?: (item: ItineraryItem) => void;
 }
 
-const getTransitIconAndDetails = (itemA: ItineraryItem, itemB: ItineraryItem, lang: "en" | "zh") => {
-  const dx = (itemA.coordinates?.x || 30) - (itemB.coordinates?.x || 50);
-  const dy = (itemA.coordinates?.y || 40) - (itemB.coordinates?.y || 60);
-  const rawDist = Math.sqrt(dx * dx + dy * dy);
-  
-  let timeMins = Math.max(5, Math.floor(rawDist * 1.5));
-  let modeType: "walk" | "subway" | "bus" = "walk";
-  let mode = lang === "zh" ? "步行" : "Walk";
-  let line = "";
-
-  if (timeMins > 25) {
-    modeType = "subway";
-    mode = lang === "zh" ? "搭乘地鐵" : "MTR Subway";
-    const subways = lang === "zh" ? ["東鐵綫", "丸之內線", "銀座線", "山手線", "新宿線"] : ["East Rail Line", "Marunouchi Line", "Ginza Line", "Yamanote Line", "Shinjuku Line"];
-    line = " " + subways[Math.abs(itemA.title.length - itemB.title.length) % subways.length];
-  } else if (timeMins > 12) {
-    modeType = "bus";
-    mode = lang === "zh" ? "搭乘巴士" : "Bus Connection";
-    line = " No." + (Math.abs(itemA.title.length + itemB.title.length) % 80 + 1);
-  }
-
-  return {
-    modeType,
-    label: lang === "zh" ? `${mode}${line} — ${timeMins}分鐘` : `${mode}${line} — ${timeMins} mins`,
-    distText: lang === "zh" ? `距離約 ${(rawDist * 0.15).toFixed(1)} 公里` : `dist approx ${(rawDist * 0.15).toFixed(1)} km`
-  };
-};
-
 export default function ItineraryPlanner({
   itineraries,
   participants,
@@ -72,6 +44,33 @@ export default function ItineraryPlanner({
   const [category, setCategory] = useState<ItineraryItem["category"]>("restaurant");
   const [cost, setCost] = useState<string>("35");
   const [showMap, setShowMap] = useState<boolean>(true);
+  const [timelineLayout, setTimelineLayout] = useState<"vertical" | "horizontal">("vertical");
+
+  // Modern minimalism style values that are customizable at one single source of truth
+  const STYLE_CONFIG = {
+    colors: {
+      background: "bg-[#0c0d12] dark:bg-[#08090d]",
+      cardBgActive: "border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/5",
+      cardBgInactive: "border-white/5 bg-white/3 hover:bg-white/6 hover:border-white/10 shadow-md",
+      accent: "text-blue-400",
+      primaryButton: "bg-blue-600 hover:bg-blue-500 text-white border-blue-400",
+      secondaryButton: "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10",
+      timelineLine: "bg-slate-800/80",
+      timelineNode: "bg-slate-900 border-slate-700",
+      timelineNodeActive: "bg-blue-500 border-blue-400",
+    },
+    spacing: {
+      cardPadding: "p-6 md:p-7",
+      gap: "gap-6",
+    },
+    typography: {
+      title: "font-sans font-extrabold tracking-tight text-white",
+      subtitle: "font-sans text-xs text-slate-400 font-medium",
+      body: "text-slate-300 text-xs leading-relaxed break-words whitespace-pre-line",
+      time: "font-mono text-xs text-slate-200 font-bold",
+    },
+    transitions: "transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+  };
 
   // Edit states for modifying exist itinerary items
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -212,8 +211,7 @@ export default function ItineraryPlanner({
           cost: item.cost || 0,
           votes: [],
           comments: [],
-          coordinates: { x: Math.floor(Math.random() * 80) + 10, y: Math.floor(Math.random() * 80) + 10 },
-          trafficStatus: ["smooth", "moderate", "congested"][Math.floor(Math.random() * 3)] as any
+          coordinates: { x: Math.floor(Math.random() * 80) + 10, y: Math.floor(Math.random() * 80) + 10 }
         }));
         onApplyAIOptimization(formatted);
         if (onPostAISystemMessage) {
@@ -291,8 +289,8 @@ export default function ItineraryPlanner({
           const names = data.items.map((it: any) => it.title).join(", ");
           onPostAISystemMessage(
             lang === "zh"
-              ? `🎙️ AI 語音排程成功！已自動偵測並排定：${names}`
-              : `🎙️ AI Voice Schedule Successful! Auto-parsed and scheduled: ${names}`
+              ? `[AI] 語音排程成功！已自動偵測並排定：${names}`
+              : `[AI] Voice Schedule Successful! Auto-parsed and scheduled: ${names}`
           );
         }
         setVoiceInput("");
@@ -332,8 +330,8 @@ export default function ItineraryPlanner({
           const names = data.items.map((it: any) => it.title).join(", ");
           onPostAISystemMessage(
             lang === "zh"
-              ? `📥 智慧確認信解析成功！已自動偵測並匯入日程：${names}`
-              : `📥 Smart Confirmation Email Parsed! Automatically imported activities: ${names}`
+              ? `[AI] 智慧確認信解析成功！已自動偵測並匯入日程：${names}`
+              : `[AI] Smart Confirmation Email Parsed! Automatically imported activities: ${names}`
           );
         }
         setEmailInput("");
@@ -377,6 +375,27 @@ export default function ItineraryPlanner({
   const filteredItems = itineraries
     .filter(item => item.dayIndex === activeDay)
     .sort((a, b) => a.time.localeCompare(b.time));
+
+  const handleMoveItem = async (idx: number, direction: "up" | "down") => {
+    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= filteredItems.length) return;
+    
+    const itemA = filteredItems[idx];
+    const itemB = filteredItems[targetIdx];
+    
+    const tempTime = itemA.time;
+    
+    if (onUpdateItineraryItem) {
+      await onUpdateItineraryItem({
+        ...itemA,
+        time: itemB.time
+      });
+      await onUpdateItineraryItem({
+        ...itemB,
+        time: tempTime
+      });
+    }
+  };
 
   const handlePostCommentSubmit = (e: React.FormEvent, itemId: string) => {
     e.preventDefault();
@@ -446,7 +465,7 @@ export default function ItineraryPlanner({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[repeat(3,minmax(0,1fr))] gap-6">
       {/* List Itineraries */}
       <div className={`${isSidebarOpen ? "lg:col-span-2" : "lg:col-span-3"} space-y-4 transition-all duration-300`}>
         {backupItineraries && backupItineraries.length > 0 && (
@@ -635,7 +654,13 @@ export default function ItineraryPlanner({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowMap(!showMap)}
+                    onClick={() => {
+                      const nextState = !showMap;
+                      setShowMap(nextState);
+                      if (nextState) {
+                        setIsSidebarOpen(true);
+                      }
+                    }}
                     className={`flex items-center gap-1.5 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-sm shrink-0 h-10 ${
                       showMap 
                         ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25" 
@@ -701,7 +726,7 @@ export default function ItineraryPlanner({
                     </button>
                   </h4>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
                     <div>
                       <label className="block text-slate-300 font-medium mb-1">{t.activityTitle}</label>
                       <input
@@ -793,328 +818,340 @@ export default function ItineraryPlanner({
                 </form>
               )}
 
-              {/* Timeline View & Map Split Wrapper */}
-              <div className={`flex-grow ${showMap ? "grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[400px]" : "flex flex-col"}`}>
-                
-                {/* Timeline List Column */}
-                <div className={`flex flex-col justify-between ${showMap ? "lg:col-span-6" : "flex-grow"}`}>
-                  <div className="flex-grow space-y-4 pr-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
-                    {filteredItems.length === 0 ? (
-                      <div className="py-20 text-center flex flex-col items-center justify-center p-6 bg-white/3 border border-white/5 rounded-2xl border-dashed">
-                        <Clock className="text-indigo-400 mb-2" size={24} />
-                        <p className="text-xs text-slate-400 max-w-md">{t.vacantMessage}</p>
-                      </div>
-                    ) : (
-                      filteredItems.map((item, idx) => {
-                        const voterMetas = getVoterMeta(item.votes);
-                        const userVoted = item.votes.includes(currentUser);
+              {/* Vertical Timeline List Wrapper */}
+              <div className="flex-grow relative space-y-4 pr-1 overflow-y-auto overflow-x-hidden scrollbar-thin">
+                {/* Continuous desktop decorative timeline line */}
+                {filteredItems.length > 0 && (
+                  <div className="absolute left-[34px] top-6 bottom-6 w-[2px] bg-white/10 dark:bg-white/5 pointer-events-none z-0 hidden md:block" />
+                )}
 
-                        if (editingItemId === item.id) {
-                          return (
-                            <form
-                              key={item.id}
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                if (onUpdateItineraryItem) {
-                                  onUpdateItineraryItem({
-                                    ...item,
-                                    title: editTitle,
-                                    locationName: editLocationName || editTitle,
-                                    description: editDescription,
-                                    time: editTime,
-                                    category: editCategory,
-                                    cost: parseFloat(editCost) || 0
-                                  });
-                                }
-                                setEditingItemId(null);
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                              className="p-6 md:p-8 rounded-3xl border border-blue-500/50 bg-blue-500/10 backdrop-blur-xl space-y-5 text-xs animate-fadeIn text-left shadow-lg"
+                {filteredItems.length === 0 ? (
+                  <div className="py-20 text-center flex flex-col items-center justify-center p-6 bg-white/3 border border-white/5 rounded-2xl border-dashed w-full">
+                    <Clock className="text-indigo-400 mb-2" size={24} />
+                    <p className="text-xs text-slate-400 max-w-md">{t.vacantMessage}</p>
+                  </div>
+                ) : (
+                  filteredItems.map((item, idx) => {
+                    const voterMetas = getVoterMeta(item.votes);
+                    const userVoted = item.votes.includes(currentUser);
+
+                    if (editingItemId === item.id) {
+                      return (
+                        <form
+                          key={item.id}
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            if (onUpdateItineraryItem) {
+                              onUpdateItineraryItem({
+                                ...item,
+                                title: editTitle,
+                                locationName: editLocationName || editTitle,
+                                description: editDescription,
+                                time: editTime,
+                                category: editCategory,
+                                cost: parseFloat(editCost) || 0
+                              });
+                            }
+                            setEditingItemId(null);
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-6 md:p-8 rounded-3xl border border-blue-500/50 bg-blue-500/10 backdrop-blur-xl space-y-5 text-xs animate-fadeIn text-left shadow-lg w-full"
+                        >
+                          <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <span className="font-bold text-blue-400 flex items-center gap-1.5">
+                              <Plus size={14} className="rotate-45 text-blue-400" />
+                              <span>{lang === "zh" ? "編輯行程項目細節" : "Edit Itinerary Activity"}</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setEditingItemId(null)}
+                              className="text-slate-400 hover:text-white font-semibold cursor-pointer"
                             >
-                              <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                <span className="font-bold text-blue-400 flex items-center gap-1.5">
-                                  <Plus size={14} className="rotate-45 text-blue-400" />
-                                  <span>{lang === "zh" ? "編輯行程項目細節" : "Edit Itinerary Activity"}</span>
-                                </span>
+                              {lang === "zh" ? "取消" : "Cancel"}
+                            </button>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-[repeat(2,minmax(0,1fr))] gap-3">
+                            <div>
+                              <label className="block text-slate-300 font-medium mb-1">{t.activityTitle}</label>
+                              <input
+                                type="text"
+                                required
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-slate-300 font-medium mb-1">{t.placeName}</label>
+                              <input
+                                type="text"
+                                required
+                                value={editLocationName}
+                                onChange={(e) => setEditLocationName(e.target.value)}
+                                className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-[repeat(3,minmax(0,1fr))] gap-3">
+                            <div>
+                              <label className="block text-slate-300 font-medium mb-1">{t.timeSchedule}</label>
+                              <input
+                                type="time"
+                                required
+                                value={editTime}
+                                onChange={(e) => setEditTime(e.target.value)}
+                                className="w-full glass-input px-3 py-2 rounded-xl text-white font-mono bg-slate-900 border border-white/10"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-slate-300 font-medium mb-1">{t.categoryType}</label>
+                              <select
+                                value={editCategory}
+                                onChange={(e: any) => setEditCategory(e.target.value)}
+                                className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                              >
+                                <option value="sight">{getLocalizedCategoryName("sight")}</option>
+                                <option value="restaurant">{getLocalizedCategoryName("restaurant")}</option>
+                                <option value="shop">{getLocalizedCategoryName("shop")}</option>
+                                <option value="transit">{getLocalizedCategoryName("transit")}</option>
+                                <option value="hotel">{getLocalizedCategoryName("hotel")}</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-slate-300 font-medium mb-1">{t.estimatedCost}</label>
+                              <input
+                                type="number"
+                                value={editCost}
+                                onChange={(e) => setEditCost(e.target.value)}
+                                className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-slate-300 font-medium mb-1">{t.briefDesc}</label>
+                            <textarea
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              className="w-full glass-input px-3 py-2 rounded-xl text-white h-14 resize-none bg-slate-900 border border-white/10"
+                            />
+                          </div>
+
+                          <div className="flex justify-end gap-2.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditingItemId(null)}
+                              className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition cursor-pointer text-[11px] font-semibold text-slate-300"
+                            >
+                              {lang === "zh" ? "取消" : "Cancel"}
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-[11px] font-semibold text-white cursor-pointer"
+                            >
+                              {lang === "zh" ? "儲存修改" : "Save Changes"}
+                            </button>
+                          </div>
+                        </form>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="relative z-10 text-left pl-0 md:pl-16"
+                      >
+                        {/* Decorative Timeline Node Axis Point on Desktop */}
+                        <div className={`absolute left-[29px] top-8 w-3.5 h-3.5 rounded-full border-4 ${
+                          activeCommentDrawerId === item.id 
+                            ? "bg-blue-500 border-blue-500/30" 
+                            : "bg-slate-900 border-white/20"
+                        } shadow-md hidden md:block z-20 ${STYLE_CONFIG.transitions}`} />
+
+                        {/* The Activity Card */}
+                        <div
+                          id={`itinerary-card-${item.id}`}
+                          onClick={() => setActiveCommentDrawerId(item.id)}
+                          className={`p-6 md:p-7 rounded-3xl border ${STYLE_CONFIG.transitions} cursor-pointer flex flex-col justify-between h-full min-h-[180px] ${
+                            activeCommentDrawerId === item.id
+                              ? STYLE_CONFIG.colors.cardBgActive
+                              : STYLE_CONFIG.colors.cardBgInactive
+                          }`}
+                        >
+                          <div className="space-y-4">
+                            {/* Header: Category and Reorder buttons */}
+                            <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
+                              <span className={`text-[10px] font-extrabold border rounded-lg px-2 py-0.5 uppercase tracking-wider flex items-center gap-1.5 ${getCategoryBadgeColor(item.category)}`}>
+                                {getCategoryIcon(item.category)}
+                                <span>{getLocalizedCategoryName(item.category)}</span>
+                              </span>
+
+                              {/* Drag / Reorder Operations Panel (FAT FINGER SAFE: 44px buttons) */}
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                {/* Grip Decorative Drag Indicator */}
+                                <div className="text-slate-500 hover:text-slate-300 transition-colors cursor-grab active:cursor-grabbing p-1.5 h-11 w-11 md:h-9 md:w-9 flex items-center justify-center shrink-0" title={lang === "zh" ? "拖曳排序佔位" : "Drag Handle"}>
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-slate-500"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+                                </div>
+
+                                {/* Move Up Button */}
                                 <button
                                   type="button"
-                                  onClick={() => setEditingItemId(null)}
-                                  className="text-slate-400 hover:text-white font-semibold cursor-pointer"
+                                  disabled={idx === 0}
+                                  onClick={() => handleMoveItem(idx, "up")}
+                                  className={`h-11 w-11 md:h-9 md:w-9 flex items-center justify-center rounded-xl transition-all border ${
+                                    idx === 0
+                                      ? "text-slate-600 border-transparent cursor-not-allowed opacity-30"
+                                      : "text-blue-400 border-white/5 hover:bg-white/5 hover:border-white/10 cursor-pointer"
+                                  }`}
+                                  title={lang === "zh" ? "往上移動" : "Move Up"}
                                 >
-                                  {lang === "zh" ? "取消" : "Cancel"}
+                                  <ChevronLeft size={16} className="rotate-90 shrink-0" />
                                 </button>
-                              </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-slate-300 font-medium mb-1">{t.activityTitle}</label>
-                                  <input
-                                    type="text"
-                                    required
-                                    value={editTitle}
-                                    onChange={(e) => setEditTitle(e.target.value)}
-                                    className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-slate-300 font-medium mb-1">{t.placeName}</label>
-                                  <input
-                                    type="text"
-                                    required
-                                    value={editLocationName}
-                                    onChange={(e) => setEditLocationName(e.target.value)}
-                                    className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
-                                  />
-                                </div>
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                <div>
-                                  <label className="block text-slate-300 font-medium mb-1">{t.timeSchedule}</label>
-                                  <input
-                                    type="time"
-                                    required
-                                    value={editTime}
-                                    onChange={(e) => setEditTime(e.target.value)}
-                                    className="w-full glass-input px-3 py-2 rounded-xl text-white font-mono bg-slate-900 border border-white/10"
-                                  />
-                                </div>
-
-                                <div>
-                                  <label className="block text-slate-300 font-medium mb-1">{t.categoryType}</label>
-                                  <select
-                                    value={editCategory}
-                                    onChange={(e: any) => setEditCategory(e.target.value)}
-                                    className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
-                                  >
-                                    <option value="sight">{getLocalizedCategoryName("sight")}</option>
-                                    <option value="restaurant">{getLocalizedCategoryName("restaurant")}</option>
-                                    <option value="shop">{getLocalizedCategoryName("shop")}</option>
-                                    <option value="transit">{getLocalizedCategoryName("transit")}</option>
-                                    <option value="hotel">{getLocalizedCategoryName("hotel")}</option>
-                                  </select>
-                                </div>
-
-                                <div>
-                                  <label className="block text-slate-300 font-medium mb-1">{t.estimatedCost}</label>
-                                  <input
-                                    type="number"
-                                    value={editCost}
-                                    onChange={(e) => setEditCost(e.target.value)}
-                                    className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
-                                  />
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="block text-slate-300 font-medium mb-1">{t.briefDesc}</label>
-                                <textarea
-                                  value={editDescription}
-                                  onChange={(e) => setEditDescription(e.target.value)}
-                                  className="w-full glass-input px-3 py-2 rounded-xl text-white h-14 resize-none bg-slate-900 border border-white/10"
-                                />
-                              </div>
-
-                              <div className="flex justify-end gap-2.5 pt-1">
+                                {/* Move Down Button */}
                                 <button
                                   type="button"
-                                  onClick={() => setEditingItemId(null)}
-                                  className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition cursor-pointer text-[11px] font-semibold text-slate-300"
+                                  disabled={idx === filteredItems.length - 1}
+                                  onClick={() => handleMoveItem(idx, "down")}
+                                  className={`h-11 w-11 md:h-9 md:w-9 flex items-center justify-center rounded-xl transition-all border ${
+                                    idx === filteredItems.length - 1
+                                      ? "text-slate-600 border-transparent cursor-not-allowed opacity-30"
+                                      : "text-blue-400 border-white/5 hover:bg-white/5 hover:border-white/10 cursor-pointer"
+                                  }`}
+                                  title={lang === "zh" ? "往下移動" : "Move Down"}
                                 >
-                                  {lang === "zh" ? "取消" : "Cancel"}
+                                  <ChevronLeft size={16} className="-rotate-90 shrink-0" />
                                 </button>
-                                <button
-                                  type="submit"
-                                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-xl text-[11px] font-semibold text-white cursor-pointer"
-                                >
-                                  {lang === "zh" ? "儲存修改" : "Save Changes"}
-                                </button>
-                              </div>
-                            </form>
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={item.id}
-                            id={`itinerary-card-${item.id}`}
-                            onClick={() => setActiveCommentDrawerId(item.id)}
-                            className={`p-6 md:p-8 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 cursor-pointer border transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 ${
-                              activeCommentDrawerId === item.id
-                                ? "border-blue-500 bg-blue-500/15 shadow-md backdrop-blur-xl"
-                                : "border-white/10 dark:border-white/5 bg-white/10 dark:bg-black/20 backdrop-blur-xl hover:bg-white/15 dark:hover:bg-black/30 hover:border-white/20 dark:hover:border-white/10 shadow-md"
-                            }`}
-                          >
-                            {/* Event item details block */}
-                            <div className="flex items-start gap-4">
-                              <div className="flex flex-col items-center justify-center bg-white/5 px-3.5 py-3 rounded-xl border border-white/5 text-slate-200 font-mono text-xs font-bold leading-none select-none">
-                                <Clock size={11} className="text-blue-400 mb-1" />
-                                <span>{item.time}</span>
-                              </div>
-
-                              <div className="space-y-1.5 text-left">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <h4 className="font-bold text-white text-base tracking-tight">{item.title}</h4>
-                                  <span className={`text-[9.5px] font-bold border rounded-md px-2 py-0.5 uppercase tracking-wider flex items-center gap-1 ${getCategoryBadgeColor(item.category)}`}>
-                                    {getCategoryIcon(item.category)}
-                                    <span>{getLocalizedCategoryName(item.category)}</span>
-                                  </span>
-                                </div>
-
-                                <p className="text-slate-300 text-xs leading-relaxed max-w-xl">{item.description}</p>
-
-                                <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 pt-1 text-[11px] text-slate-400">
-                                  <span className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-2.5 py-0.5 rounded-lg">
-                                    <MapPin size={11} className="text-blue-400" />
-                                    <span className="text-slate-300 font-medium leading-none">{item.locationName}</span>
-                                  </span>
-                                  {item.cost > 0 && (
-                                    <span className="font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2.5 py-0.5 rounded-lg font-bold">
-                                      ${item.cost}
-                                    </span>
-                                  )}
-
-                                  {item.trafficStatus && (
-                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize flex items-center gap-1 shrink-0 ${
-                                      item.trafficStatus === "smooth"
-                                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/20"
-                                        : item.trafficStatus === "moderate"
-                                        ? "bg-amber-500/15 text-amber-300 border-amber-500/20"
-                                        : "bg-rose-500/15 text-rose-300 border-rose-500/20"
-                                    }`}>
-                                      <Zap size={10} className="shrink-0 text-amber-300" />
-                                      <span>{item.trafficStatus === "smooth" ? t.trafficSmooth : item.trafficStatus === "moderate" ? t.trafficModerate : t.trafficCongested}</span>
-                                    </span>
-                                  )}
-                                </div>
                               </div>
                             </div>
 
-                            {/* Preference Votings line */}
-                            <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3.5 pt-3 sm:pt-0 border-t sm:border-0 border-white/5 shrink-0">
-                              <div className="flex items-center gap-2">
-                                {/* Vote Action */}
-                                <button
-                                  id={`vote-activity-${item.id}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onVoteItinerary(item.id);
-                                  }}
-                                  className={`px-3 h-12 sm:h-9 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 border cursor-pointer flex items-center justify-center gap-1.5 text-[11px] font-semibold ${
-                                    userVoted
-                                      ? "bg-blue-600 text-white border-blue-500"
-                                      : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
-                                  }`}
-                                >
-                                  <ThumbsUp size={11} />
-                                  <span>{item.votes.length}</span>
-                                </button>
-
-                                {/* Comments button indicator tooltip */}
-                                <div className="px-3 h-12 sm:h-9 bg-white/3 text-slate-300 border border-white/5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-[11px] leading-none">
-                                  <MessageSquare size={11} className="text-slate-400" />
-                                  <span>{item.comments.length}</span>
+                            {/* Body content */}
+                            <div className="space-y-3">
+                              {/* Time & Title Row */}
+                              <div className="flex items-start gap-3">
+                                <div className="flex flex-col items-center justify-center bg-white/5 px-2.5 py-2 rounded-xl border border-white/5 text-slate-200 font-mono text-[11px] font-bold leading-none select-none shrink-0">
+                                  <Clock size={11} className="text-blue-400 mb-1" />
+                                  <span>{item.time}</span>
                                 </div>
-
-                                {/* Edit Activity Action Button */}
-                                {onUpdateItineraryItem && (
-                                  <button
-                                    id={`edit-activity-${item.id}`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingItemId(item.id);
-                                      setEditTitle(item.title);
-                                      setEditDescription(item.description || "");
-                                      setEditLocationName(item.locationName || item.title);
-                                      setEditTime(item.time);
-                                      setEditCategory(item.category);
-                                      setEditCost(item.cost.toString());
-                                    }}
-                                    className="p-2 h-12 w-12 sm:h-9 sm:w-9 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/10 hover:border-blue-500/20 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 cursor-pointer flex items-center justify-center shrink-0"
-                                    title={lang === "zh" ? "編輯此日程" : "Edit active itinerary"}
-                                  >
-                                    <Pencil size={11} />
-                                  </button>
-                                )}
-
-                                {/* Delete Activity Action Button */}
-                                {onDeleteItineraryItem && (
-                                  <button
-                                    id={`delete-activity-${item.id}`}
-                                    onClick={async (e) => {
-                                      e.stopPropagation();
-                                      await onDeleteItineraryItem(item.id);
-                                      if (activeCommentDrawerId === item.id) {
-                                        setActiveCommentDrawerId(null);
-                                      }
-                                    }}
-                                    className="p-2 h-12 w-12 sm:h-9 sm:w-9 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 cursor-pointer flex items-center justify-center shrink-0"
-                                    title={lang === "zh" ? "刪除此日程" : "Delete active itinerary"}
-                                  >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-                                  </button>
-                                )}
+                                <div className="space-y-1 min-w-0">
+                                  <h4 className="font-extrabold text-white text-base tracking-tight leading-tight truncate">{item.title}</h4>
+                                  <span className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                                    <MapPin size={11} className="text-blue-400 shrink-0" />
+                                    <span className="text-slate-300 font-medium truncate">{item.locationName}</span>
+                                  </span>
+                                </div>
                               </div>
 
-                              {/* Voter Avatars list */}
-                              {voterMetas.length > 0 && (
-                                <div className="flex -space-x-1.5 overflow-hidden">
-                                  {voterMetas.slice(0, 3).map((voter) => (
-                                    <div
-                                      key={voter.id}
-                                      style={{ backgroundColor: voter.avatarColor }}
-                                      className="w-[18px] h-[18px] rounded-full border border-slate-900 text-[8px] font-bold text-white flex items-center justify-center shadow-xs"
-                                      title={voter.name}
-                                    >
-                                      {voter.name[0]}
-                                    </div>
-                                  ))}
-                                  {voterMetas.length > 3 && (
-                                    <div className="w-[18px] h-[18px] rounded-full bg-slate-800 border border-slate-900 text-[8px] text-slate-400 flex items-center justify-center font-bold">
-                                      +{voterMetas.length - 3}
-                                    </div>
-                                  )}
+                              {/* Description (expanded height, no cutoff) */}
+                              <p className="text-slate-300 text-xs leading-relaxed break-words whitespace-pre-wrap">{item.description}</p>
+
+                              {/* Badges line */}
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                {item.cost > 0 && (
+                                  <span className="font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2.5 py-0.5 rounded-lg text-[10px] font-bold">
+                                    ${item.cost}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Footer: Comments, votes & actions */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-white/5 mt-4">
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              {/* Vote (FAT FINGER COMPLIANT: 44px height on mobile) */}
+                              <button
+                                id={`vote-activity-${item.id}`}
+                                onClick={() => onVoteItinerary(item.id)}
+                                className={`px-3 h-11 sm:h-9 rounded-xl transition-all border cursor-pointer flex items-center justify-center gap-1.5 text-[11px] font-semibold ${
+                                  userVoted
+                                    ? "bg-blue-600 text-white border-blue-500 shadow-sm shadow-blue-500/20"
+                                    : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
+                                }`}
+                                title={lang === "zh" ? "投下一票" : "Vote this activity"}
+                              >
+                                <ThumbsUp size={11} className="shrink-0" />
+                                <span>{item.votes.length}</span>
+                              </button>
+
+                              {/* Comments button indicator tooltip */}
+                              <div className="px-3 h-11 sm:h-9 bg-white/3 text-slate-300 border border-white/5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-[11px] leading-none select-none">
+                                <MessageSquare size={11} className="text-slate-400 shrink-0" />
+                                <span>{item.comments.length}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                              {/* Edit Activity Button (FAT FINGER COMPLIANT: 44px) */}
+                              {onUpdateItineraryItem && (
+                                <button
+                                  id={`edit-activity-${item.id}`}
+                                  onClick={() => {
+                                    setEditingItemId(item.id);
+                                    setEditTitle(item.title);
+                                    setEditDescription(item.description || "");
+                                    setEditLocationName(item.locationName || item.title);
+                                    setEditTime(item.time);
+                                    setEditCategory(item.category);
+                                    setEditCost(item.cost.toString());
+                                  }}
+                                  className="p-2 h-11 w-11 md:h-9 md:w-9 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/10 hover:border-blue-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+                                  title={lang === "zh" ? "編輯行程" : "Edit activity"}
+                                >
+                                  <Pencil size={11} className="shrink-0" />
+                                </button>
+                              )}
+
+                              {/* Delete Activity Button (FAT FINGER COMPLIANT: 44px) */}
+                              {onDeleteItineraryItem && (
+                                <button
+                                  id={`delete-activity-${item.id}`}
+                                  onClick={async () => {
+                                    await onDeleteItineraryItem(item.id);
+                                    if (activeCommentDrawerId === item.id) {
+                                      setActiveCommentDrawerId(null);
+                                    }
+                                  }}
+                                  className="p-2 h-11 w-11 md:h-9 md:w-9 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+                                  title={lang === "zh" ? "刪除行程" : "Delete activity"}
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Voter Avatars list inside card footer */}
+                          {voterMetas.length > 0 && (
+                            <div className="flex -space-x-1.5 overflow-hidden pt-2 border-t border-white/5 mt-2">
+                              {voterMetas.slice(0, 4).map((voter) => (
+                                <div
+                                  key={voter.id}
+                                  style={{ backgroundColor: voter.avatarColor }}
+                                  className="w-[18px] h-[18px] rounded-full border border-slate-900 text-[8px] font-bold text-white flex items-center justify-center shadow-xs"
+                                  title={voter.name}
+                                >
+                                  {voter.name[0]}
+                                </div>
+                              ))}
+                              {voterMetas.length > 4 && (
+                                <div className="w-[18px] h-[18px] rounded-full bg-slate-800 border border-slate-900 text-[8px] text-slate-400 flex items-center justify-center font-bold">
+                                  +{voterMetas.length - 4}
                                 </div>
                               )}
                             </div>
-                            
-                            {/* Transportation Connection Card */}
-                            {idx < filteredItems.length - 1 && (
-                              <div className="my-2 ml-7 pl-5 border-l border-dashed border-white/15 flex items-center gap-3 py-1 text-[11px] text-slate-400 select-none animate-fadeIn">
-                                <div className="flex items-center gap-2 bg-white/4 border border-white/5 hover:bg-white/8 px-2.5 py-0.5 rounded-xl text-slate-200">
-                                  <span className="text-xs">
-                                    {getTransitIconAndDetails(item, filteredItems[idx + 1], lang).modeType === "subway" ? (
-                                      <Train size={11} className="text-indigo-400" />
-                                    ) : getTransitIconAndDetails(item, filteredItems[idx + 1], lang).modeType === "bus" ? (
-                                      <Bus size={11} className="text-indigo-400" />
-                                    ) : (
-                                      <Footprints size={11} className="text-indigo-400" />
-                                    )}
-                                  </span>
-                                  <span className="font-semibold text-[9px]">{getTransitIconAndDetails(item, filteredItems[idx + 1], lang).label}</span>
-                                </div>
-                                <span className="text-[9px] text-slate-500 font-mono">
-                                  {getTransitIconAndDetails(item, filteredItems[idx + 1], lang).distText}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                </div>
+                          )}
+                        </div>
 
-                {/* Live Interactive Itinerary Map Column */}
-                {showMap && (
-                  <div className="lg:col-span-6 w-full h-[360px] lg:h-[480px] min-h-[350px] lg:min-h-0 animate-fadeIn flex flex-col rounded-2xl overflow-hidden shadow-2xl border border-white/10">
-                    <ItineraryMap
-                      destination={filteredItems[0]?.locationName || "Tokyo"}
-                      items={filteredItems}
-                      lang={lang}
-                    />
-                  </div>
+                        {/* End of itinerary item wrapper */}
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>
@@ -1128,6 +1165,18 @@ export default function ItineraryPlanner({
           <div className="glass-container rounded-2xl p-5 shadow-lg h-full min-h-[500px] flex flex-col justify-between">
             <div className="flex-grow flex flex-col justify-between h-full">
               <div className="flex flex-col flex-1 h-full">
+                
+                {/* Embedded Interactive Map in Sidebar */}
+                {showMap && (
+                  <div className="w-full h-[220px] min-h-[220px] mb-4 rounded-xl overflow-hidden border border-white/10 dark:border-white/5 shadow-md shrink-0">
+                    <ItineraryMap
+                      destination={filteredItems[0]?.locationName || "Tokyo"}
+                      items={filteredItems}
+                      lang={lang}
+                    />
+                  </div>
+                )}
+
                 {/* Tab selector */}
                 <div className="flex bg-white/5 p-1 rounded-xl border border-white/5 backdrop-blur-md text-[11px] font-bold leading-none mb-4 shrink-0">
                   <button
@@ -1221,8 +1270,8 @@ export default function ItineraryPlanner({
                         className="flex items-center justify-between cursor-pointer select-none"
                         onClick={() => setIsVoiceCollapsed(!isVoiceCollapsed)}
                       >
-                        <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-300">
-                          <span>🎙️</span>
+                        <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-300">
+                          <Sparkles size={13} className="text-indigo-400 shrink-0" />
                           <span>{lang === "zh" ? "AI 語音/自然語言排班" : "AI Voice / Natural Schedule"}</span>
                         </div>
                         <span className="text-slate-400 text-[10px] font-bold">{isVoiceCollapsed ? "＋" : "－"}</span>
@@ -1255,7 +1304,7 @@ export default function ItineraryPlanner({
                                   </>
                                 ) : (
                                   <>
-                                    <span>⚡</span>
+                                    <Zap size={11} className="text-white shrink-0" />
                                     <span>{lang === "zh" ? "一鍵智慧排程" : "Generate Schedule"}</span>
                                   </>
                                 )}
@@ -1263,10 +1312,10 @@ export default function ItineraryPlanner({
                               <button
                                 type="button"
                                 onClick={() => setVoiceInput(lang === "zh" ? "幫我把第三天下午 3 點加進淺草寺，順便推薦附近步行 10 分鐘內、預算在 2000 日圓內的拉麵店" : "Add Sensoji temple on Day 3 afternoon, and recommend a ramen shop nearby under 2000 JPY")}
-                                className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0"
+                                className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0 font-medium"
                                 title={lang === "zh" ? "載入語音範例" : "Load Example"}
                               >
-                                💡
+                                {lang === "zh" ? "範例" : "Example"}
                               </button>
                             </div>
                           </form>
@@ -1281,7 +1330,7 @@ export default function ItineraryPlanner({
                         onClick={() => setIsEmailCollapsed(!isEmailCollapsed)}
                       >
                         <div className="flex items-center gap-1.5 text-[11px] font-bold text-teal-300">
-                          <span>📥</span>
+                          <Calendar size={13} className="text-teal-400 shrink-0" />
                           <span>{lang === "zh" ? "一鍵導入機票/酒店確認信" : "Import Flight/Hotel confirmation"}</span>
                         </div>
                         <span className="text-slate-400 text-[10px] font-bold">{isEmailCollapsed ? "＋" : "－"}</span>
@@ -1314,7 +1363,7 @@ export default function ItineraryPlanner({
                                   </>
                                 ) : (
                                   <>
-                                    <span>🚀</span>
+                                    <Send size={11} className="text-white shrink-0" />
                                     <span>{lang === "zh" ? "智慧一鍵導入" : "Import & Parse"}</span>
                                   </>
                                 )}
@@ -1328,10 +1377,10 @@ export default function ItineraryPlanner({
                                       : `Booking.com confirmation:\nReservation: #BK-1849102\nHotel: Ginza Grand Hotel Tokyo\nCheck-in Date: Day 1 at 15:00\nRoom Type: Standard Queen Non-Smoking\nBreakfast: Included\nLocation: 8-6-15 Ginza, Chuo, Tokyo`
                                   );
                                 }}
-                                className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0"
+                                className="px-2 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] text-slate-400 cursor-pointer transition-all shrink-0 font-medium"
                                 title={lang === "zh" ? "載入機票預約範例" : "Load Booking Example"}
                               >
-                                📋
+                                {lang === "zh" ? "範例" : "Example"}
                               </button>
                             </div>
                           </form>

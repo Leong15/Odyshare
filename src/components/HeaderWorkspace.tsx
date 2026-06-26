@@ -81,41 +81,44 @@ export default function HeaderWorkspace({
     }
   };
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <>
-      <header className="glass-container border-b border-white/15 py-4 px-4 sm:px-6 sticky top-0 z-40 shadow-xl backdrop-blur-md font-sans">
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-        
-        {/* Brand Block & Project Switcher List */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 flex-1">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 border border-white/10 shrink-0">
-              <span className="font-extrabold text-xs tracking-wider leading-none select-none">W/S</span>
+      <header className="glass-container border-b border-white/5 py-3 px-4 sm:px-6 sticky top-0 z-40 shadow-lg backdrop-blur-none font-sans">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          
+          {/* Left Block: Logo & Trip Details */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-md border border-blue-500/30 shrink-0">
+              <span className="font-bold text-xs tracking-wider select-none">W/S</span>
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-white text-xs tracking-tight leading-none sm:text-sm">{translations[lang].brandTitle}</h1>
+                <h1 className="font-semibold text-white text-[14px] leading-tight sm:text-[15px]">{translations[lang].brandTitle}</h1>
                 {syncing && (
-                  <span className="p-0.5 px-1 bg-blue-500/20 border border-blue-400/30 rounded text-[7px] text-blue-300 animate-pulse uppercase select-none">
+                  <span className="px-1.5 py-0.5 bg-blue-500/20 border border-blue-400/30 rounded text-[9px] text-blue-300 animate-pulse uppercase select-none font-medium">
                     {translations[lang].syncing}
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-slate-450 mt-1 flex items-center gap-1.5 leading-none select-none">
-                <MapPin size={9} className="text-blue-400" />
+              <p className="text-[12px] text-slate-400 mt-0.5 flex items-center gap-1.5 leading-none select-none">
+                <MapPin size={11} className="text-blue-500" />
                 <span>
-                  {translations[lang].destination}: <span className="font-bold text-slate-200">{trip.destination}</span>
+                  {translations[lang].destination}: <span className="font-semibold text-slate-200">{trip.destination}</span>
                 </span>
               </p>
             </div>
           </div>
 
-          {/* Trip Project Dropdown */}
-          <div className="flex items-center flex-wrap gap-2">
-            <div className="flex items-center bg-white/5 border border-white/10 p-1 rounded-xl backdrop-blur-md text-xs">
-              <div className="flex items-center pl-2.5 pr-2 py-0.5">
-                <FolderLock size={12} className="text-blue-300 mr-2" />
-                <span className="text-[9.5px] font-extrabold text-slate-400 mr-1.5 uppercase tracking-wide select-none">
+          {/* Desktop & Tablet Navigation Content */}
+          <div className="hidden md:flex items-center gap-6 flex-1 justify-end">
+            
+            {/* Trip Project Dropdown Container */}
+            <div className="flex items-center bg-white/5 border border-white/10 p-1.5 rounded-xl text-xs overflow-x-auto min-w-0">
+              <div className="flex items-center pl-2 pr-1.5 py-0.5 min-w-0">
+                <FolderLock size={13} className="text-blue-400 mr-2 shrink-0" />
+                <span className="text-xs font-semibold text-slate-400 mr-1.5 uppercase tracking-wide select-none shrink-0">
                   {lang === "zh" ? "旅程專案" : "Workspace:"}
                 </span>
                 
@@ -123,55 +126,55 @@ export default function HeaderWorkspace({
                   id="trip-project-dropdown"
                   value={trip.id}
                   onChange={(e) => onSelectTrip(e.target.value)}
-                  className="bg-transparent border-0 font-bold text-white text-xs leading-none focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none mr-1.5 pr-1"
+                  className="bg-transparent border-0 font-semibold text-white text-xs focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none mr-1.5 min-w-0"
                 >
                   {(trip.tripsList || []).map(tOpt => (
-                    <option key={tOpt.id} value={tOpt.id} className="bg-slate-900 text-slate-100 font-extrabold text-xs">
+                    <option key={tOpt.id} value={tOpt.id} className="bg-slate-900 text-slate-100 font-semibold text-xs">
                       {tOpt.name}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="h-4.5 w-[1px] bg-white/15 mx-1" />
+              <div className="h-5 w-[1px] bg-white/10 mx-1.5 shrink-0" />
 
-              {/* Create project button inside capsule */}
+              {/* Create project button */}
               <button
                 id="create-new-trip-btn"
                 onClick={onShowCreateTripModal}
-                className="p-1 px-2.5 hover:bg-white/10 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition text-[11px] text-blue-300 hover:text-white"
+                className="p-1 px-3 hover:bg-white/5 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition text-xs text-blue-400 hover:text-white min-w-0 shrink-0"
               >
-                <FolderPlus size={11.5} />
+                <FolderPlus size={12} />
                 <span>{lang === "zh" ? "新增" : "+ New"}</span>
               </button>
 
-              {/* Delete current project inside capsule */}
+              {/* Delete current project */}
               {(trip.tripsList || []).length > 1 && (
                 <>
-                  <div className="h-4.5 w-[1px] bg-white/15 mx-1" />
+                  <div className="h-5 w-[1px] bg-white/10 mx-1.5 shrink-0" />
                   <button
                     id="delete-trip-btn"
                     onClick={() => onDeleteTrip(trip.id)}
-                    className="p-1 px-2 hover:bg-rose-500/20 rounded-lg font-bold flex items-center gap-1 cursor-pointer transition text-[11px] text-rose-300"
+                    className="p-1 px-2.5 hover:bg-rose-500/20 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition text-xs text-rose-300 min-w-0 shrink-0"
                     title={lang === "zh" ? "刪除此專案" : "Delete folder"}
                   >
-                    <Trash size={11} />
+                    <Trash size={12} />
                   </button>
                 </>
               )}
             </div>
 
-            {/* Dynamic Traveler Avatars Stack with Highlight Invite Button */}
-            <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1.5 rounded-xl backdrop-blur-md">
-              <span className="text-[9.5px] font-extrabold text-slate-405 uppercase tracking-wide select-none leading-none pt-0.5">
-                👥 {lang === "zh" ? "協同成員" : "Team"}:
+            {/* Dynamic Traveler Avatars Stack - Cleansed with More Spacing */}
+            <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-xl overflow-x-auto min-w-0">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide select-none leading-none min-w-0 shrink-0">
+                {lang === "zh" ? "協同成員" : "Team"}:
               </span>
-              <div className="flex items-center -space-x-1.5 shrink-0 select-none">
+              <div className="flex items-center -space-x-1 select-none min-w-0">
                 {(trip.participants || []).map((p) => (
                   <div
                     key={p.id}
                     style={{ backgroundColor: p.avatarColor }}
-                    className="w-5 h-5 rounded-full text-[8.5px] font-black text-white flex items-center justify-center border border-slate-900 shadow-sm shrink-0 uppercase"
+                    className="w-6 h-6 rounded-full text-xs font-bold text-white flex items-center justify-center border border-slate-900 shadow-sm shrink-0 uppercase transition-transform hover:scale-110"
                     title={`${p.name} (${p.email})`}
                   >
                     {p.name ? p.name[0] : "?"}
@@ -179,233 +182,365 @@ export default function HeaderWorkspace({
                 ))}
               </div>
 
-              {/* Master Invite trigger for pulling/adding members directly from anywhere */}
+              {/* Master Invite with more space */}
               <button
                 id="header-invite-member-btn"
                 onClick={onOpenInviteModal}
-                className="p-0.5 px-2 bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-300 hover:text-white border border-emerald-500/30 rounded-lg text-[10.5px] font-bold cursor-pointer transition flex items-center gap-1 outline-none ml-1 shadow-sm font-sans"
+                className="ml-2 h-8 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium cursor-pointer transition-all flex items-center justify-center gap-1 shadow-md border border-blue-400/35 min-w-0 shrink-0"
                 title={lang === "zh" ? "快速拉人加入專案" : "Pull collaborator into project"}
               >
-                <span className="leading-none text-xs">+</span>
-                <span className="leading-none">{lang === "zh" ? "拉人/邀請" : "Invite"}</span>
+                <UserPlus size={12} />
+                <span>{lang === "zh" ? "邀請成員" : "Invite"}</span>
               </button>
             </div>
-          </div>
-        </div>
 
-        {/* Active profile controls, Light Mode Toggle & Language switcher (Absolute top-right on mobile) */}
-        <div className="absolute top-4 right-4 lg:relative lg:top-0 lg:right-0 flex items-center gap-2.5 z-40">
-          
-          {/* Profile Display Box */}
-          {currentUser && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 p-1.5 px-3 rounded-xl text-xs backdrop-blur-md cursor-pointer transition select-none"
-              >
-                <div
-                  style={{ backgroundColor: currentUser.avatarColor }}
-                  className="w-5.5 h-5.5 rounded-full text-[9.5px] font-black text-white flex items-center justify-center border border-white/20 shadow-sm shrink-0 uppercase"
+            {/* Profile Dropdown & Controls */}
+            {currentUser && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowUserDropdown(!showUserDropdown)}
+                  className="flex items-center gap-2.5 bg-white/5 border border-white/10 hover:bg-white/10 p-2 px-3.5 rounded-xl text-[13px] cursor-pointer transition select-none"
                 >
-                  {currentUser.name[0]}
-                </div>
-                <span id="user-profile-display" className="font-bold text-white text-[11.5px] leading-none font-sans max-w-[100px] truncate">
-                  {currentUser.name}
-                </span>
-                <span className="text-[7.5px] text-slate-400">▼</span>
+                  <div
+                    style={{ backgroundColor: currentUser.avatarColor }}
+                    className="w-6 h-6 rounded-full text-[10px] font-black text-white flex items-center justify-center border border-white/20 shadow-sm shrink-0 uppercase"
+                  >
+                    {currentUser.name[0]}
+                  </div>
+                  <span id="user-profile-display" className="font-medium text-white leading-none max-w-[110px] truncate">
+                    {currentUser.name}
+                  </span>
+                  <span className="text-[8px] text-slate-400">▼</span>
+                </button>
+
+                {/* Popover actions dropdown */}
+                {showUserDropdown && (
+                  <div className="absolute right-0 mt-2 w-44 bg-slate-900 border border-white/10 rounded-xl shadow-xl py-1.5 z-50 text-[12px] flex flex-col animate-fade-in-scale">
+                    <button
+                      id="header-change-password-btn"
+                      type="button"
+                      onClick={() => {
+                        setPwdError("");
+                        setPwdSuccess("");
+                        setCurrentPwd("");
+                        setNewPwd("");
+                        setShowChangePwdModal(true);
+                        setShowUserDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-white/5 transition flex items-center gap-2 cursor-pointer font-medium"
+                    >
+                      <span>🔑</span>
+                      <span>{lang === "zh" ? "修改密碼" : "Password"}</span>
+                    </button>
+
+                    <div className="h-[1px] bg-white/5 my-1" />
+
+                    <button
+                      onClick={() => {
+                        onLogout();
+                        setShowUserDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-rose-400 hover:bg-rose-500/10 transition flex items-center gap-2 cursor-pointer font-medium"
+                    >
+                      <LogOut size={12} className="text-rose-400" />
+                      <span>{lang === "zh" ? "登出系統" : "Log out"}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Desktop Settings capsule */}
+            <div className="flex items-center bg-white/5 border border-white/10 p-1 rounded-xl text-[13px]">
+              <button
+                id="theme-switch-btn"
+                type="button"
+                onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
+                className="p-1 px-3 hover:bg-white/5 rounded-lg cursor-pointer transition-all flex items-center justify-center text-amber-300 text-[13px]"
+                title={lang === "zh" ? "日間/夜間主題切換" : "Toggle theme mode"}
+              >
+                {theme === "light" ? (
+                  <Moon size={14} className="text-indigo-400" />
+                ) : (
+                  <Sun size={14} className="text-amber-400" />
+                )}
               </button>
 
-              {/* Popover actions dropdown */}
-              {showUserDropdown && (
-                <div className="absolute right-0 mt-1.5 w-44 lg:w-36 bg-slate-950 border border-white/15 rounded-xl shadow-2xl py-1 z-50 text-[11px] flex flex-col backdrop-blur-lg animate-in fade-in slide-in-from-top-1 duration-100">
-                  
-                  {/* Mobile-only theme/mode and language integration */}
-                  <div className="px-3 py-1.5 text-slate-400 font-extrabold uppercase text-[9px] border-b border-white/10 lg:hidden block">
-                    {lang === "zh" ? "設定" : "System preferences"}
-                  </div>
+              <div className="h-4.5 w-[1px] bg-white/10 mx-1" />
 
-                  {/* Mode switcher inside list only for mobile */}
-                  <button
-                    type="button"
-                    onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
-                    className="lg:hidden w-full text-left px-3 py-2 text-slate-200 hover:bg-white/10 transition flex items-center justify-between cursor-pointer font-bold leading-none"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span>🌓</span>
-                      <span>{lang === "zh" ? "日間/夜間" : "Theme Mode"}</span>
-                    </span>
-                    <span className="text-amber-300">
-                      {theme === "light" ? <Moon size={11} /> : <Sun size={11} className="animate-spin-slow" />}
-                    </span>
-                  </button>
-
-                  {/* Language Selector inside list only for mobile */}
-                  <div className="lg:hidden w-full px-3 py-1.5 hover:bg-white/10 transition flex items-center justify-between font-bold leading-none">
-                    <span className="flex items-center gap-1.5 text-slate-200">
-                      <Languages size={11.5} className="text-blue-400" />
-                      <span>{lang === "zh" ? "語言" : "Language"}</span>
-                    </span>
-                    <select
-                      value={lang}
-                      onChange={(e) => setLang(e.target.value as "en" | "zh")}
-                      className="bg-transparent border-0 font-bold text-white text-[10px] focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none mr-1"
-                    >
-                      <option value="zh" className="bg-slate-900 text-slate-100">繁中</option>
-                      <option value="en" className="bg-slate-900 text-slate-100">EN</option>
-                    </select>
-                  </div>
-
-                  <div className="h-[1px] bg-white/10 my-0.5 lg:hidden" />
-
-                  <button
-                    id="header-change-password-btn"
-                    type="button"
-                    onClick={() => {
-                      setPwdError("");
-                      setPwdSuccess("");
-                      setCurrentPwd("");
-                      setNewPwd("");
-                      setShowChangePwdModal(true);
-                      setShowUserDropdown(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-slate-200 hover:bg-white/10 transition flex items-center gap-1.5 cursor-pointer font-bold leading-none"
-                  >
-                    <span>🔑</span>
-                    <span>{lang === "zh" ? "修改密碼" : "Password"}</span>
-                  </button>
-
-                  <div className="h-[1px] bg-white/10 my-0.5" />
-
-                  <button
-                    onClick={() => {
-                      onLogout();
-                      setShowUserDropdown(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-rose-400 hover:bg-rose-500/10 transition flex items-center gap-1.5 cursor-pointer font-bold leading-none"
-                  >
-                    <LogOut size={11} className="text-rose-455" />
-                    <span>{lang === "zh" ? "登出系統" : "Log out"}</span>
-                  </button>
-                </div>
-              )}
+              {/* Language Selector */}
+              <div className="flex items-center gap-1.5 pl-2 pr-2 py-1">
+                <Languages size={13} className="text-blue-400" />
+                <select
+                  id="language-selector"
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value as "en" | "zh")}
+                  className="bg-transparent border-0 font-medium text-white text-[13px] focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none pr-1"
+                >
+                  <option value="zh" className="bg-slate-900 text-slate-100">繁中 (ZH)</option>
+                  <option value="en" className="bg-slate-900 text-slate-100 font-sans">EN</option>
+                </select>
+              </div>
             </div>
-          )}
 
-          {/* Consolidated System Settings Capsule - Desktop-Only */}
-          <div className="hidden lg:flex items-center bg-white/5 border border-white/10 p-1 rounded-xl text-xs backdrop-blur-md">
-            {/* Light vs Dark Theme Selection */}
-            <button
-              id="theme-switch-btn"
-              type="button"
-              onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
-              className="p-1 px-2.5 hover:bg-white/10 rounded-lg cursor-pointer transition-all flex items-center justify-center text-amber-300 select-none text-xs"
-              title={lang === "zh" ? "日間/夜間主題切換" : "Toggle theme mode"}
-            >
-              {theme === "light" ? (
-                <Moon size={12.5} className="text-indigo-400" />
-              ) : (
-                <Sun size={12.5} className="text-amber-400 animate-spin-slow" />
-              )}
-            </button>
+          </div>
 
-            <div className="h-4 w-[1px] bg-white/15 mx-1" />
-
-            {/* Language Selector */}
-            <div className="flex items-center gap-1.5 pl-1.5 pr-2 py-1">
-              <Languages size={11.5} className="text-blue-400" />
-              <select
-                id="language-selector"
-                value={lang}
-                onChange={(e) => setLang(e.target.value as "en" | "zh")}
-                className="bg-transparent border-0 font-bold text-white text-[11.5px] focus:outline-none focus:ring-0 cursor-pointer p-0 select-none outline-none pr-1"
+          {/* Mobile Right Block: Active User Avatar + Hamburger toggle */}
+          <div className="flex md:hidden items-center gap-2.5">
+            {currentUser && (
+              <div
+                style={{ backgroundColor: currentUser.avatarColor }}
+                className="w-8 h-8 rounded-full text-xs font-black text-white flex items-center justify-center border border-white/20 shadow-sm shrink-0 uppercase"
+                title={currentUser.name}
               >
-                <option value="zh" className="bg-slate-900 text-slate-100">繁中 (ZH)</option>
-                <option value="en" className="bg-slate-900 text-slate-100">EN</option>
-              </select>
+                {currentUser.name[0]}
+              </div>
+            )}
+            
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 bg-white/5 border border-white/10 rounded-xl text-slate-300 hover:text-white cursor-pointer active:scale-95 transition-all"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <span className="block w-5 h-4.5 relative">
+                <span className="block w-5 h-0.5 bg-current rounded absolute top-0"></span>
+                <span className="block w-5 h-0.5 bg-current rounded absolute top-2"></span>
+                <span className="block w-5 h-0.5 bg-current rounded absolute top-4"></span>
+              </span>}
+            </button>
+          </div>
+
+        </div>
+      </header>
+
+      {/* Mobile Drawer Slide-in Panel */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex justify-end">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)}></div>
+          
+          <div className="relative w-72 h-full bg-[#0f111a] border-l border-white/10 shadow-2xl p-6 flex flex-col gap-6 overflow-y-auto animate-fade-in-scale">
+            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+              <h2 className="text-[15px] font-semibold text-white">{lang === "zh" ? "旅程選單" : "Menu Options"}</h2>
+              <button onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-white p-1">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Mobile Project switcher */}
+            <div className="space-y-2">
+              <label className="text-[12px] font-semibold text-slate-400 uppercase tracking-wider block">
+                {lang === "zh" ? "旅程專案" : "Workspace:"}
+              </label>
+              <div className="flex flex-col bg-white/5 border border-white/5 p-3 rounded-xl gap-3">
+                <select
+                  id="trip-project-dropdown-mobile"
+                  value={trip.id}
+                  onChange={(e) => {
+                    onSelectTrip(e.target.value);
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 font-semibold text-white text-[13px]"
+                >
+                  {(trip.tripsList || []).map(tOpt => (
+                    <option key={tOpt.id} value={tOpt.id} className="bg-slate-900 text-slate-100">
+                      {tOpt.name}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      onShowCreateTripModal();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold flex items-center justify-center gap-1.5 text-[12px]"
+                  >
+                    <FolderPlus size={13} />
+                    <span>{lang === "zh" ? "新增" : "New"}</span>
+                  </button>
+
+                  {(trip.tripsList || []).length > 1 && (
+                    <button
+                      onClick={() => {
+                        onDeleteTrip(trip.id);
+                        setMobileMenuOpen(false);
+                      }}
+                      className="px-3 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 rounded-lg flex items-center justify-center"
+                    >
+                      <Trash size={13} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile Travelers Stack */}
+            <div className="space-y-2">
+              <label className="text-[12px] font-semibold text-slate-400 uppercase tracking-wider block">
+                {lang === "zh" ? "協同成員" : "Team members"}
+              </label>
+              <div className="bg-white/5 border border-white/5 p-3.5 rounded-xl space-y-3.5">
+                <div className="flex flex-wrap gap-2">
+                  {(trip.participants || []).map((p) => (
+                    <div
+                      key={p.id}
+                      style={{ backgroundColor: p.avatarColor }}
+                      className="w-7 h-7 rounded-full text-[11px] font-bold text-white flex items-center justify-center border border-slate-900 uppercase"
+                      title={`${p.name} (${p.email})`}
+                    >
+                      {p.name ? p.name[0] : "?"}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    onOpenInviteModal?.();
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[12px] font-medium transition flex items-center justify-center gap-1.5"
+                >
+                  <UserPlus size={13} />
+                  <span>{lang === "zh" ? "邀請協同成員" : "Invite Members"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Settings & Extras */}
+            <div className="space-y-3 border-t border-white/5 pt-4">
+              <div className="flex items-center justify-between text-[13px]">
+                <span className="text-slate-400">{lang === "zh" ? "介面主題" : "Interface Mode"}</span>
+                <button
+                  type="button"
+                  onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
+                  className="p-1 px-3 bg-white/5 border border-white/10 rounded-lg text-amber-300 flex items-center gap-1.5"
+                >
+                  {theme === "light" ? <Moon size={13} className="text-indigo-400" /> : <Sun size={13} className="text-amber-400" />}
+                  <span className="text-[12px] text-slate-300">{theme === "light" ? "日間" : "夜間"}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between text-[13px]">
+                <span className="text-slate-400">{lang === "zh" ? "系統語言" : "Language"}</span>
+                <select
+                  value={lang}
+                  onChange={(e) => setLang(e.target.value as "en" | "zh")}
+                  className="bg-slate-900 border border-white/10 rounded-lg p-1.5 text-white text-[12px]"
+                >
+                  <option value="zh">繁中 (ZH)</option>
+                  <option value="en">EN</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Account Password & Sign Out */}
+            <div className="mt-auto space-y-2.5 border-t border-white/5 pt-4">
+              <button
+                onClick={() => {
+                  setPwdError("");
+                  setPwdSuccess("");
+                  setCurrentPwd("");
+                  setNewPwd("");
+                  setShowChangePwdModal(true);
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full py-2 bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-200 rounded-lg flex items-center justify-center gap-1.5 text-[12px]"
+              >
+                🔑 {lang === "zh" ? "變更密碼" : "Change Password"}
+              </button>
+
+              <button
+                onClick={() => {
+                  onLogout();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 rounded-lg flex items-center justify-center gap-1.5 text-[12px] font-bold"
+              >
+                <LogOut size={13} />
+                <span>{lang === "zh" ? "登出系統" : "Log out"}</span>
+              </button>
             </div>
           </div>
         </div>
-      </div>
-    </header>
+      )}
 
-    {/* Change Password Backdrop Closable Dialog Modal */}
-    {showChangePwdModal && (
-      <div
-        id="change-password-backdrop"
-        onClick={() => setShowChangePwdModal(false)}
-        className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fadeIn"
-      >
+      {/* Change Password Backdrop Closable Dialog Modal */}
+      {showChangePwdModal && (
         <div
-          onClick={(e) => e.stopPropagation()} // Satisfies non-dialog click ignore
-          className={`w-full max-w-sm rounded-3xl p-6 shadow-2xl border ${
-            isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-white/10 text-white"
-          } relative animate-scaleUp`}
+          id="change-password-backdrop"
+          onClick={() => setShowChangePwdModal(false)}
+          className="fixed inset-0 bg-slate-950/80 backdrop-blur-none z-50 flex items-center justify-center p-4 animate-fade-in-scale"
         >
-          {/* Close Button Button */}
-          <button
-            type="button"
-            onClick={() => setShowChangePwdModal(false)}
-            className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-xs font-black"
+          <div
+            onClick={(e) => e.stopPropagation()} // Satisfies non-dialog click ignore
+            className={`w-full max-w-sm rounded-2xl p-6 shadow-xl border ${
+              isLight ? "bg-white border-slate-200 text-slate-900" : "bg-slate-900 border-white/8 text-white animate-fade-in-scale"
+            } relative`}
           >
-            ✕
-          </button>
-
-          <h3 className="text-sm font-black mb-1.5 flex items-center gap-1.5">
-            🔑 {lang === "zh" ? "變更協作密碼" : "Change Account Password"}
-          </h3>
-          <p className="text-[10px] text-slate-400 mb-4">
-            {lang === "zh" ? "請輸入原本密碼及符合高強度的安全新密碼" : "Input your legacy credentials and robust new key."}
-          </p>
-
-          <form onSubmit={handleChangePasswordSubmit} className="space-y-3">
-            <div className="space-y-1">
-              <span className="block text-[10px] font-bold text-slate-405 uppercase font-mono">{lang === "zh" ? "當前安全密碼" : "Current Password"}</span>
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={currentPwd}
-                onChange={(e) => setCurrentPwd(e.target.value)}
-                className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
-                  isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
-                }`}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <span className="block text-[10px] font-bold text-slate-450 uppercase font-mono">
-                {lang === "zh" ? "高強度新密碼" : "New Secure Password"}
-              </span>
-              <input
-                type="password"
-                required
-                placeholder={lang === "zh" ? "包含大、小寫及符號" : "Upper, lower & symbols required"}
-                value={newPwd}
-                onChange={(e) => setNewPwd(e.target.value)}
-                className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
-                  isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
-                }`}
-              />
-              <p className="text-[9px] text-slate-450 leading-tight">
-                {lang === "zh" ? "（必備: 1個大寫字母, 1個小寫字母, 1個特殊符號）" : "(Constraint: 1 uppercase, 1 lowercase, 1 symbol)"}
-              </p>
-            </div>
-
-            {pwdError && <p className="text-[10px] text-rose-400 font-bold leading-relaxed">⚠️ {pwdError}</p>}
-            {pwdSuccess && <p className="text-[10px] text-emerald-400 font-bold leading-relaxed">✓ {pwdSuccess}</p>}
-
+            {/* Close Button Button */}
             <button
-              type="submit"
-              disabled={pwdLoading}
-              className="w-full mt-2 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.01] text-white font-extrabold text-xs rounded-xl shadow transition duration-200 cursor-pointer disabled:opacity-50"
+              type="button"
+              onClick={() => setShowChangePwdModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 text-xs font-black cursor-pointer"
             >
-              {pwdLoading ? (lang === "zh" ? "更新中..." : "Updating password...") : (lang === "zh" ? "儲存新密碼" : "Save New Password")}
+              ✕
             </button>
-          </form>
+
+            <h3 className="text-sm font-semibold mb-1.5 flex items-center gap-1.5">
+              🔑 {lang === "zh" ? "變更協作密碼" : "Change Account Password"}
+            </h3>
+            <p className="text-[12px] text-slate-400 mb-4">
+              {lang === "zh" ? "請輸入原本密碼及符合高強度的安全新密碼" : "Input your legacy credentials and robust new key."}
+            </p>
+
+            <form onSubmit={handleChangePasswordSubmit} className="space-y-3">
+              <div className="space-y-1">
+                <span className="block text-[11px] font-semibold text-slate-400 uppercase font-sans">{lang === "zh" ? "當前安全密碼" : "Current Password"}</span>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={currentPwd}
+                  onChange={(e) => setCurrentPwd(e.target.value)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
+                    isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
+                  }`}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <span className="block text-[11px] font-semibold text-slate-400 uppercase font-sans font-sans">
+                  {lang === "zh" ? "高強度新密碼" : "New Secure Password"}
+                </span>
+                <input
+                  type="password"
+                  required
+                  placeholder={lang === "zh" ? "包含大、小寫及符號" : "Upper, lower & symbols required"}
+                  value={newPwd}
+                  onChange={(e) => setNewPwd(e.target.value)}
+                  className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
+                    isLight ? "bg-slate-50 text-slate-900 border-slate-300" : "bg-slate-950 text-slate-100 border-white/5"
+                  }`}
+                />
+                <p className="text-[11px] text-slate-400 leading-tight">
+                  {lang === "zh" ? "（必備: 1個大寫字母, 1個小寫字母, 1個特殊符號）" : "(Constraint: 1 uppercase, 1 lowercase, 1 symbol)"}
+                </p>
+              </div>
+
+              {pwdError && <p className="text-[12px] text-rose-400 font-bold leading-relaxed">⚠️ {pwdError}</p>}
+              {pwdSuccess && <p className="text-[12px] text-emerald-400 font-bold leading-relaxed">✓ {pwdSuccess}</p>}
+
+              <button
+                type="submit"
+                disabled={pwdLoading}
+                className="w-full mt-2 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow transition duration-200 cursor-pointer disabled:opacity-50"
+              >
+                {pwdLoading ? (lang === "zh" ? "更新中..." : "Updating password...") : (lang === "zh" ? "儲存新密碼" : "Save New Password")}
+              </button>
+            </form>
+          </div>
         </div>
-      </div>
-    )}
+      )}
     </>
   );
 }

@@ -495,7 +495,7 @@ export default function TripDashboard({
       </div>
 
       {/* Grid cross-project aggregated statistics highlights */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] lg:grid-cols-5 gap-4">
         {[
           {
             title: lang === "zh" ? "團隊專案總數" : "Total Workspaces",
@@ -530,29 +530,29 @@ export default function TripDashboard({
           }
         ].map((stat, i) => (
           <div key={i} className={`bg-slate-900/45 border border-white/5 rounded-2xl p-4 space-y-1 ${stat.hideOnMobile ? 'hidden lg:block' : ''}`}>
-            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block">
               {stat.title}
             </span>
             <h4 className={`text-xl font-black ${stat.color} font-mono`}>{stat.value}</h4>
-            <p className="text-[9.5px] text-slate-500 font-medium truncate leading-none mt-0.5">{stat.desc}</p>
+            <p className="text-xs text-slate-500 font-medium truncate leading-none mt-0.5">{stat.desc}</p>
           </div>
         ))}
       </div>
 
       {/* Premium Constellation World Map section + Hover frequency */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[repeat(3,minmax(0,1fr))] gap-6">
         {/* SVG Tactical Cyber Map View */}
         <div className="lg:col-span-2 bg-slate-950 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col justify-between shadow-xl min-h-[220px] md:min-h-[400px] overflow-hidden relative">
           <div className="flex justify-between items-start gap-4">
             <div>
-              <span className="text-[10px] text-blue-400 font-mono font-bold tracking-widest uppercase block">
+              <span className="text-xs text-blue-400 font-mono font-bold tracking-widest uppercase block">
                 🗺️ {lang === "zh" ? "全域協作專案世界地圖" : "All Projects Global World Map"}
               </span>
               <h3 className="text-xs font-black text-white mt-1">
                 {lang === "zh" ? "標註所有行程目的，點擊節點即可快速切換控制台" : "Visualizing all project destinations on Earth. Click a node to instantly switch workspace."}
               </h3>
             </div>
-            <span className="text-[9px] bg-slate-900 border border-white/5 text-slate-400 px-2 py-0.5 rounded-full font-mono font-bold uppercase">
+            <span className="text-xs bg-slate-900 border border-white/5 text-slate-400 px-2 py-0.5 rounded-full font-mono font-bold uppercase">
               PORTFOLIO SCAN
             </span>
           </div>

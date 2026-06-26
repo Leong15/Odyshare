@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Plus, Trash2, Users, ChevronRight, AlertCircle, CheckSquare, Square, DollarSign, Upload, Camera, X, Image, Zap, Sparkles, Pencil, ShoppingBag, Utensils, Percent } from "lucide-react";
+import { Plus, Trash2, Users, ChevronRight, AlertCircle, CheckSquare, Square, DollarSign, Upload, Camera, X, Image, Zap, Sparkles, Pencil, ShoppingBag, Utensils, Percent, FileText } from "lucide-react";
 import { ExpenseItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 import SettlementModal from "./SettlementModal";
@@ -198,7 +198,7 @@ export default function ExpenseTracker({
       });
       const data = await res.json();
       if (data && data.amount != null) {
-        setDescription(data.description || "🧾 OCR Receipt Expense");
+        setDescription(data.description || "OCR Receipt Expense");
         setAmount(data.amount.toString());
         setCategory(data.category || "food");
         setOcrInput("");
@@ -293,7 +293,7 @@ export default function ExpenseTracker({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[repeat(3,minmax(0,1fr))] gap-6">
       {/* Primary Action Panel: Transaction History & Ledger (Now on the left/top for perfect mobile hierarchy) */}
       <div className="lg:col-span-2 space-y-4">
         <div className="glass-container rounded-2xl p-6 md:p-8 shadow-lg border border-white/10 h-full flex flex-col">
@@ -307,7 +307,7 @@ export default function ExpenseTracker({
             <button
               id="add-expense-trigger"
               onClick={() => setShowAddForm(true)}
-              className="flex items-center justify-center gap-1.5 glass-button-primary text-white font-semibold text-xs h-12 sm:h-9 px-3.5 rounded-xl cursor-pointer"
+              className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[13px] md:text-xs h-12 md:h-9 px-4 rounded-xl cursor-pointer shadow transition-all active:scale-[0.98]"
             >
               <Plus size={14} /> {t.addNewCost}
             </button>
@@ -317,29 +317,29 @@ export default function ExpenseTracker({
           {showAddForm && (
             <form
               onSubmit={handleSubmit}
-              className="bg-white/3 border border-white/10 p-4 rounded-xl space-y-4 text-xs animate-fadeIn mb-5"
+              className="bg-slate-900/80 border border-white/10 p-5 md:p-6 rounded-2xl space-y-6 text-sm animate-fade-in-scale mb-6"
             >
-              <h4 className="font-extrabold text-white flex items-center justify-between border-b border-white/5 pb-2">
+              <h4 className="font-semibold text-white text-[15px] flex items-center justify-between border-b border-white/5 pb-3">
                 <span>{t.inputSharedExpense}</span>
                 <button
                   type="button"
                   onClick={() => setShowAddForm(false)}
-                  className="text-slate-400 hover:text-white font-semibold cursor-pointer"
+                  className="text-slate-400 hover:text-white font-medium cursor-pointer"
                 >
                   {lang === "zh" ? "取消" : "Cancel"}
                 </button>
               </h4>
 
-              {/* 🧾 AI Receipt Scanner OCR Panel */}
-              <div className="bg-white/4 border border-white/5 rounded-xl p-3.5 mb-2.5 text-xs text-left select-none animate-fadeIn flex flex-col gap-2.5">
+              {/* AI Receipt Scanner OCR Panel */}
+              <div className="bg-white/5 border border-white/5 rounded-xl p-4 mb-3 text-sm text-left select-none animate-fadeIn flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-emerald-400 flex items-center gap-1.5 text-[11px]">
-                    <span>🧾</span>
+                  <span className="font-semibold text-emerald-400 flex items-center gap-1.5 text-[12px]">
+                    <FileText size={13} className="text-emerald-400 shrink-0" />
                     <span>{lang === "zh" ? "AI 智慧實體收據辨識 (OCR)" : "AI Smart Receipt OCR Scanner"}</span>
                   </span>
-                  <span className="text-[10px] text-slate-500 font-mono">Powered by Gemini</span>
+                  <span className="text-[11px] text-slate-500 font-mono">Powered by Gemini</span>
                 </div>
-                <p className="text-[10.5px] text-slate-400 leading-relaxed">
+                <p className="text-[12px] text-slate-400 leading-relaxed">
                   {lang === "zh" 
                     ? "在國外拿到實體紙本發票時，可選擇相片上傳、即時拍照，或直接貼上/輸入明細，AI 將自動辨識總金額、品項、消費類別，快速完成記帳！" 
                     : "When you get physical receipts, upload a photo, take a real-time picture, or paste text. AI will auto-extract total amount, currency, and category!"}
@@ -367,34 +367,34 @@ export default function ExpenseTracker({
                   <button
                     type="button"
                     onClick={() => uploadInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg text-[10.5px] cursor-pointer transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg text-[11.5px] cursor-pointer transition-colors h-10 md:h-8"
                   >
-                    <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                    <Upload className="w-4 h-4 text-emerald-400" />
                     <span>{lang === "zh" ? "選擇收據相片" : "Select Receipt"}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg text-[10.5px] cursor-pointer transition-colors"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg text-[11.5px] cursor-pointer transition-colors h-10 md:h-8"
                   >
-                    <Camera className="w-3.5 h-3.5 text-emerald-400" />
+                    <Camera className="w-4 h-4 text-emerald-400" />
                     <span>{lang === "zh" ? "手機即時拍照" : "Take Photo"}</span>
                   </button>
 
                   {receiptImage && (
-                    <div className="relative group flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg animate-fadeIn">
-                      <Image className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-[10px] text-emerald-400 font-medium truncate max-w-[120px]">
-                        {lang === "zh" ? "📸 已載入發票圖片" : "📸 Loaded Image"}
+                    <div className="relative group flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg animate-fadeIn">
+                      <Image className="w-4 h-4 text-emerald-400" />
+                      <span className="text-[11px] text-emerald-400 font-medium truncate max-w-[120px]">
+                        {lang === "zh" ? "已載入發票圖片" : "Loaded Image"}
                       </span>
                       <button
                         type="button"
                         onClick={() => setReceiptImage("")}
-                        className="p-0.5 hover:bg-red-500/20 rounded text-slate-400 hover:text-red-400 cursor-pointer transition-colors"
+                        className="p-1 hover:bg-red-500/20 rounded text-slate-400 hover:text-red-400 cursor-pointer transition-colors"
                         title={lang === "zh" ? "移除圖片" : "Remove Image"}
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   )}
@@ -402,7 +402,7 @@ export default function ExpenseTracker({
 
                 {/* Image Thumbnail Preview */}
                 {receiptImage && (
-                  <div className="mt-0.5 relative w-24 h-24 rounded-lg overflow-hidden border border-emerald-500/30 group animate-fadeIn shadow-lg shadow-black/30">
+                  <div className="mt-1 relative w-24 h-24 rounded-lg overflow-hidden border border-emerald-500/30 group animate-fadeIn shadow-lg shadow-black/30">
                     <img src={receiptImage} alt="Receipt Preview" className="w-full h-full object-cover" />
                     <button
                       type="button"
@@ -410,35 +410,35 @@ export default function ExpenseTracker({
                       className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-600 rounded-full text-white cursor-pointer transition-colors shadow-md"
                       title={lang === "zh" ? "移除圖片" : "Remove Image"}
                     >
-                      <X className="w-3 h-3" />
+                      <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row gap-2 mt-1">
+                <div className="flex flex-col sm:flex-row gap-2.5 mt-1">
                   <input
                     type="text"
                     placeholder={lang === "zh" ? "手動貼上收據文字/備註（選填）..." : "Manual receipt text/memo (optional)..."}
                     value={ocrInput}
                     onChange={(e) => setOcrInput(e.target.value)}
-                    className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-2.5 py-1.5 text-[11px] text-white outline-none"
+                    className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-[12px] text-white outline-none focus:border-emerald-500"
                   />
 
-                  <div className="flex gap-1">
+                  <div className="flex gap-1.5">
                     <button
                       type="button"
                       onClick={handleReceiptOcrSubmit}
                       disabled={ocrParsing || (!ocrInput.trim() && !receiptImage)}
-                      className="h-12 sm:h-auto px-3 bg-emerald-600/90 hover:bg-emerald-650 border border-emerald-500/15 text-white font-semibold rounded-lg text-[10.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1 shrink-0"
+                      className="h-11 sm:h-auto px-4 bg-emerald-600 hover:bg-emerald-500 border border-emerald-500/15 text-white font-semibold rounded-xl text-[11.5px] cursor-pointer disabled:opacity-50 transition-all flex items-center justify-center gap-1.5 shrink-0"
                     >
                       {ocrParsing ? (
                         <>
-                          <Sparkles size={11} className="animate-spin text-white shrink-0" />
+                          <Sparkles size={13} className="animate-spin text-white shrink-0" />
                           <span>{lang === "zh" ? "辨識中..." : "Extracting..."}</span>
                         </>
                       ) : (
                         <>
-                          <Zap size={11} className="text-amber-400 shrink-0" />
+                          <Zap size={13} className="text-amber-400 shrink-0" />
                           <span>{lang === "zh" ? "智慧一鍵辨識" : "Scan Receipt"}</span>
                         </>
                       )}
@@ -456,7 +456,7 @@ export default function ExpenseTracker({
                           setOcrInput("STARBUCKS COFFEE SHIBUYA TSUTAYA\n1x Caramel Macchiato: JPY 650\n1x Matcha Frappuccino: JPY 600\nSUBTOTAL: JPY 1,250\nTAX 8%: JPY 100\nTOTAL JPY 1,250");
                         }
                       }}
-                      className="bg-slate-950 border border-white/10 hover:border-white/25 rounded-xl px-2 text-[10.5px] text-slate-400 cursor-pointer outline-none shrink-0"
+                      className="bg-slate-950 border border-white/10 hover:border-white/25 rounded-xl px-2.5 text-[11px] text-slate-400 cursor-pointer outline-none shrink-0"
                     >
                       <option value="">📋 {lang === "zh" ? "載入真實收據範例" : "Load Receipt Template"}</option>
                       <option value="izakaya">🍣 {lang === "zh" ? "新宿居酒屋細目 (8,650日圓)" : "Shinjuku Izakaya (8,650 JPY)"}</option>
@@ -485,9 +485,9 @@ export default function ExpenseTracker({
 
                 return (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-[repeat(2,minmax(0,1fr))] gap-5">
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">{t.expenseDesc}</label>
+                        <label className="block text-slate-300 font-medium mb-1.5">{t.expenseDesc}</label>
                         <input
                           id="expense-desc-input"
                           type="text"
@@ -495,40 +495,40 @@ export default function ExpenseTracker({
                           placeholder="e.g., Shinjuku Ramen Lunch"
                           value={description}
                           onChange={(e) => setDescription(e.target.value)}
-                          className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 rounded-xl px-3 py-2 text-white outline-none"
+                          className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 rounded-xl px-3.5 py-2.5 text-white outline-none"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">
+                        <label className="block text-slate-300 font-medium mb-1.5">
                           {lang === "zh" ? "拆分方式" : "Split Method"}
                         </label>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2.5">
                           <button
                             type="button"
                             onClick={() => setSplitType('equal')}
-                            className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-bold transition-all ${
+                            className={`flex-1 rounded-xl border text-[13px] md:text-xs font-semibold transition-all h-12 md:h-10 flex items-center justify-center ${
                               splitType === 'equal'
-                                ? 'bg-blue-500/20 border-blue-500 text-blue-300'
-                                : 'bg-slate-950 border-white/5 hover:border-white/20 text-slate-400'
+                                ? 'bg-blue-600/20 border-blue-500 text-blue-300'
+                                : 'bg-slate-955 border-white/5 hover:border-white/20 text-slate-400 bg-slate-950'
                             }`}
                           >
-                            <span className="flex items-center justify-center gap-1.5">
-                              <Users size={12} />
+                            <span className="flex items-center gap-1.5">
+                              <Users size={14} />
                               <span>{lang === "zh" ? "人頭等額平分" : "Equal Split"}</span>
                             </span>
                           </button>
                           <button
                             type="button"
                             onClick={() => setSplitType('individual')}
-                            className={`flex-1 py-1.5 px-3 rounded-lg border text-xs font-bold transition-all ${
+                            className={`flex-1 rounded-xl border text-[13px] md:text-xs font-semibold transition-all h-12 md:h-10 flex items-center justify-center ${
                               splitType === 'individual'
-                                ? 'bg-blue-500/20 border-blue-500 text-blue-300'
-                                : 'bg-slate-950 border-white/5 hover:border-white/20 text-slate-400'
+                                ? 'bg-blue-600/20 border-blue-500 text-blue-300'
+                                : 'bg-slate-955 border-white/5 hover:border-white/20 text-slate-400 bg-slate-950'
                             }`}
                           >
-                            <span className="flex items-center justify-center gap-1.5">
-                              <Percent size={12} />
+                            <span className="flex items-center gap-1.5">
+                              <Percent size={14} />
                               <span>{lang === "zh" ? "個別消費自付" : "Individual Split"}</span>
                             </span>
                           </button>
@@ -539,9 +539,9 @@ export default function ExpenseTracker({
                     {/* Amount or Individual Entry depending on Split Type */}
                     {splitType === 'equal' ? (
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">{t.costAmount}</label>
+                        <label className="block text-slate-300 font-medium mb-1.5">{t.costAmount}</label>
                         <div className="relative">
-                          <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">$</span>
+                          <span className="absolute inset-y-0 left-3.5 flex items-center text-slate-400 font-semibold">$</span>
                           <input
                             id="expense-amount-input"
                             type="number"
@@ -550,33 +550,33 @@ export default function ExpenseTracker({
                             placeholder="e.g., 45.50"
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
-                            className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 pl-7 pr-3 py-2 rounded-xl text-white font-mono outline-none"
+                            className="w-full bg-slate-950 border border-white/10 focus:border-blue-500 pl-8 pr-3.5 py-2.5 rounded-xl text-white font-mono outline-none"
                           />
                         </div>
                       </div>
                     ) : (
-                      <div className="p-3 bg-slate-950/60 rounded-xl border border-white/5 space-y-2">
-                        <div className="font-bold text-slate-300 border-b border-white/5 pb-1 mb-2">
+                      <div className="p-4 bg-slate-950/60 rounded-xl border border-white/5 space-y-3 overflow-hidden">
+                        <div className="font-semibold text-slate-300 border-b border-white/5 pb-2 mb-3">
                           {lang === "zh" ? "請輸入各成員個人原始消費額" : "Input individual raw purchase amount for each:"}
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                          {participants.map(p => {
+                        <div className="grid grid-cols-1 sm:grid-cols-[repeat(2,minmax(0,1fr))] gap-3 text-sm overflow-hidden">
+                           {participants.map(p => {
                             const isSelected = splitAmong.includes(p.id);
                             if (!isSelected) {
                               return (
-                                <div key={p.id} className="flex items-center gap-2 justify-between border-b border-white/5 pb-2 opacity-35">
+                                <div key={p.id} className="flex items-center gap-2.5 justify-between border-b border-white/5 pb-2.5 opacity-35">
                                   <span className="text-slate-500 truncate">{p.name} ({lang === "zh" ? "未參與分攤" : "Not sharing"})</span>
                                 </div>
                               );
                             }
                             return (
-                              <div key={p.id} className="flex items-center gap-2 justify-between border-b border-white/5 pb-2">
-                                <span className="text-slate-300 flex items-center gap-1.5 truncate">
-                                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: p.avatarColor }} />
+                              <div key={p.id} className="flex items-center gap-2.5 justify-between border-b border-white/5 pb-2.5">
+                                <span className="text-slate-300 flex items-center gap-2 truncate">
+                                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: p.avatarColor }} />
                                   {p.name}
                                 </span>
-                                <div className="relative w-28">
-                                  <span className="absolute inset-y-0 left-2 flex items-center text-slate-400 font-mono">$</span>
+                                <div className="relative w-32 shrink-0 min-w-0">
+                                  <span className="absolute inset-y-0 left-3 flex items-center text-slate-400 font-mono font-bold">$</span>
                                   <input
                                     type="number"
                                     step="0.01"
@@ -588,7 +588,7 @@ export default function ExpenseTracker({
                                         [p.id]: e.target.value
                                       });
                                     }}
-                                    className="w-full bg-slate-950 border border-white/10 rounded-lg pl-5 pr-2 py-1 text-white font-mono text-xs outline-none focus:border-slate-500"
+                                    className="w-full bg-slate-950 border border-white/10 rounded-lg pl-6 pr-2 py-1.5 text-white font-mono text-xs outline-none focus:border-slate-500 min-w-0"
                                   />
                                 </div>
                               </div>
@@ -598,14 +598,14 @@ export default function ExpenseTracker({
                       </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-[repeat(3,minmax(0,1fr))] gap-5">
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">{t.paidBy}</label>
+                        <label className="block text-slate-300 font-medium mb-1.5">{t.paidBy}</label>
                         <select
                           id="expense-payer-select"
                           value={paidBy}
                           onChange={(e) => setPaidBy(e.target.value)}
-                          className="w-full bg-slate-955 border border-white/10 rounded-xl px-3 py-2 text-white bg-slate-900 outline-none"
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white bg-slate-900 outline-none focus:border-blue-500"
                         >
                           {participants.map(p => (
                             <option key={p.id} value={p.id} className="bg-slate-900">{p.name}</option>
@@ -614,12 +614,12 @@ export default function ExpenseTracker({
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">{t.category}</label>
+                        <label className="block text-slate-300 font-medium mb-1.5">{t.category}</label>
                         <select
                           id="expense-category-select"
                           value={category}
                           onChange={(e: any) => setCategory(e.target.value)}
-                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-white bg-slate-900 outline-none"
+                          className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white bg-slate-900 outline-none focus:border-blue-500"
                         >
                           <option value="food" className="bg-slate-900">{getLocalizedCategoryName("food")}</option>
                           <option value="activities" className="bg-slate-900">{getLocalizedCategoryName("activities")}</option>
@@ -631,17 +631,17 @@ export default function ExpenseTracker({
                       </div>
 
                       <div>
-                        <label className="block text-slate-300 font-medium mb-1">{t.splitRatioControl}</label>
-                        <div className="p-2 border border-white/5 bg-white/5 rounded-xl flex items-center justify-between">
-                          <span className="text-[10px] text-slate-400">{t.splittingWith} ({splitAmong.length})</span>
-                          <div className="flex gap-1.5 font-sans">
+                        <label className="block text-slate-300 font-medium mb-1.5">{t.splitRatioControl}</label>
+                        <div className="p-2.5 border border-white/5 bg-white/5 rounded-xl flex items-center justify-between h-[45px] md:h-[42px]">
+                          <span className="text-xs text-slate-450">{t.splittingWith} ({splitAmong.length})</span>
+                          <div className="flex gap-2 font-sans">
                             {participants.map(p => (
                               <button
                                 key={p.id}
                                 type="button"
                                 onClick={() => handleToggleSplit(p.id)}
                                 style={{ backgroundColor: splitAmong.includes(p.id) ? p.avatarColor : "transparent" }}
-                                className={`w-5 h-5 rounded-full text-[9px] font-bold text-white flex items-center justify-center cursor-pointer transition-all border ${
+                                className={`w-6 h-6 rounded-full text-xs font-bold text-white flex items-center justify-center cursor-pointer transition-all border ${
                                   !splitAmong.includes(p.id) ? "text-slate-500 border-white/10 hover:border-white/30" : "border-white/20"
                                 }`}
                                 title={p.name}
@@ -659,15 +659,15 @@ export default function ExpenseTracker({
                       <div className="font-bold text-slate-300 flex items-center gap-1.5">
                         <ShoppingBag size={14} className="text-slate-300" />
                         <span>{lang === "zh" ? "免稅退稅 & 折扣比例調整 (可填單項或不填)" : "Tax Refund & Discount Adjustment (Optional)"}</span>
-                        <span className="bg-amber-500/10 text-amber-400 text-[9px] px-1.5 py-0.5 rounded border border-amber-500/10 font-mono">
+                        <span className="bg-amber-500/10 text-amber-400 text-xs px-1.5 py-0.5 rounded border border-amber-500/10 font-mono">
                           {lang === "zh" ? "後續自動等比扣減" : "Proportional adjustment"}
                         </span>
                       </div>
-                      <p className="text-[10px] text-slate-400 leading-normal">
+                      <p className="text-xs text-slate-400 leading-normal">
                         {lang === "zh" ? "收據往往只有一個退稅總額，在此輸入後，系統會自動在各個成員的自付款項中，按原始金額比例分減扣除，計算出極致精準的實際付款額！" 
                                      : "Enter overall discount or tax back total; the ledger automatically distributes deductions according to individual raw ratios for precise splits!"}
                       </p>
-                      <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 text-xs">
                         <div>
                           <label className="block text-slate-400 mb-1">{lang === "zh" ? "折減退稅金額 $" : "Deduction/Refund ($ Amount)"}</label>
                           <div className="relative">
@@ -702,14 +702,14 @@ export default function ExpenseTracker({
 
                       {/* Dynamically calculated share preview box */}
                       {rawTotalVal > 0 && (
-                        <div className="bg-slate-950 border border-white/5 rounded-lg p-3 space-y-2 mt-2">
-                          <div className="font-bold text-blue-300 border-b border-white/5 pb-1 text-[11px] flex items-center justify-between">
-                            <span>📊 {lang === "zh" ? "即時試算分攤預覽" : "Live Share Preview"}</span>
-                            <span className="font-mono text-slate-450 text-[10px]">
+                        <div className="bg-slate-950 border border-white/5 rounded-lg p-3 space-y-2 mt-2 overflow-hidden">
+                          <div className="font-bold text-blue-300 border-b border-white/5 pb-1 text-xs flex items-center justify-between">
+                            <span>{lang === "zh" ? "即時試算分攤預覽" : "Live Share Preview"}</span>
+                            <span className="font-mono text-slate-450 text-xs">
                               {lang === "zh" ? `退稅比例: ${(ratioVal * 100).toFixed(1)}% 實付` : `Refund ratio: ${(ratioVal * 100).toFixed(1)}% act`}
                             </span>
                           </div>
-                          <div className="space-y-1 font-mono text-[10.5px]">
+                          <div className="space-y-1 font-mono text-xs">
                             <div className="flex justify-between text-slate-400">
                               <span>{lang === "zh" ? "原始原價總金額：" : "Raw total sum:"}</span>
                               <span>${rawTotalVal.toFixed(2)}</span>
@@ -737,7 +737,7 @@ export default function ExpenseTracker({
                                 const pSaved = pRaw - pFinal;
 
                                 return (
-                                  <div key={p.id} className="flex justify-between text-slate-300 text-[10px]">
+                                  <div key={p.id} className="flex justify-between text-slate-300 text-xs">
                                     <span className="flex items-center gap-1.5 truncate">
                                       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: p.avatarColor }} />
                                       {p.name}:
@@ -746,7 +746,7 @@ export default function ExpenseTracker({
                                       <span className="text-slate-500 font-normal">${pRaw.toFixed(2)} {lang === "zh" ? "原價" : "raw"}</span>
                                       <span className="text-slate-600 font-normal mx-1">→</span>
                                       <span className="text-emerald-400 font-bold">${pFinal.toFixed(2)}</span>
-                                      {pSaved > 0 && <span className="text-amber-400 text-[9px] ml-1.5">({lang === "zh" ? `減$${pSaved.toFixed(1)}` : `-$${pSaved.toFixed(1)}`})</span>}
+                                      {pSaved > 0 && <span className="text-amber-400 text-xs ml-1.5">({lang === "zh" ? `減$${pSaved.toFixed(1)}` : `-$${pSaved.toFixed(1)}`})</span>}
                                     </span>
                                   </div>
                                 );
@@ -763,7 +763,7 @@ export default function ExpenseTracker({
               <button
                 id="submit-expense-btn"
                 type="submit"
-                className="w-full h-12 sm:h-10 glass-button-primary text-white font-bold rounded-xl transition-all cursor-pointer text-xs flex items-center justify-center"
+                className="w-full h-12 md:h-11 bg-blue-600 hover:bg-blue-505 text-white font-semibold rounded-xl transition-all cursor-pointer text-[13px] md:text-xs flex items-center justify-center shadow-md shadow-blue-500/10 active:scale-[0.98]"
               >
                 {t.postSplitLedgerEntry}
               </button>
@@ -911,15 +911,15 @@ export default function ExpenseTracker({
           {/* Content */}
           {!isBudgetCollapsed && (
             <div className="p-4 space-y-4 animate-fadeIn">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-4">
                 <div>
-                  <span className="text-[11px] text-slate-400 block font-medium">
+                  <span className="text-xs text-slate-400 block font-medium">
                     {lang === "zh" ? "已勾選總支出" : "Checked Total"}
                   </span>
                   <span className="text-lg font-black text-white font-mono">${totalSpent.toFixed(2)}</span>
                 </div>
                 <div>
-                  <span className="text-[11px] text-slate-400 block font-medium">{t.remaining}</span>
+                  <span className="text-xs text-slate-400 block font-medium">{t.remaining}</span>
                   <span className={`text-lg font-black font-mono ${remainingBudget < 0 ? "text-rose-400" : "text-emerald-400"}`}>
                     ${remainingBudget.toFixed(2)}
                   </span>
@@ -1202,8 +1202,8 @@ export default function ExpenseTracker({
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-xl mb-3">
                 <div className="text-[10.5px] text-indigo-300 font-bold leading-relaxed max-w-[75%]">
                   {lang === "zh"
-                    ? "✨ 結算完成！可一鍵導出精美 HTML/PDF 結帳收據，並為台灣(街口/LINE Pay)與香港(FPS)自動生成還款二維碼。"
-                    : "✨ Settlement complete! Generate printable receipts & customized payment links (LINE Pay, Jkopay, FPS) for your companions."}
+                    ? "結算完成！可一鍵導出精美 HTML/PDF 結帳收據，並為台灣(街口/LINE Pay)與香港(FPS)自動生成還款二維碼。"
+                    : "Settlement complete! Generate printable receipts & customized payment links (LINE Pay, Jkopay, FPS) for your companions."}
                 </div>
                 <button
                   type="button"
@@ -1233,14 +1233,14 @@ export default function ExpenseTracker({
                       </div>
                       <div className="text-right">
                         <span className="font-extrabold text-white font-mono">${transaction.amount.toFixed(2)}</span>
-                        <span className="block text-[9px] text-slate-500 uppercase tracking-wider font-extrabold">{t.reimburse}</span>
+                        <span className="block text-xs text-slate-500 uppercase tracking-wider font-extrabold">{t.reimburse}</span>
                       </div>
                     </div>
                   ))
                 )}
               </div>
 
-              <div className="mt-4 pt-3 border-t border-white/5 grid grid-cols-2 gap-2 text-center text-[10px]">
+              <div className="mt-4 pt-3 border-t border-white/5 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2 text-center text-xs">
                 {participants.map(p => {
                   const b = balances[p.id] || 0;
                   return (

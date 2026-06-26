@@ -451,14 +451,12 @@ export default function App() {
 
         {/* 4. Navigation Tabs */}
         {trip && (
-          <nav className="glass-container border-b border-white/10 py-2 sm:py-3 px-4 shadow sticky top-[73px] lg:top-[69px] z-30 backdrop-blur-md">
-            <div className="max-w-7xl mx-auto flex overflow-x-auto gap-1.5 scrollbar-none pb-1 text-xs">
+          <nav className="glass-container border-b border-white/5 py-3 px-5 sticky top-[73px] lg:top-[69px] z-30 backdrop-blur-none">
+            <div className="max-w-7xl mx-auto flex overflow-x-auto gap-2 scrollbar-none pb-1 text-[13px] scroll-smooth">
               <button
                 id="tab-btn-dashboard"
                 onClick={() => setActiveTab("dashboard")}
-                className={`px-4 py-2 rounded-xl font-extrabold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === "dashboard" ? "bg-white/10 text-white shadow-inner font-black" : "text-slate-400 hover:text-white"
-                }`}
+                className={`nav-tab ${activeTab === "dashboard" ? "nav-tab-active" : "nav-tab-inactive"}`}
               >
                 <span>📊</span>
                 <span>{lang === "zh" ? "首頁控制台" : "Dashboard"}</span>
@@ -467,66 +465,54 @@ export default function App() {
               <button
                 id="tab-btn-itinerary"
                 onClick={() => setActiveTab("itinerary")}
-                className={`px-4 py-2 rounded-xl font-extrabold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === "itinerary" ? "bg-white/10 text-white shadow-inner font-black" : "text-slate-400 hover:text-white"
-                }`}
+                className={`nav-tab ${activeTab === "itinerary" ? "nav-tab-active" : "nav-tab-inactive"}`}
               >
-                <Calendar size={13} className="text-blue-400" />
+                <Calendar size={14} className="shrink-0" />
                 <span>{translations[lang].tabItinerary}</span>
               </button>
 
               <button
                 id="tab-btn-map"
                 onClick={() => setActiveTab("map")}
-                className={`px-4 py-2 rounded-xl font-extrabold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === "map" ? "bg-white/10 text-white shadow-inner font-black" : "text-slate-400 hover:text-white"
-                }`}
+                className={`nav-tab ${activeTab === "map" ? "nav-tab-active" : "nav-tab-inactive"}`}
               >
-                <Map size={13} className="text-blue-400" />
+                <Map size={14} className="shrink-0" />
                 <span>{translations[lang].tabMap}</span>
               </button>
 
               <button
                 id="tab-btn-flights"
                 onClick={() => setActiveTab("flights")}
-                className={`px-4 py-2 rounded-xl font-extrabold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === "flights" ? "bg-white/10 text-white shadow-inner font-black" : "text-slate-400 hover:text-white"
-                }`}
+                className={`nav-tab ${activeTab === "flights" ? "nav-tab-active" : "nav-tab-inactive"}`}
               >
-                <Plane size={14} className="text-blue-400" />
+                <Plane size={14} className="shrink-0" />
                 <span>{translations[lang].tabFlights}</span>
               </button>
 
               <button
                 id="tab-btn-budget"
                 onClick={() => setActiveTab("budget")}
-                className={`px-4 py-2 rounded-xl font-extrabold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === "budget" ? "bg-white/10 text-white shadow-inner font-black" : "text-slate-400 hover:text-white"
-                }`}
+                className={`nav-tab ${activeTab === "budget" ? "nav-tab-active" : "nav-tab-inactive"}`}
               >
-                <DollarSign size={13} className="text-blue-400" />
+                <DollarSign size={14} className="shrink-0" />
                 <span>{translations[lang].tabBudget}</span>
               </button>
 
               <button
                 id="tab-btn-vault"
                 onClick={() => setActiveTab("vault")}
-                className={`px-4 py-2 rounded-xl font-extrabold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === "vault" ? "bg-white/10 text-white shadow-inner font-black" : "text-slate-400 hover:text-white"
-                }`}
+                className={`nav-tab ${activeTab === "vault" ? "nav-tab-active" : "nav-tab-inactive"}`}
               >
-                <Lock size={13} className="text-blue-400" />
+                <Lock size={14} className="shrink-0" />
                 <span>{translations[lang].tabVault}</span>
               </button>
 
               <button
                 id="tab-btn-chat"
                 onClick={() => setActiveTab("chat")}
-                className={`px-4 py-2 rounded-xl font-extrabold cursor-pointer transition whitespace-nowrap flex items-center gap-1.5 ${
-                  activeTab === "chat" ? "bg-white/10 text-white shadow-inner font-black" : "text-slate-400 hover:text-white"
-                }`}
+                className={`nav-tab ${activeTab === "chat" ? "nav-tab-active" : "nav-tab-inactive"}`}
               >
-                <Users size={13} className="text-blue-400" />
+                <Users size={14} className="shrink-0" />
                 <span>{translations[lang].tabChat}</span>
               </button>
             </div>
