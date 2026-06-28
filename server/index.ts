@@ -42,9 +42,6 @@ app.use("/api/ai", aiRouter);
 
 // Start server hosting & Vite integrations
 async function start() {
-  // Connect and load database state from Firebase Firestore
-  await initFirebase();
-
   if (process.env.NODE_ENV !== "production") {
     // Force direct serving of source images folder to guarantee they load in dev mode
     app.use("/src/assets/images", express.static(path.join(process.cwd(), "src/assets/images")));
@@ -66,6 +63,12 @@ async function start() {
     console.log(`OdyShareSync Server running on http://0.0.0.0:${PORT}`);
     // Start automated scheduler monitoring
     startScheduler();
+  });
+
+  // Connect and load database state from Firebase Firestore in the background
+  console.log("[Server] Initializing Firebase database sync in the background...");
+  initFirebase().catch((err) => {
+    console.error("[Server] Firebase initialization background error:", err);
   });
 }
 

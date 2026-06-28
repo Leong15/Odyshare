@@ -22,7 +22,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
 
   const mockPredefinedFiles = [
     { name: "Group_Airbnb_Voucher.pdf", size: "1.1 MB", type: "application/pdf" },
-    { name: "Leo_Passport_SecureScan.png", size: "2.4 MB", type: "image/png" },
+    { name: "assport_SecureScan.png", size: "2.4 MB", type: "image/png" },
     { name: "Tokyo_Subway_Route_Offline_EN.pdf", size: "3.2 MB", type: "application/pdf" }
   ];
 

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Trip } from "../types";
+import { MAP_BOUNDS } from "../lib/constants";
 
 export interface DashboardTrip {
   id: string;
@@ -48,17 +49,12 @@ interface TripDashboardProps {
   onDeleteTrip: (tripId: string) => Promise<void>;
 }
 
-export const MAP_LON_MIN = -180.0;
-export const MAP_LON_MAX =  180.0;
-export const MAP_LAT_MAX =  92.0;
-export const MAP_LAT_MIN = -95.0;
-
 export function gpsToPercent(lat: number, lng: number): { left: number; top: number } {
-  const clampedLat = Math.max(MAP_LAT_MIN, Math.min(MAP_LAT_MAX, Number(lat)));
-  const clampedLng = Math.max(MAP_LON_MIN, Math.min(MAP_LON_MAX, Number(lng)));
+  const clampedLat = Math.max(MAP_BOUNDS.LAT_MIN, Math.min(MAP_BOUNDS.LAT_MAX, Number(lat)));
+  const clampedLng = Math.max(MAP_BOUNDS.LON_MIN, Math.min(MAP_BOUNDS.LON_MAX, Number(lng)));
   return {
-    left: ((clampedLng - MAP_LON_MIN) / (MAP_LON_MAX - MAP_LON_MIN)) * 100,
-    top:  ((MAP_LAT_MAX - clampedLat) / (MAP_LAT_MAX - MAP_LAT_MIN)) * 100,
+    left: ((clampedLng - MAP_BOUNDS.LON_MIN) / (MAP_BOUNDS.LON_MAX - MAP_BOUNDS.LON_MIN)) * 100,
+    top:  ((MAP_BOUNDS.LAT_MAX - clampedLat) / (MAP_BOUNDS.LAT_MAX - MAP_BOUNDS.LAT_MIN)) * 100,
   };
 }
 

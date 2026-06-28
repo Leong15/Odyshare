@@ -4,61 +4,8 @@ import { motion, AnimatePresence } from "motion/react";
 import L from "leaflet";
 import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
-
-// Resolve Lat/Lng standard coords for itinerary names in various cities
-const resolveLatLng = (name: string, dest: string, x: number, y: number, itemLat?: number, itemLng?: number): { lat: number; lng: number } => {
-  if (itemLat !== undefined && itemLng !== undefined && itemLat !== null && itemLng !== null && !isNaN(Number(itemLat)) && !isNaN(Number(itemLng))) {
-    return { lat: Number(itemLat), lng: Number(itemLng) };
-  }
-  const d = dest.toLowerCase();
-  const n = (name || "").toLowerCase();
-
-  // 1. Establish center coordinates based on destination
-  let center = { lat: 35.6762, lng: 139.6503 }; // Tokyo default
-  if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
-    center = { lat: 22.3193, lng: 114.1694 };
-  } else if (d.includes("paris") || d.includes("巴黎")) {
-    center = { lat: 48.8566, lng: 2.3522 };
-  } else if (d.includes("london") || d.includes("倫敦")) {
-    center = { lat: 51.5074, lng: -0.1278 };
-  } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
-    center = { lat: 25.0330, lng: 121.5654 };
-  } else if (d.includes("new york") || d.includes("nyc")) {
-    center = { lat: 40.7128, lng: -74.0060 };
-  }
-
-  // 2. Specific matching of hot locations
-  // Tokyo
-  if (n.includes("gyoen") || n.includes("御苑")) return { lat: 35.6852, lng: 139.7101 };
-  if (n.includes("crossing") || n.includes("澀谷") || n.includes("shibuya")) return { lat: 35.6580, lng: 139.7016 };
-  if (n.includes("tsukiji") || n.includes("築地")) return { lat: 35.6658, lng: 139.7701 };
-  if (n.includes("sensoji") || n.includes("淺草") || n.includes("asakusa")) return { lat: 35.7148, lng: 139.7967 };
-  if (n.includes("akihabara") || n.includes("秋葉")) return { lat: 35.6997, lng: 139.7715 };
-  
-  // Hong Kong
-  if (n.includes("victoria") || n.includes("peak") || n.includes("太平山")) return { lat: 22.2759, lng: 114.1455 };
-  if (n.includes("tsim sha tsui") || n.includes("tst") || n.includes("尖沙咀")) return { lat: 22.2988, lng: 114.1722 };
-  if (n.includes("ocean park") || n.includes("海洋公園")) return { lat: 22.2475, lng: 114.1744 };
-  if (n.includes("disneyland") || n.includes("迪士尼")) return { lat: 22.3130, lng: 114.0413 };
-  if (n.includes("lan kwai fong") || n.includes("蘭桂坊")) return { lat: 22.2808, lng: 114.1557 };
-
-  // Paris
-  if (n.includes("eiffel") || n.includes("鐵塔")) return { lat: 48.8584, lng: 2.2945 };
-  if (n.includes("louvre") || n.includes("羅浮宮")) return { lat: 48.8606, lng: 2.3376 };
-  if (n.includes("arc") || n.includes("凱旋門")) return { lat: 48.8738, lng: 2.2950 };
-
-  // London
-  if (n.includes("ben") || n.includes("笨鐘")) return { lat: 51.5007, lng: -0.1246 };
-  if (n.includes("eye") || n.includes("眼")) return { lat: 51.5033, lng: -0.1195 };
-
-  // 3. Fallback: map the custom coordinate space [x, y] onto offset relative to center
-  const latOffset = (50 - y) * 0.0015;
-  const lngOffset = (x - 50) * 0.0018;
-  return {
-    lat: center.lat + latOffset,
-    lng: center.lng + lngOffset
-  };
-};
+import { resolveLatLng } from "../utils/mapHelpers";
+import { MAP_CONFIG } from "../lib/constants";
 
 // Polyline decoder to convert Google Maps Encoded Polyline algorithm format to latlng arrays
 const decodePolyline = (encoded: string): [number, number][] => {
@@ -116,7 +63,23 @@ interface MapTarget {
   isCustom?: boolean;
   isItinerary?: boolean;
   originalItem?: ItineraryItem;
+  dayIndex?: number;
 }
+
+// Helper to assign a unique, high-contrast color for each itinerary day
+export const getDayColor = (dayIndex: number): string => {
+  const colors = [
+    "#6366f1", // Day 1: Indigo
+    "#f59e0b", // Day 2: Amber
+    "#ec4899", // Day 3: Pink
+    "#10b981", // Day 4: Emerald
+    "#a855f7", // Day 5: Purple
+    "#06b6d4", // Day 6: Cyan
+    "#f97316", // Day 7: Orange
+    "#14b8a6", // Day 8: Teal
+  ];
+  return colors[dayIndex % colors.length];
+};
 
 export default function OfflineMapSimulator({
   destination = "Tokyo",
@@ -132,6 +95,7 @@ export default function OfflineMapSimulator({
   tripLng
 }: OfflineMapSimulatorProps) {
   const [viewMode, setViewMode] = useState<"simulator" | "leaflet">("leaflet");
+  const [selectedDayFilter, setSelectedDayFilter] = useState<number>(-1); // -1 means "All Days"
   const [offlineMode, setOfflineMode] = useState<boolean>(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isDownloaded, setIsDownloaded] = useState<boolean>(true);
@@ -241,8 +205,8 @@ export default function OfflineMapSimulator({
 
     let angle = Math.random() * 2 * Math.PI;
     const interval = setInterval(() => {
-      const stepSize = 0.00015; // smooth increment step
-      angle += (Math.random() - 0.5) * 0.4; // random OdyShareing course drift
+      const stepSize = MAP_CONFIG.WALK_STEP_SIZE; // smooth increment step
+      angle += (Math.random() - 0.5) * MAP_CONFIG.WALK_ANGLE_DRIFT; // random OdyShareing course drift
       
       setCurrentGeoLocation(prev => {
         if (!prev) return prev;
@@ -250,7 +214,7 @@ export default function OfflineMapSimulator({
         const nextLng = prev.lng + Math.cos(angle) * stepSize;
         return { lat: nextLat, lng: nextLng };
       });
-    }, 1500);
+    }, MAP_CONFIG.WALK_INTERVAL_MS);
 
     return () => clearInterval(interval);
   }, [isSimulatedMoving]);
@@ -300,7 +264,7 @@ export default function OfflineMapSimulator({
       }).catch(err => {
         console.warn("Telemetry reporting error:", err);
       });
-    }, 1500);
+    }, MAP_CONFIG.LOCATION_REPORT_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
   }, [currentGeoLocation, currentUserId]);
@@ -312,6 +276,21 @@ export default function OfflineMapSimulator({
     setCustomHotspots([]);
     setCurrentGeoLocation(resolveLatLng(destination, destination, 34, 65));
   }, [destination]);
+
+  // Dynamic list of unique days in the itinerary
+  const uniqueDays = React.useMemo(() => {
+    const days = new Set<number>();
+    (itineraries || []).forEach(item => {
+      if (typeof item.dayIndex === "number") {
+        days.add(item.dayIndex);
+      }
+    });
+    const daysList = Array.from(days).sort((a, b) => a - b);
+    if (daysList.length === 0) {
+      return [0];
+    }
+    return daysList;
+  }, [itineraries]);
 
   // Combine dynamic local itinerary plans so they display on map!
   const itineraryPins = React.useMemo(() => {
@@ -326,15 +305,19 @@ export default function OfflineMapSimulator({
         type: item.category === "hotel" ? "hotel" : item.category === "restaurant" ? "food" : "sight",
         traffic: (index % 3 === 0 ? "congested" : index % 3 === 1 ? "moderate" : "smooth") as any,
         isItinerary: true,
-        originalItem: item
+        originalItem: item,
+        dayIndex: item.dayIndex || 0
       };
     });
   }, [itineraries, destination]);
 
   // Master merged map objects - NO HARDCODED LANDMARKS (AS REQUESTED: "hard code data不要了")
   const allMapObjects = React.useMemo(() => {
-    return [...itineraryPins, ...customHotspots];
-  }, [itineraryPins, customHotspots]);
+    const filteredPins = selectedDayFilter === -1
+      ? itineraryPins
+      : itineraryPins.filter(pin => pin.dayIndex === selectedDayFilter);
+    return [...filteredPins, ...customHotspots];
+  }, [itineraryPins, customHotspots, selectedDayFilter]);
 
   // Cache other active participants with broadcast geolocations
   const otherParticipants = React.useMemo(() => {
@@ -344,9 +327,11 @@ export default function OfflineMapSimulator({
   }, [participants, currentUserId]);
 
   // Filter map list based on search query
-  const filteredObjects = allMapObjects.filter(item =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredObjects = React.useMemo(() => {
+    return allMapObjects.filter(item =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [allMapObjects, searchQuery]);
 
   // Fetch route parameters and decode polyline from our secure Google Routes API proxy
   const fetchGoogleRoute = async (mode: "WALKING" | "DRIVE") => {
@@ -556,7 +541,7 @@ export default function OfflineMapSimulator({
       time: "10:00",
       title: spot.name,
       description: lang === "zh"
-        ? `偵測到該地區的熱門推荐！當前路況判定：${spot.traffic === "smooth" ? "暢通" : spot.traffic === "moderate" ? "多車" : "壅塞"}`
+        ? `偵測到該地區的熱門推薦！當前路況判定：${spot.traffic === "smooth" ? "暢通" : spot.traffic === "moderate" ? "多車" : "壅塞"}`
         : `Explore local hotspot '${spot.name}' in active destination ${destination}. Traffic indicator: ${spot.traffic}`,
       locationName: spot.lat && spot.lng && spot.isCustom ? `${spot.lat.toFixed(6)}, ${spot.lng.toFixed(6)}` : spot.name,
       category: spot.type === "food" ? "restaurant" : "sight",
@@ -839,7 +824,7 @@ export default function OfflineMapSimulator({
       const isSpotActive = activeItem?.locationName === spot.name;
 
       const markerColor = spot.isItinerary
-        ? "#fbbf24" // gold for active itineraries
+        ? getDayColor(spot.dayIndex || 0) // dynamic color for different days
         : spot.isCustom
         ? "#ec4899" // hot pink for custom pins
         : spot.traffic === "smooth"
@@ -848,13 +833,17 @@ export default function OfflineMapSimulator({
         ? "#f59e0b"
         : "#ef4444";
 
-      const badgeIcon = spot.isItinerary ? "📅" : spot.type === "food" ? "🍴" : "📍";
+      const badgeIcon = spot.isItinerary
+        ? `D${(spot.dayIndex || 0) + 1}`
+        : spot.type === "food"
+        ? "🍴"
+        : "📍";
 
       const pinIcon = L.divIcon({
         className: `custom-leaflet-pin-wrapper`,
         html: `
           <div class="flex flex-col items-center ${isSpotActive ? 'scale-115 z-50' : 'opacity-90'} transition-transform duration-200">
-            <div class="w-6.5 h-6.5 rounded-full border-2 border-white flex items-center justify-center shadow-md text-white text-[10px]" style="background-color: ${markerColor}; ${isSpotActive ? 'box-shadow: 0 0 10px #fbbf24; border-color: #fbbf24;' : ''}">
+            <div class="w-7.5 h-7.5 rounded-full border-2 border-white flex items-center justify-center shadow-md text-white text-[9.5px] font-black font-mono leading-none" style="background-color: ${markerColor}; ${isSpotActive ? 'box-shadow: 0 0 10px ' + markerColor + '; border-color: #fbbf24;' : ''}">
               ${badgeIcon}
             </div>
             <div class="mt-1 px-1.5 py-0.5 rounded bg-slate-900 border border-white/10 text-white text-[9px] font-bold whitespace-nowrap leading-none shadow-sm ${isSpotActive ? 'text-amber-300 border-amber-400 font-extrabold bg-slate-950 scale-105' : ''}">
@@ -862,8 +851,8 @@ export default function OfflineMapSimulator({
             </div>
           </div>
         `,
-        iconSize: [28, 44],
-        iconAnchor: [14, 44]
+        iconSize: [30, 46],
+        iconAnchor: [15, 46]
       });
 
       L.marker([pos.lat, pos.lng], { icon: pinIcon })
@@ -1073,6 +1062,48 @@ export default function OfflineMapSimulator({
           )}
         </div>
 
+        {/* Day Filter Selector */}
+        <div className="mb-4 shrink-0">
+          <label className="block text-[10.5px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
+            {lang === "zh" ? "📅 選擇查看天數" : "📅 Filter by Day"}
+          </label>
+          <div className="flex gap-1 overflow-x-auto pb-1.5 scrollbar-none">
+            <button
+              type="button"
+              id="day-filter-btn-all"
+              onClick={() => setSelectedDayFilter(-1)}
+              className={`px-3 py-1.5 text-[11px] font-bold rounded-xl transition-all shrink-0 cursor-pointer border ${
+                selectedDayFilter === -1
+                  ? "bg-indigo-600 border-indigo-500 text-white shadow-md shadow-indigo-600/20"
+                  : "bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border-white/5"
+              }`}
+            >
+              {lang === "zh" ? "全部天數" : "All Days"}
+            </button>
+            {uniqueDays.map((dayIdx) => {
+              const dayColor = getDayColor(dayIdx);
+              const isActive = selectedDayFilter === dayIdx;
+              return (
+                <button
+                  key={dayIdx}
+                  type="button"
+                  id={`day-filter-btn-${dayIdx}`}
+                  onClick={() => setSelectedDayFilter(dayIdx)}
+                  className={`px-3 py-1.5 text-[11px] font-bold rounded-xl transition-all shrink-0 cursor-pointer flex items-center gap-1.5 border`}
+                  style={{
+                    backgroundColor: isActive ? dayColor : "rgba(15, 23, 42, 0.6)",
+                    borderColor: isActive ? dayColor : "rgba(255, 255, 255, 0.05)",
+                    color: isActive ? "#ffffff" : "rgb(148, 163, 184)"
+                  }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isActive ? "#ffffff" : dayColor }}></span>
+                  <span>{lang === "zh" ? `第 ${dayIdx + 1} 天` : `Day ${dayIdx + 1}`}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* List of elements in map viewport */}
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
           <div className="flex items-center justify-between block mb-1">
@@ -1103,15 +1134,24 @@ export default function OfflineMapSimulator({
                   }`}
                 >
                   <div className="flex items-center gap-2 max-w-[70%] min-w-0 overflow-hidden">
-                    <MapPin size={13} className={spot.isItinerary ? "text-amber-400" : isSpotActive ? "text-blue-400" : "text-slate-400"} />
+                    <MapPin
+                      size={13}
+                      style={{
+                        color: spot.isItinerary
+                          ? getDayColor(spot.dayIndex || 0)
+                          : isSpotActive
+                          ? "#3b82f6"
+                          : "rgb(148, 163, 184)"
+                      }}
+                    />
                     <div className="truncate min-w-0">
                       <h4 className="text-xs font-bold text-white leading-tight truncate">{spot.name}</h4>
                       <span className="text-xs text-slate-400 font-mono capitalize truncate block">
                         {spot.isItinerary 
-                          ? (lang === "zh" ? "★ 自行规划之日程" : "★ Itinerary Plan") 
+                          ? (lang === "zh" ? `★ 第 ${ (spot.dayIndex || 0) + 1 } 天日程` : `★ Day ${ (spot.dayIndex || 0) + 1 } Plan`) 
                           : spot.isCustom 
                           ? (lang === "zh" ? "自訂探查地標" : "User dropped pin") 
-                          : (lang === "zh" ? "本地精選推荐" : "OdyShareSmart spot")}
+                          : (lang === "zh" ? "本地精選推薦" : "OdyShareSmart spot")}
                       </span>
                     </div>
                   </div>
@@ -1610,9 +1650,9 @@ export default function OfflineMapSimulator({
                     r={isSpotActive ? (spot.isItinerary ? "2.6" : "2.2") : "1.4"}
                     fill={
                       isSpotActive
-                        ? spot.isItinerary ? "#f59e0b" : "#3b82f6"
+                        ? spot.isItinerary ? getDayColor(spot.dayIndex || 0) : "#3b82f6"
                         : spot.isItinerary
-                        ? "#fbbf24" // gold for active schedules
+                        ? getDayColor(spot.dayIndex || 0) // dynamic color for different days
                         : spot.isCustom
                         ? "#ec4899" // hot pink for user custom-added coordinates
                         : spot.traffic === "smooth"
@@ -1625,14 +1665,20 @@ export default function OfflineMapSimulator({
                     strokeWidth="0.3"
                   />
 
-                  {/* Tiny star glyph inside gold itinerary node pins */}
+                  {/* Tiny text label representing day inside the pin */}
                   {spot.isItinerary && (
-                    <circle
-                      cx={spot.x}
-                      cy={spot.y}
-                      r="0.5"
-                      fill="#451a03"
-                    />
+                    <text
+                      x={spot.x}
+                      y={spot.y + 0.4}
+                      fill="#ffffff"
+                      fontSize="1.1"
+                      fontWeight="black"
+                      fontFamily="monospace"
+                      textAnchor="middle"
+                      className="pointer-events-none select-none"
+                    >
+                      {((spot.dayIndex || 0) + 1).toString()}
+                    </text>
                   )}
 
                   {/* Labeled text underneath point */}

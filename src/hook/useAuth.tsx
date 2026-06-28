@@ -6,8 +6,8 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import type { Participant } from "../types";
+import { SESSION_TTL_MS } from "../lib/constants";
 
-const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 function readStorage(key: string): string {
   return localStorage.getItem(key) || "";

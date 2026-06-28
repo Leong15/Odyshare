@@ -150,7 +150,7 @@ export default function LoginTerminal({
                 <input
                   type="text"
                   required
-                  placeholder={lang === "zh" ? "e.g. 小明 / Leo Chen" : "e.g. Leo Chen"}
+                  placeholder={lang === "zh" ? "e.g. 小明 / Ben Chan" : "e.g. Ben Chan"}
                   value={authName}
                   onChange={(e) => setAuthName(e.target.value)}
                   className={`w-full px-3.5 py-2.5 rounded-xl text-base md:text-xs border focus:outline-none transition-all ${
@@ -322,7 +322,7 @@ export default function LoginTerminal({
                     <input
                       type="text"
                       required
-                      placeholder="e.g. leochau"
+                      placeholder="e.g. benchan"
                       value={recoveryUsername}
                       onChange={(e) => setRecoveryUsername(e.target.value)}
                       className={`w-full px-3.5 py-2 rounded-xl text-base md:text-xs border focus:outline-none ${

@@ -2,67 +2,13 @@ import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { ItineraryItem } from "../types";
 import { MapPin, Navigation, Globe } from "lucide-react";
+import { resolveLatLng } from "../utils/mapHelpers";
 
 interface ItineraryMapProps {
   destination?: string;
   items: ItineraryItem[];
   lang?: "en" | "zh";
 }
-
-// Coordinate resolver
-const resolveLatLng = (
-  name: string,
-  dest: string,
-  x: number = 50,
-  y: number = 50,
-  lat?: number,
-  lng?: number
-): { lat: number; lng: number } => {
-  if (lat != null && lng != null && lat !== 0 && lng !== 0) {
-    return { lat, lng };
-  }
-
-  const d = (dest || "Tokyo").toLowerCase();
-  const n = (name || "").toLowerCase();
-
-  // Establish center coordinates based on destination
-  let center = { lat: 35.6762, lng: 139.6503 }; // Tokyo default
-  if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
-    center = { lat: 22.3193, lng: 114.1694 };
-  } else if (d.includes("paris") || d.includes("巴黎")) {
-    center = { lat: 48.8566, lng: 2.3522 };
-  } else if (d.includes("london") || d.includes("倫敦")) {
-    center = { lat: 51.5074, lng: -0.1278 };
-  } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
-    center = { lat: 25.0330, lng: 121.5654 };
-  } else if (d.includes("new york") || d.includes("nyc")) {
-    center = { lat: 40.7128, lng: -74.0060 };
-  }
-
-  // Matching of hotspots
-  if (n.includes("gyoen") || n.includes("御苑")) return { lat: 35.6852, lng: 139.7101 };
-  if (n.includes("crossing") || n.includes("澀谷") || n.includes("shibuya")) return { lat: 35.6580, lng: 139.7016 };
-  if (n.includes("tsukiji") || n.includes("築地")) return { lat: 35.6658, lng: 139.7701 };
-  if (n.includes("sensoji") || n.includes("淺草") || n.includes("asakusa")) return { lat: 35.7148, lng: 139.7967 };
-  if (n.includes("akihabara") || n.includes("秋葉")) return { lat: 35.6997, lng: 139.7715 };
-  if (n.includes("tower") || n.includes("東京鐵塔")) return { lat: 35.6586, lng: 139.7454 };
-  if (n.includes("disney") || n.includes("迪士尼")) return { lat: 35.6329, lng: 139.8804 };
-  if (n.includes("shinjuku") || n.includes("新宿")) return { lat: 35.6909, lng: 139.7003 };
-
-  // HK hotspots
-  if (n.includes("victoria") || n.includes("peak") || n.includes("太平山")) return { lat: 22.2759, lng: 114.1455 };
-  if (n.includes("tsim sha tsui") || n.includes("tst") || n.includes("尖沙咀")) return { lat: 22.2988, lng: 114.1722 };
-  if (n.includes("ocean park") || n.includes("海洋公園")) return { lat: 22.2475, lng: 114.1744 };
-  if (n.includes("disneyland") || n.includes("迪士尼")) return { lat: 22.3130, lng: 114.0413 };
-
-  // Fallback map x/y offsets
-  const latOffset = (50 - y) * 0.0015;
-  const lngOffset = (x - 50) * 0.0018;
-  return {
-    lat: center.lat + latOffset,
-    lng: center.lng + lngOffset
-  };
-};
 
 export default function ItineraryMap({
   destination = "Tokyo",
@@ -129,7 +75,19 @@ export default function ItineraryMap({
     }
 
     return () => {
-      // Cleanup on unmount only
+      if (polylineRef.current) {
+        polylineRef.current.remove();
+        polylineRef.current = null;
+      }
+      if (markersGroupRef.current) {
+        markersGroupRef.current.clearLayers();
+        markersGroupRef.current.remove();
+        markersGroupRef.current = null;
+      }
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
     };
   }, []);
 

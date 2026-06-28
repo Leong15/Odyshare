@@ -1,41 +1,10 @@
 import { Router, Request, Response } from "express";
 import { getDB, writeDB } from "../db.js";
-import argon2 from "argon2";
-import crypto from "crypto";
 import { sendRealEmail } from "../utils/email.js";
+import { safeHash, safeVerify } from "../utils/crypto.js";
+import crypto from "crypto";
 
 const router = Router();
-
-// Safe hashing utility using Argon2 with automatic built-in Node.js scrypt fallback
-async function safeHash(password: string): Promise<string> {
-  try {
-    return await argon2.hash(password.trim(), { type: argon2.argon2id });
-  } catch (err) {
-    console.warn("Argon2 hashing failed, falling back to secure scrypt:", err);
-    const salt = crypto.randomBytes(16).toString("hex");
-    const hash = crypto.scryptSync(password.trim(), salt, 64).toString("hex");
-    return `$scrypt$default$${salt}$${hash}`;
-  }
-}
-
-async function safeVerify(storedHash: string, passwordToVerify: string): Promise<boolean> {
-  if (storedHash.startsWith("$argon2")) {
-    try {
-      return await argon2.verify(storedHash, passwordToVerify.trim());
-    } catch (err) {
-      console.warn("Argon2 verification failed/crashed, check fallback scrypt:", err);
-      return false;
-    }
-  } else if (storedHash.startsWith("$scrypt$")) {
-    const parts = storedHash.split("$");
-    const salt = parts[2];
-    const hash = parts[3];
-    const verifyHash = crypto.scryptSync(passwordToVerify.trim(), salt, 64).toString("hex");
-    return crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(verifyHash, "hex"));
-  } else {
-    return storedHash === passwordToVerify.trim();
-  }
-}
 
 // ── Email Verification Endpoint ──────────────────────────────────────────────
 router.get("/verify-email", async (req: Request, res: Response) => {
