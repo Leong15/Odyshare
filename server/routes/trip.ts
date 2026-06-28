@@ -264,16 +264,47 @@ router.post("/vote", async (req: Request, res: Response) => {
 
 // ── POST /api/trip/document/upload ──────────────────────────────────────────
 router.post("/document/upload", async (req: Request, res: Response) => {
-  const { name, size, type, uploadedBy } = req.body;
+  const { name, size, type, uploadedBy, fileData } = req.body;
   const current = readTripsDB(req);
+
+  let downloadUrl = "#";
+  let calculatedSize = size || "1.2 MB";
+
+  if (fileData) {
+    try {
+      const buffer = Buffer.from(fileData, "base64");
+      // Calculate human-readable size
+      if (buffer.length < 1024 * 1024) {
+        calculatedSize = (buffer.length / 1024).toFixed(1) + " KB";
+      } else {
+        calculatedSize = (buffer.length / (1024 * 1024)).toFixed(1) + " MB";
+      }
+
+      // Lazily import firebase/storage components
+      const { ref: storageRefLoc, uploadBytes: uploadBytesLoc, getDownloadURL: getDownloadURLLoc } = await import("firebase/storage");
+      const { storage: storageInstance } = await import("../db.js");
+
+      const storagePath = `trips/${current.id}/documents/${Date.now()}_${name}`;
+      const fileRef = storageRefLoc(storageInstance, storagePath);
+
+      const uint8Array = new Uint8Array(buffer);
+      const snapshot = await uploadBytesLoc(fileRef, uint8Array, {
+        contentType: type || "application/octet-stream"
+      });
+      downloadUrl = await getDownloadURLLoc(snapshot.ref);
+      console.log(`[Firebase Storage] Uploaded '${name}' to '${storagePath}' successfully -> ${downloadUrl}`);
+    } catch (storageErr) {
+      console.error("[Firebase Storage] Upload failed:", storageErr);
+    }
+  }
 
   const newDoc = {
     id: "doc-" + Date.now(),
     name,
-    size: size || "1.2 MB",
+    size: calculatedSize,
     type: type || "application/pdf",
     uploadedAt: new Date().toISOString(),
-    url: "#",
+    url: downloadUrl,
     accessKey: "doc_hash_sha250_" + Math.random().toString(36).slice(2, 12),
     uploadedBy: uploadedBy || "Unknown",
   };

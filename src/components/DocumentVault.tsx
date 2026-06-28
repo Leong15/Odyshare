@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { FolderLock, FileText, Download, ShieldCheck, Key, Plus, FileUp } from "lucide-react";
 import { DocumentItem } from "../types";
 import { translations } from "../lib/translations";
@@ -6,14 +6,21 @@ import { translations } from "../lib/translations";
 interface DocumentVaultProps {
   documents: DocumentItem[];
   currentUser: string;
-  onUploadDocument: (doc: { name: string; size: string; type: string; uploadedBy: string }) => void;
+  onUploadDocument: (doc: { name: string; size: string; type: string; uploadedBy: string }, fileData?: string) => void;
   lang?: "en" | "zh";
 }
 
 export default function DocumentVault({ documents, currentUser, onUploadDocument, lang = "en" }: DocumentVaultProps) {
   const [showUploadSim, setShowUploadSim] = useState<boolean>(false);
   const [dragActive, setDragActive] = useState<boolean>(false);
-  const [selectedFile, setSelectedFile] = useState<{ name: string; size: string } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{
+    name: string;
+    size: string;
+    type: string;
+    base64Data?: string;
+  } | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // In-app secure feedback modal/toast state (instead of iframe-unfriendly window.alert)
   const [activeToast, setActiveToast] = useState<{ type: "keygen" | "download"; fileName: string; keySig?: string } | null>(null);
@@ -43,12 +50,51 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
       const sizeStr = (file.size / (1024 * 1024)).toFixed(1) + " MB";
-      setSelectedFile({ name: file.name, size: sizeStr });
+      
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Data = reader.result as string;
+        setSelectedFile({
+          name: file.name,
+          size: sizeStr,
+          type: file.type || "application/octet-stream",
+          base64Data: base64Data.split(",")[1]
+        });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const sizeStr = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+      
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64Data = reader.result as string;
+        setSelectedFile({
+          name: file.name,
+          size: sizeStr,
+          type: file.type || "application/octet-stream",
+          base64Data: base64Data.split(",")[1]
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const triggerFileBrowser = () => {
+    fileInputRef.current?.click();
+  };
+
   const simulateSelectPredefined = (file: typeof mockPredefinedFiles[0]) => {
-    setSelectedFile({ name: file.name, size: file.size });
+    setSelectedFile({
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      base64Data: btoa("This is simulated decrypted secure content of " + file.name)
+    });
   };
 
   const handlePostFile = () => {
@@ -56,9 +102,9 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     onUploadDocument({
       name: selectedFile.name,
       size: selectedFile.size,
-      type: selectedFile.name.endsWith(".pdf") ? "application/pdf" : "image/png",
+      type: selectedFile.type,
       uploadedBy: currentUser
-    });
+    }, selectedFile.base64Data);
     setSelectedFile(null);
     setShowUploadSim(false);
   };
@@ -82,6 +128,21 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     setTimeout(() => {
       setActiveToast(null);
     }, 4000);
+  };
+
+  const handleDownloadFile = (docUrl: string, docName: string) => {
+    showDownloadSim(docName);
+    if (docUrl && docUrl !== "#") {
+      setTimeout(() => {
+        const link = document.createElement("a");
+        link.href = docUrl;
+        link.target = "_blank";
+        link.download = docName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }, 1000);
+    }
   };
 
   return (
@@ -128,20 +189,30 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
 
       {showUploadSim && (
         <div className="mb-6 p-5 bg-slate-900/60 border border-white/8 rounded-2xl space-y-4 text-xs animate-fadeIn">
-          <h4 className="font-semibold text-white text-[13px]">{lang === "zh" ? "模擬拖放憑證上傳" : "Simulate Document Drag & Drop"}</h4>
+          <h4 className="font-semibold text-white text-[13px]">{lang === "zh" ? "真實/模擬憑證上傳" : "Real / Mock Document Upload"}</h4>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
           <div
             onDragEnter={handleDrag}
             onDragOver={handleDrag}
             onDragLeave={handleDrag}
             onDrop={handleDrop}
+            onClick={triggerFileBrowser}
             className={`h-28 border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${
               dragActive ? "border-blue-500 bg-blue-500/20" : "border-white/10 bg-slate-950 hover:bg-slate-900"
             }`}
           >
             <FileUp size={24} className="text-slate-400 mb-1" />
-            <span className="text-[11.5px] text-slate-300 font-semibold">{t.dragDropText}</span>
-            <span className="text-[10px] text-slate-500 mt-0.5">{lang === "zh" ? "或單擊下方快捷項目直接添加" : "Or tap select preset below"}</span>
+            <span className="text-[11.5px] text-slate-300 font-semibold">
+              {lang === "zh" ? "點擊瀏覽檔案 或 拖放檔案至此" : "Click to browse or drag & drop files here"}
+            </span>
+            <span className="text-[10px] text-slate-500 mt-0.5">{lang === "zh" ? "或單擊下方快捷項目直接模擬" : "Or tap select preset below"}</span>
           </div>
 
           <div className="space-y-2">
@@ -218,7 +289,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
                 </button>
                 <button
                   id={`doc-download-${doc.id}`}
-                  onClick={() => showDownloadSim(doc.name)}
+                  onClick={() => handleDownloadFile(doc.url, doc.name)}
                   className="flex items-center gap-1.5 text-white bg-blue-600 hover:bg-blue-500 font-medium cursor-pointer px-3 py-1.5 rounded-xl border border-blue-500/15 text-xs h-9 flex items-center justify-center transition-all shadow active:scale-[0.98]"
                 >
                   <Download size={11} /> {t.decryptPdf}

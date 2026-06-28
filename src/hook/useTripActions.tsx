@@ -280,12 +280,12 @@ export function useTripActions({
   // ---------------------------------------------------------------------------
 
   const handleUploadDocument = useCallback(
-    async (doc: Omit<DocumentItem, "id" | "uploadedAt" | "url" | "accessKey">) => {
+    async (doc: Omit<DocumentItem, "id" | "uploadedAt" | "url" | "accessKey">, fileData?: string) => {
       try {
         const res = await fetchWithAuth("/api/trip/document/upload", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(doc),
+          body: JSON.stringify({ ...doc, fileData }),
         });
         if (res.ok) {
           const data = await res.json();

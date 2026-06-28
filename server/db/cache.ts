@@ -18,6 +18,9 @@ export let memoryDB: MemoryDB = {
   invitations: []
 };
 
+// Keep a deep copy of the last synchronized database state to correctly compute delta differences
+export let lastSyncedDB: MemoryDB = JSON.parse(JSON.stringify(memoryDB));
+
 // Synchronous fetch of current state
 export function getDB(): MemoryDB {
   return memoryDB;
@@ -31,17 +34,22 @@ export function setMemoryDB(data: Partial<MemoryDB>) {
     trips: Array.isArray(data.trips) ? data.trips : memoryDB.trips,
     invitations: Array.isArray(data.invitations) ? data.invitations : memoryDB.invitations
   };
+  lastSyncedDB = JSON.parse(JSON.stringify(memoryDB));
 }
 
 // Background Delta Sync of Cache to Firestore (zero lock times, high responsiveness)
 export function writeDB(data: Partial<MemoryDB>) {
-  const oldDB = { ...memoryDB };
+  const oldDB = lastSyncedDB;
+  
   memoryDB = {
     activeTripId: data.activeTripId || memoryDB.activeTripId,
     users: Array.isArray(data.users) ? data.users : memoryDB.users,
     trips: Array.isArray(data.trips) ? data.trips : memoryDB.trips,
     invitations: Array.isArray(data.invitations) ? data.invitations : memoryDB.invitations
   };
+
+  // Deep clone memoryDB after updating it so that it becomes the baseline for the next sync
+  lastSyncedDB = JSON.parse(JSON.stringify(memoryDB));
 
 
   // Run async firestore updates

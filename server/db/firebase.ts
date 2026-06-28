@@ -2,6 +2,7 @@ import path from "path";
 import fs from "fs";
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, doc, getDocs, getDoc, setLogLevel } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import { seedDefaults } from "./seed.js";
 import { DB_PATH, setMemoryDB } from "./cache.js";
 import type { DBUser, DBInvitation } from "../types/db";
@@ -15,6 +16,7 @@ const configPath = path.join(process.cwd(), "firebase-applet-config.json");
 const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 const firebaseApp = initializeApp(firebaseConfig);
 export const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || "default");
+export const storage = getStorage(firebaseApp);
 
 // Helper to race a promise against a timeout
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
