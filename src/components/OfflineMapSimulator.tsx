@@ -5,7 +5,7 @@ import L from "leaflet";
 import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 import { resolveLatLng } from "../utils/mapHelpers";
-import { MAP_CONFIG } from "../lib/constants";
+import { MAP_CONFIG, isItineraryItem } from "../lib/constants";
 
 // Polyline decoder to convert Google Maps Encoded Polyline algorithm format to latlng arrays
 const decodePolyline = (encoded: string): [number, number][] => {
@@ -108,6 +108,8 @@ export default function OfflineMapSimulator({
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
+  const markerCacheRef = useRef<Map<string, L.Marker>>(new Map());
+  const polylineRef = useRef<L.Polyline | null>(null);
 
   // Geolocation and navigation
   const [currentGeoLocation, setCurrentGeoLocation] = useState<{ lat: number; lng: number }>(() => {
@@ -149,22 +151,9 @@ export default function OfflineMapSimulator({
 
   // Helper to convert real Lat/Lng standard coordinates to pseudo canvas X/Y
   const getSvgCoordsFromLatLng = (lat: number, lng: number): { x: number; y: number } => {
-    let center = { lat: 35.6762, lng: 139.6503 }; // Tokyo default
+    let center = resolveLatLng("", destination, 50, 50);
     if (tripLat !== undefined && tripLat !== null && tripLng !== undefined && tripLng !== null && !isNaN(Number(tripLat)) && !isNaN(Number(tripLng))) {
       center = { lat: Number(tripLat), lng: Number(tripLng) };
-    } else {
-      const d = destination.toLowerCase();
-      if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
-        center = { lat: 22.3193, lng: 114.1694 };
-      } else if (d.includes("paris") || d.includes("巴黎")) {
-        center = { lat: 48.8566, lng: 2.3522 };
-      } else if (d.includes("london") || d.includes("倫敦")) {
-        center = { lat: 51.5074, lng: -0.1278 };
-      } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
-        center = { lat: 25.0330, lng: 121.5654 };
-      } else if (d.includes("new york") || d.includes("nyc")) {
-        center = { lat: 40.7128, lng: -74.0060 };
-      }
     }
 
     const y = 50 - (lat - center.lat) / 0.0015;
@@ -374,10 +363,14 @@ export default function OfflineMapSimulator({
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || (lang === "zh" ? "獲取路線規劃失敗" : "Failed to retrieve route."));
+        const errMsg = typeof data.error === "object" && data.error !== null
+          ? (data.error.message || data.error.code || (lang === "zh" ? "獲取路線規劃失敗" : "Failed to retrieve route."))
+          : (data.error || (lang === "zh" ? "獲取路線規劃失敗" : "Failed to retrieve route."));
+        throw new Error(errMsg);
       }
 
-      const backendData = await res.json();
+      const jsonRes = await res.json();
+      const backendData = jsonRes.success && jsonRes.data ? jsonRes.data : jsonRes;
       if (backendData.routes && backendData.routes[0]) {
         const route = backendData.routes[0];
         const encoded = route.polyline?.encodedPolyline;
@@ -517,7 +510,7 @@ export default function OfflineMapSimulator({
 
   const handleDeleteOrCreateNode = async () => {
     if (!activeItem) return;
-    const isRealItinerary = activeItem.id && activeItem.id.startsWith("it-");
+    const isRealItinerary = activeItem.id && isItineraryItem(activeItem.id);
     if (isRealItinerary) {
       if (onDeleteItineraryItem) {
         await onDeleteItineraryItem(activeItem.id);
@@ -541,8 +534,8 @@ export default function OfflineMapSimulator({
       time: "10:00",
       title: spot.name,
       description: lang === "zh"
-        ? `偵測到該地區的熱門推薦！當前路況判定：${spot.traffic === "smooth" ? "暢通" : spot.traffic === "moderate" ? "多車" : "壅塞"}`
-        : `Explore local hotspot '${spot.name}' in active destination ${destination}. Traffic indicator: ${spot.traffic}`,
+        ? `偵測到該地區的熱門推薦！`
+        : `Explore local hotspot '${spot.name}' in active destination ${destination}.`,
       locationName: spot.lat && spot.lng && spot.isCustom ? `${spot.lat.toFixed(6)}, ${spot.lng.toFixed(6)}` : spot.name,
       category: spot.type === "food" ? "restaurant" : "sight",
       cost: 0,
@@ -764,10 +757,13 @@ export default function OfflineMapSimulator({
     if (!mapRef.current || !markersGroupRef.current) return;
 
     const group = markersGroupRef.current;
-    group.clearLayers();
+    const activeKeys = new Set<string>();
 
-    // Paint current real GPS geolocation if available
+    // 1. Paint current real GPS geolocation if available
     if (currentGeoLocation) {
+      const key = "gps-user";
+      activeKeys.add(key);
+
       const geoIcon = L.divIcon({
         className: "custom-leaflet-geo-pin",
         html: `
@@ -784,12 +780,23 @@ export default function OfflineMapSimulator({
         iconAnchor: [16, 24]
       });
 
-      L.marker([currentGeoLocation.lat, currentGeoLocation.lng], { icon: geoIcon })
-        .addTo(group);
+      const existing = markerCacheRef.current.get(key);
+      if (existing) {
+        existing.setLatLng([currentGeoLocation.lat, currentGeoLocation.lng]);
+        existing.setIcon(geoIcon);
+      } else {
+        const marker = L.marker([currentGeoLocation.lat, currentGeoLocation.lng], { icon: geoIcon })
+          .addTo(group);
+        markerCacheRef.current.set(key, marker);
+      }
     }
 
-    // Paint other active participants' live positions in team project
+    // 2. Paint other active participants' live positions in team project
     otherParticipants.forEach(p => {
+      if (p.lat == null || p.lng == null) return;
+      const key = `participant-${p.id}`;
+      activeKeys.add(key);
+
       const pColor = p.avatarColor || "#10b981";
       const initials = (p.name || "").substring(0, 2).toUpperCase() || "?";
       
@@ -813,13 +820,23 @@ export default function OfflineMapSimulator({
         iconAnchor: [18, 26]
       });
 
-      L.marker([p.lat!, p.lng!], { icon: pIcon })
-        .addTo(group)
-        .bindPopup(`<strong>${p.name}</strong><br/>${lang === "zh" ? "成員即時位置" : "Participant Live Location"}`);
+      const existing = markerCacheRef.current.get(key);
+      if (existing) {
+        existing.setLatLng([p.lat, p.lng]);
+        existing.setIcon(pIcon);
+      } else {
+        const marker = L.marker([p.lat, p.lng], { icon: pIcon })
+          .addTo(group)
+          .bindPopup(`<strong>${p.name}</strong><br/>${lang === "zh" ? "成員即時位置" : "Participant Live Location"}`);
+        markerCacheRef.current.set(key, marker);
+      }
     });
 
-    // Paint other targets
+    // 3. Paint other targets (spots/itinerary items)
     allMapObjects.forEach(spot => {
+      const key = `spot-${spot.id || spot.name}`;
+      activeKeys.add(key);
+
       const pos = getSpotCoords(spot);
       const isSpotActive = activeItem?.locationName === spot.name;
 
@@ -827,11 +844,7 @@ export default function OfflineMapSimulator({
         ? getDayColor(spot.dayIndex || 0) // dynamic color for different days
         : spot.isCustom
         ? "#ec4899" // hot pink for custom pins
-        : spot.traffic === "smooth"
-        ? "#10b981"
-        : spot.traffic === "moderate"
-        ? "#f59e0b"
-        : "#ef4444";
+        : "#64748b";
 
       const badgeIcon = spot.isItinerary
         ? `D${(spot.dayIndex || 0) + 1}`
@@ -855,16 +868,39 @@ export default function OfflineMapSimulator({
         iconAnchor: [15, 46]
       });
 
-      L.marker([pos.lat, pos.lng], { icon: pinIcon })
-        .addTo(group)
-        .on("click", () => {
+      const existing = markerCacheRef.current.get(key);
+      if (existing) {
+        existing.setLatLng([pos.lat, pos.lng]);
+        existing.setIcon(pinIcon);
+        existing.off("click");
+        existing.on("click", () => {
           handleSelectObject(spot);
         });
+      } else {
+        const marker = L.marker([pos.lat, pos.lng], { icon: pinIcon })
+          .addTo(group)
+          .on("click", () => {
+            handleSelectObject(spot);
+          });
+        markerCacheRef.current.set(key, marker);
+      }
     });
 
-    // Draw calculated Google-Routes-API polyline path on Leaflet
+    // Remove any markers from group and cache that are no longer active
+    for (const [key, marker] of markerCacheRef.current.entries()) {
+      if (!activeKeys.has(key)) {
+        group.removeLayer(marker);
+        markerCacheRef.current.delete(key);
+      }
+    }
+
+    // 4. Draw calculated Google-Routes-API polyline path on Leaflet
+    if (polylineRef.current) {
+      group.removeLayer(polylineRef.current);
+      polylineRef.current = null;
+    }
     if (routePoints && routePoints.length > 0) {
-      L.polyline(routePoints, {
+      const pl = L.polyline(routePoints, {
         color: routeMeta?.mode === "WALKING" ? "#3b82f6" : "#10b981",
         weight: 6,
         opacity: 0.85,
@@ -872,6 +908,7 @@ export default function OfflineMapSimulator({
         lineJoin: "round",
         dashArray: routeMeta?.mode === "WALKING" ? "5, 10" : undefined
       }).addTo(group);
+      polylineRef.current = pl;
     }
 
   }, [allMapObjects, activeItem, currentGeoLocation, viewMode, routePoints, routeMeta, otherParticipants]);
@@ -927,12 +964,6 @@ export default function OfflineMapSimulator({
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  };
-
-  const getTrafficText = (traffic: string) => {
-    if (traffic === "smooth") return t.trafficSmooth;
-    if (traffic === "moderate") return t.trafficModerate;
-    return t.trafficCongested;
   };
 
   return (
@@ -1155,15 +1186,6 @@ export default function OfflineMapSimulator({
                       </span>
                     </div>
                   </div>
-                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full uppercase leading-none shrink-0 ${
-                    spot.traffic === "smooth"
-                      ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/15"
-                      : spot.traffic === "moderate"
-                      ? "bg-amber-500/10 text-amber-300 border border-amber-500/15"
-                      : "bg-rose-500/10 text-rose-300 border border-rose-500/15"
-                  }`}>
-                    {spot.traffic === "smooth" ? (lang === "zh" ? "暢通" : "Smooth") : spot.traffic === "moderate" ? (lang === "zh" ? "多車" : "Moderate") : (lang === "zh" ? "壅塞" : "Congested")}
-                  </span>
                 </button>
               );
             })
@@ -1207,17 +1229,8 @@ export default function OfflineMapSimulator({
                   <div className="flex items-start justify-between">
                     <div className="space-y-1 max-w-[70%]">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full text-white uppercase ${
-                          activeItem.trafficStatus === "smooth"
-                            ? "bg-emerald-600"
-                            : activeItem.trafficStatus === "moderate"
-                            ? "bg-amber-600"
-                            : "bg-red-600"
-                        }`}>
-                          {getTrafficText(activeItem.trafficStatus || "smooth")}
-                        </span>
                         <span className="text-[10px] text-slate-400 font-mono">
-                          {activeItem.id && activeItem.id.startsWith("it-") 
+                          {activeItem.id && isItineraryItem(activeItem.id) 
                             ? `📅 ${lang === "zh" ? "日程安排" : "Itinerary Plan"}` 
                             : `📍 ${lang === "zh" ? "自訂探針" : "Custom Drop"}`}
                         </span>
@@ -1348,7 +1361,7 @@ export default function OfflineMapSimulator({
 
                   {/* Actions Bar */}
                   <div className="flex gap-2 pt-2 border-t border-white/5 text-xs font-bold justify-between">
-                    {activeItem.id && activeItem.id.startsWith("it-") ? (
+                    {activeItem.id && isItineraryItem(activeItem.id) ? (
                       // Itinerary item deletion
                       <button
                         type="button"
@@ -1491,7 +1504,7 @@ export default function OfflineMapSimulator({
                       ↩️ {lang === "zh" ? "返回" : "Back"}
                     </button>
 
-                    {activeItem.id && activeItem.id.startsWith("it-") ? (
+                    {activeItem.id && isItineraryItem(activeItem.id) ? (
                       <button
                         type="button"
                         onClick={handleUpdateExistingItineraryPlan}
@@ -1589,9 +1602,9 @@ export default function OfflineMapSimulator({
             <path d="M 45 0 L 45 100" stroke="#ffffff" strokeWidth="0.15" strokeOpacity="0.1" />
             <path d="M 0 75 Q 50 60 100 75" fill="none" stroke="#ffffff" strokeWidth="0.15" strokeOpacity="0.08" />
 
-            {/* Primary simulated highways showing traffic condition colors (Red / Orange / Green) */}
-            <path d="M 10 10 L 90 90" fill="none" stroke="#22c55e" strokeWidth="0.3" strokeOpacity="0.25" strokeLinecap="round" />
-            <path d="M 15 85 L 85 15" fill="none" stroke="#f59e0b" strokeWidth="0.3" strokeOpacity="0.25" strokeLinecap="round" strokeDasharray="1,1" />
+            {/* Primary arterial highways */}
+            <path d="M 10 10 L 90 90" fill="none" stroke="#ffffff" strokeWidth="0.15" strokeOpacity="0.1" strokeLinecap="round" />
+            <path d="M 15 85 L 85 15" fill="none" stroke="#ffffff" strokeWidth="0.15" strokeOpacity="0.1" strokeLinecap="round" strokeDasharray="1,1" />
 
             {/* Connection Lines between selected Active Item and GPS Point */}
             {activeItem?.coordinates && (
@@ -1655,11 +1668,7 @@ export default function OfflineMapSimulator({
                         ? getDayColor(spot.dayIndex || 0) // dynamic color for different days
                         : spot.isCustom
                         ? "#ec4899" // hot pink for user custom-added coordinates
-                        : spot.traffic === "smooth"
-                        ? "#10b981"
-                        : spot.traffic === "moderate"
-                        ? "#f59e0b"
-                        : "#ef4444"
+                        : "#64748b"
                     }
                     stroke="#ffffff"
                     strokeWidth="0.3"

@@ -113,7 +113,10 @@ export function getTripForRequest(req: Request) {
       lng: t.lng,
       participants: t.participants || [],
       expenses: t.expenses || [],
-      itineraries: t.itineraries || []
+      itineraries: t.itineraries || [],
+      flightEstimates: t.flightEstimates || [],
+      documents: t.documents || [],
+      chats: t.chats || []
     }))
   };
 }
@@ -179,7 +182,10 @@ export function readTripsDB(req?: Request) {
       lng: t.lng,
       participants: t.participants || [],
       expenses: t.expenses || [],
-      itineraries: t.itineraries || []
+      itineraries: t.itineraries || [],
+      flightEstimates: t.flightEstimates || [],
+      documents: t.documents || [],
+      chats: t.chats || []
     }))
   };
 }

@@ -3,19 +3,25 @@ import { db } from "./firebase.js";
 import { DB_PATH, setMemoryDB } from "./cache.js";
 import { DEFAULT_TRIP } from "./defaultTrip.js";
 import fs from "fs";
+import { safeHash } from "../utils/crypto.js";
 
 export { DEFAULT_TRIP };
 
 export async function seedDefaults() {
+  const hashedPassword = await safeHash("123");
   const defaultUsers = [
-    { id: "u1", username: "Admin", password: "123", name: "Admin", email: "admin@gmail.com", avatarColor: "#3b82f6" },
+    { id: "u1", username: "Admin", password: hashedPassword, name: "Admin", email: "admin@gmail.com", avatarColor: "#3b82f6" },
   ];
   for (const u of defaultUsers) {
     const { id, ...uData } = u;
     await setDoc(doc(db, "users", id), uData);
   }
   
-  await setDoc(doc(db, "trips", DEFAULT_TRIP.id), DEFAULT_TRIP);
+  const tripPayload = {
+    ...DEFAULT_TRIP,
+    participantIds: ((DEFAULT_TRIP.participants as any[]) || []).map((p: any) => p.id).filter(Boolean)
+  };
+  await setDoc(doc(db, "trips", DEFAULT_TRIP.id), tripPayload);
   await setDoc(doc(db, "config", "active"), { activeTripId: "tokyo-group-2026" });
 
   const seeded = {

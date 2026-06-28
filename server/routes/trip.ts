@@ -5,10 +5,12 @@
  * and only keeps the core trip CRUD + shared utilities here.
  */
 import { Router, Request, Response } from "express";
+import type { Trip, Participant } from "../../src/types";
 import {
   readTripsDB, writeTripsDB, getDB, writeDB, registerSSEClient, unregisterSSEClient,
 } from "../db.js";
 import { resolveCoordinates } from "../utils/geocoding.js";
+import { ok, fail } from "../utils/apiResponse.js";
 
 // Sub-routers
 import itineraryRouter from "./itinerary.js";
@@ -28,12 +30,12 @@ router.use("/", flightSubRouter);         // /:id/flight-subscription
 router.post("/google-route", async (req: Request, res: Response) => {
   const { origin, destination, travelMode } = req.body;
   if (!origin || !destination || !travelMode) {
-    return res.status(400).json({ error: "Missing origin, destination, or travelMode" });
+    return res.status(400).json(fail("BAD_REQUEST", "Missing origin, destination, or travelMode"));
   }
 
   const apiKey = process.env.GOOGLE_MAPS_PLATFORM_KEY || "";
   if (!apiKey) {
-    return res.status(500).json({ error: "Google Maps Platform key not configured." });
+    return res.status(500).json(fail("SERVER_ERROR", "Google Maps Platform key not configured."));
   }
 
   try {
@@ -57,11 +59,11 @@ router.post("/google-route", async (req: Request, res: Response) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      return res.status(response.status).json({ error: "Google Routes API error", details: errText });
+      return res.status(response.status).json(fail("BAD_REQUEST", `Google Routes API error: ${errText}`));
     }
-    res.json(await response.json());
+    res.json(ok(await response.json()));
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Internal server error" });
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Internal server error"));
   }
 });
 
@@ -70,19 +72,19 @@ router.post("/update-location", (req: Request, res: Response) => {
   const { lat, lng } = req.body;
   const userId = req.headers["x-user-id"] as string;
 
-  if (!userId) return res.status(401).json({ error: "x-user-id header required." });
+  if (!userId) return res.status(401).json(fail("UNAUTHORIZED", "x-user-id header required."));
   if (lat === undefined || lng === undefined) {
-    return res.status(400).json({ error: "Missing lat or lng." });
+    return res.status(400).json(fail("BAD_REQUEST", "Missing lat or lng."));
   }
 
   const current = readTripsDB(req);
-  const p = current.participants.find((part: any) => part.id === userId);
+  const p = current.participants.find((part: Participant) => part.id === userId);
   if (p) {
     p.lat = Number(lat);
     p.lng = Number(lng);
     writeTripsDB(current, req);
   }
-  res.json({ success: true });
+  res.json(ok({ success: true }));
 });
 
 // ── GET /api/trip ────────────────────────────────────────────────────────────
@@ -96,14 +98,14 @@ router.get("/", async (req: Request, res: Response) => {
     const toResolve = [
       ...(data.lat == null ? [{ id: data.id, dest: data.destination }] : []),
       ...(data.tripsList || [])
-        .filter((t: any) => t.lat == null && t.destination)
-        .map((t: any) => ({ id: t.id, dest: t.destination })),
+        .filter((t: Trip) => t.lat == null && t.destination)
+        .map((t: Trip) => ({ id: t.id, dest: t.destination })),
     ];
 
     for (const { id, dest } of toResolve) {
       const coords = await resolveCoordinates(dest);
       if (!coords) continue;
-      const idx = db.trips.findIndex((t: any) => t.id === id);
+      const idx = db.trips.findIndex((t: Trip) => t.id === id);
       if (idx !== -1) {
         db.trips[idx].lat = coords.lat;
         db.trips[idx].lng = coords.lng;
@@ -116,9 +118,9 @@ router.get("/", async (req: Request, res: Response) => {
       data = readTripsDB(req);
     }
 
-    res.json(data);
+    res.json(ok(data));
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Failed to read trip database" });
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to read trip database"));
   }
 });
 
@@ -127,20 +129,20 @@ router.post("/update", async (req: Request, res: Response) => {
   const current = readTripsDB(req);
   const updated = { ...current, ...req.body };
   writeTripsDB(updated, req);
-  res.json({ success: true, trip: readTripsDB(req) });
+  res.json(ok({ trip: readTripsDB(req) }));
 });
 
 // ── POST /api/trip/select ────────────────────────────────────────────────────
 router.post("/select", (req: Request, res: Response) => {
   const { tripId } = req.body;
   const db = getDB();
-  if (!db.trips.some((t: any) => t.id === tripId)) {
-    return res.status(404).json({ error: "Trip not found" });
+  if (!db.trips.some((t: Trip) => t.id === tripId)) {
+    return res.status(404).json(fail("NOT_FOUND", "Trip not found"));
   }
   db.activeTripId = tripId;
   writeDB(db);
   req.headers["x-trip-id"] = tripId;
-  res.json({ success: true, trip: readTripsDB(req) });
+  res.json(ok({ trip: readTripsDB(req) }));
 });
 
 // ── POST /api/trip/create ────────────────────────────────────────────────────
@@ -195,14 +197,14 @@ router.post("/create", async (req: Request, res: Response) => {
   writeDB(db);
 
   req.headers["x-trip-id"] = newTripId;
-  res.json({ success: true, trip: readTripsDB(req) });
+  res.json(ok({ trip: readTripsDB(req) }));
 });
 
 // ── POST /api/trip/update-meta ───────────────────────────────────────────────
 router.post("/update-meta", async (req: Request, res: Response) => {
   const { name, destination, totalBudget, status } = req.body;
   const current = readTripsDB(req);
-  if (!current) return res.status(404).json({ error: "No active trip found" });
+  if (!current) return res.status(404).json(fail("NOT_FOUND", "No active trip found"));
 
   if (name !== undefined) current.name = name.trim();
   if (totalBudget !== undefined) current.totalBudget = Number(totalBudget) || 3000;
@@ -219,13 +221,13 @@ router.post("/update-meta", async (req: Request, res: Response) => {
   }
 
   const db = getDB();
-  const idx = db.trips.findIndex((t: any) => t.id === current.id);
+  const idx = db.trips.findIndex((t: Trip) => t.id === current.id);
   if (idx !== -1) {
     db.trips[idx] = current;
     writeDB(db);
   }
 
-  res.json({ success: true, trip: current });
+  res.json(ok({ trip: current }));
 });
 
 // ── POST /api/trip/delete ────────────────────────────────────────────────────
@@ -233,12 +235,12 @@ router.post("/delete", async (req: Request, res: Response) => {
   const { tripId } = req.body;
   const db = getDB();
   if (db.trips.length <= 1) {
-    return res.status(400).json({ error: "Cannot delete the last remaining trip" });
+    return res.status(400).json(fail("BAD_REQUEST", "Cannot delete the last remaining trip"));
   }
-  db.trips = db.trips.filter((t: any) => t.id !== tripId);
+  db.trips = db.trips.filter((t: Trip) => t.id !== tripId);
   if (db.activeTripId === tripId) db.activeTripId = db.trips[0].id;
   writeDB(db);
-  res.json({ success: true, trip: readTripsDB(req) });
+  res.json(ok({ trip: readTripsDB(req) }));
 });
 
 // ── POST /api/trip/vote ──────────────────────────────────────────────────────
@@ -259,7 +261,7 @@ router.post("/vote", async (req: Request, res: Response) => {
     writeTripsDB(current, req);
   }
 
-  res.json({ success: true, trip: current });
+  res.json(ok({ trip: current }));
 });
 
 // ── POST /api/trip/document/upload ──────────────────────────────────────────
@@ -322,7 +324,7 @@ router.post("/document/upload", async (req: Request, res: Response) => {
   });
 
   writeTripsDB(current, req);
-  res.json({ success: true, document: newDoc, trip: current });
+  res.json(ok({ document: newDoc, trip: current }));
 });
 
 // ── POST /api/trip/chat/send ─────────────────────────────────────────────────
@@ -343,14 +345,14 @@ router.post("/chat/send", async (req: Request, res: Response) => {
 
   current.chats.push(newMsg);
   writeTripsDB(current, req);
-  res.json({ success: true, msg: newMsg, trip: current });
+  res.json(ok({ msg: newMsg, trip: current }));
 });
 
 // ── GET /api/trip/events ─────────────────────────────────────────────────────
 router.get("/events", (req: Request, res: Response) => {
   const tripId = req.query.tripId as string;
   if (!tripId) {
-    return res.status(400).json({ error: "Missing tripId parameter" });
+    return res.status(400).json(fail("BAD_REQUEST", "Missing tripId parameter"));
   }
 
   // Set headers for Server-Sent Events

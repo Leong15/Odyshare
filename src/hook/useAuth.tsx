@@ -110,12 +110,16 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
         const data = await res.json();
 
         if (!res.ok) {
-          setAuthError(data.error || "Authentication failed");
+          const errMsg = typeof data.error === "object" && data.error !== null
+            ? (data.error.message || data.error.code || "Authentication failed")
+            : (data.error || "Authentication failed");
+          setAuthError(errMsg);
           return;
         }
 
-        if (data.pendingVerification) {
-          setAuthError(`✅ ${data.message}`);
+        if (data.pendingVerification || (data.data && data.data.pendingVerification)) {
+          const payload = data.data || data;
+          setAuthError(`✅ ${payload.message}`);
           setAuthMode("login");
           setAuthPassword("");
           setAuthName("");
@@ -123,7 +127,10 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
           return;
         }
 
-        const user = data.user;
+        const user = data.user || (data.data && data.data.user);
+        if (!user) {
+          throw new Error("User data missing from response");
+        }
         localStorage.setItem("loggedInUserId", user.id);
         localStorage.setItem("loggedInUserName", user.name);
         localStorage.setItem("loggedInUserColor", user.avatarColor || "#3b82f6");

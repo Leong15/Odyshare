@@ -1,11 +1,4 @@
-export const CITY_CENTERS = {
-  tokyo: { lat: 35.6762, lng: 139.6503 },
-  hong_kong: { lat: 22.3193, lng: 114.1694 },
-  paris: { lat: 48.8566, lng: 2.3522 },
-  london: { lat: 51.5074, lng: -0.1278 },
-  taipei: { lat: 25.0330, lng: 121.5654 },
-  new_york: { lat: 40.7128, lng: -74.0060 },
-};
+import { CITY_COORDS } from "../lib/constants";
 
 export function resolveLatLng(
   name: string,
@@ -24,17 +17,45 @@ export function resolveLatLng(
   const n = (name || "").toLowerCase();
 
   // 1. Establish center coordinates based on destination
-  let center = CITY_CENTERS.tokyo; // Tokyo default
-  if (d.includes("hong") || d.includes("hkg") || d.includes("香港")) {
-    center = CITY_CENTERS.hong_kong;
-  } else if (d.includes("paris") || d.includes("巴黎")) {
-    center = CITY_CENTERS.paris;
-  } else if (d.includes("london") || d.includes("倫敦")) {
-    center = CITY_CENTERS.london;
-  } else if (d.includes("taipei") || d.includes("台北") || d.includes("taiwan")) {
-    center = CITY_CENTERS.taipei;
-  } else if (d.includes("new york") || d.includes("nyc")) {
-    center = CITY_CENTERS.new_york;
+  let center = CITY_COORDS.tokyo; // Tokyo default
+  const searchKey = d.trim();
+  let found = false;
+
+  // First exact key check
+  if (CITY_COORDS[searchKey]) {
+    center = CITY_COORDS[searchKey];
+    found = true;
+  } else {
+    // Check aliases
+    for (const key of Object.keys(CITY_COORDS)) {
+      const city = CITY_COORDS[key];
+      if (
+        key === searchKey ||
+        (city.aliases && city.aliases.some(alias => alias.toLowerCase() === searchKey))
+      ) {
+        center = city;
+        found = true;
+        break;
+      }
+    }
+  }
+
+  // If still not found, do a fuzzy partial match
+  if (!found) {
+    for (const key of Object.keys(CITY_COORDS)) {
+      const city = CITY_COORDS[key];
+      if (
+        searchKey.includes(key) ||
+        key.includes(searchKey) ||
+        (city.aliases && city.aliases.some(alias => {
+          const lowerAlias = alias.toLowerCase();
+          return searchKey.includes(lowerAlias) || lowerAlias.includes(searchKey);
+        }))
+      ) {
+        center = city;
+        break;
+      }
+    }
   }
 
   // 2. Specific matching of hot locations

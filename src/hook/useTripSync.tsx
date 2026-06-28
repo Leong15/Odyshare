@@ -15,11 +15,16 @@ interface UseTripSyncOptions {
   onUserResolved?: (participant: any) => void;
 }
 
+type ConnectionState = 'connecting' | 'connected' | 'polling' | 'reconnecting';
+
 export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptions) {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [errorState, setErrorState] = useState<string | null>(null);
   const [pendingInvitations, setPendingInvitations] = useState<any[]>([]);
+
+  // Track SSE/polling state machine
+  const connectionStateRef = useRef<ConnectionState>("connecting");
 
   // Keep a ref so the interval callback always sees the latest tripId
   const tripIdRef = useRef<string | undefined>(undefined);
@@ -87,19 +92,24 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
         if (!ct.includes("application/json"))
           throw new Error("Backend server is booting up or returned HTML.");
 
-        const data: Trip = await res.json();
-        setTrip(data);
-        if (data?.id) localStorage.setItem("activeTripId", data.id);
-        setErrorState(null);
+        const responseData = await res.json();
+        if (responseData.success) {
+          const data: Trip = responseData.data;
+          setTrip(data);
+          if (data?.id) localStorage.setItem("activeTripId", data.id);
+          setErrorState(null);
 
-        // Let the parent resolve currentUser from the participant list
-        const found = data.participants.find((p) => p.id === uid);
-        if (found && onUserResolved) {
-          onUserResolved({
-            ...found,
-            username:
-              localStorage.getItem("loggedInUserUsername") || found.username || "",
-          });
+          // Let the parent resolve currentUser from the participant list
+          const found = data.participants.find((p) => p.id === uid);
+          if (found && onUserResolved) {
+            onUserResolved({
+              ...found,
+              username:
+                localStorage.getItem("loggedInUserUsername") || found.username || "",
+            });
+          }
+        } else {
+          throw new Error(responseData.error?.message || "Server responded with error");
         }
       } catch {
         setErrorState(
@@ -138,8 +148,13 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
     const setupSSE = () => {
       const activeTripId = localStorage.getItem("activeTripId") || tripIdRef.current;
       if (!activeTripId) {
+        connectionStateRef.current = 'polling';
         startFallbackPolling(4000);
         return;
+      }
+
+      if (connectionStateRef.current !== 'reconnecting') {
+        connectionStateRef.current = 'connecting';
       }
 
       console.log("[SSE] Establishing live stream connection for active trip:", activeTripId);
@@ -171,12 +186,24 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
           eventSource = null;
         }
         
-        // Activate a 10s fallback polling loop to ensure continuity
+        // Clear existing reconnect timeout first
+        if (reconnectTimeout) {
+          clearTimeout(reconnectTimeout);
+          reconnectTimeout = null;
+        }
+
+        // Set state to polling and start fallback polling
+        connectionStateRef.current = 'polling';
         startFallbackPolling(10000);
 
         // Schedule SSE reconnection attempt in 5 seconds
-        if (reconnectTimeout) clearTimeout(reconnectTimeout);
         reconnectTimeout = setTimeout(() => {
+          // Clear polling first, then set state to reconnecting and setupSSE
+          if (fallbackInterval) {
+            clearInterval(fallbackInterval);
+            fallbackInterval = null;
+          }
+          connectionStateRef.current = 'reconnecting';
           setupSSE();
         }, 5000);
       };
@@ -188,6 +215,7 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
           clearInterval(fallbackInterval);
           fallbackInterval = null;
         }
+        connectionStateRef.current = 'connected';
       };
     };
 
@@ -246,10 +274,12 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
         body: JSON.stringify(mergedFields),
       });
       if (res.ok) {
-        const data = await res.json();
-        setTrip(data.trip);
-        localStorage.removeItem("activeTripOfflineQueue");
-        console.log("[PWA] Offline queue successfully synchronized and cleared!");
+        const responseData = await res.json();
+        if (responseData.success) {
+          setTrip(responseData.data.trip);
+          localStorage.removeItem("activeTripOfflineQueue");
+          console.log("[PWA] Offline queue successfully synchronized and cleared!");
+        }
       }
     } catch (err) {
       console.error("[PWA] Synchronizing offline queue failed, keeping queue items.", err);
@@ -300,8 +330,10 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
           body: JSON.stringify(updatedFields),
         });
         if (res.ok) {
-          const data = await res.json();
-          setTrip(data.trip);
+          const responseData = await res.json();
+          if (responseData.success) {
+            setTrip(responseData.data.trip);
+          }
         }
       } catch (err) {
         console.warn("postTripUpdate connection failed, enqueuing local update.", err);
@@ -323,9 +355,12 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
           body: JSON.stringify({ tripId: id }),
         });
         if (res.ok) {
-          const data = await res.json();
-          setTrip(data.trip);
-          await fetchTripData(true, data.trip?.id);
+          const responseData = await res.json();
+          if (responseData.success) {
+            const trip = responseData.data.trip;
+            setTrip(trip);
+            await fetchTripData(true, trip?.id);
+          }
         }
       } catch (err) {
         console.error("handleSelectTrip failed:", err);

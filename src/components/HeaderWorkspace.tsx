@@ -64,7 +64,10 @@ export default function HeaderWorkspace({
       });
       const data = await res.json();
       if (!res.ok) {
-        setPwdError(data.error || (lang === "zh" ? "目前密碼錯誤或新密碼不符強度限制" : "Incorrect current password or strength invalid"));
+        const errMsg = typeof data.error === "object" && data.error !== null
+          ? (data.error.message || data.error.code || (lang === "zh" ? "目前密碼錯誤或新密碼不符強度限制" : "Incorrect current password or strength invalid"))
+          : (data.error || (lang === "zh" ? "目前密碼錯誤或新密碼不符強度限制" : "Incorrect current password or strength invalid"));
+        setPwdError(errMsg);
         return;
       }
       setPwdSuccess(lang === "zh" ? "密碼更新成功！" : "Password updated successfully!");

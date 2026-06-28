@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Lock, Eye, EyeOff, Send, Info, Users, Bell } from "lucide-react";
 import { ChatMessage, Participant } from "../types";
 import { translations } from "../lib/translations";
+import { isSystemMessage } from "../lib/constants";
 
 interface EncryptedWorkspaceChatProps {
   chats: ChatMessage[];
@@ -80,7 +81,7 @@ export default function EncryptedWorkspaceChat({
             className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin text-xs"
           >
             {chats.map((msg) => {
-              const isSystem = msg.senderId === "system";
+              const isSystem = isSystemMessage(msg.senderId);
               const isMe = msg.senderId === currentUser;
               const viewEncrypted = showEncryptedState[msg.id] || false;
 

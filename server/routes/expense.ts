@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { readTripsDB, writeTripsDB } from "../db.js";
+import { ok, fail } from "../utils/apiResponse.js";
 
 const router = Router();
 
@@ -31,9 +32,9 @@ router.post("/add", async (req: Request, res: Response) => {
     });
 
     writeTripsDB(current, req);
-    res.json({ success: true, trip: current });
+    res.json(ok({ trip: current }));
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Failed to add expense" });
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to add expense"));
   }
 });
 
@@ -47,9 +48,9 @@ router.post("/delete", async (req: Request, res: Response) => {
       current.expenses = current.expenses.filter((e: any) => e.id !== expenseId);
     }
     writeTripsDB(current, req);
-    res.json({ success: true, trip: current });
+    res.json(ok({ trip: current }));
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Failed to delete expense" });
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to delete expense"));
   }
 });
 

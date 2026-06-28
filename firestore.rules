@@ -1,8 +1,38 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+    // 1. Users can only read/write their own user document
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // 2. Trip participants can read/write trips they belong to
+    match /trips/{tripId} {
+      allow read: if request.auth != null && (
+        resource == null || 
+        request.auth.uid in resource.data.participantIds
+      );
+      allow write: if request.auth != null && (
+        (resource == null && request.auth.uid in request.resource.data.participantIds) ||
+        (resource != null && request.auth.uid in resource.data.participantIds)
+      );
+    }
+
+    // 3. Invitations are readable/writable by sender and recipient only
+    match /invitations/{invitationId} {
+      allow read: if request.auth != null && (
+        resource.data.inviterId == request.auth.uid || 
+        resource.data.inviteeId == request.auth.uid
+      );
+      allow write: if request.auth != null && (
+        (resource == null && request.resource.data.inviterId == request.auth.uid) ||
+        (resource != null && (resource.data.inviterId == request.auth.uid || resource.data.inviteeId == request.auth.uid))
+      );
+    }
+
+    // 4. Config active mapping
+    match /config/{configId} {
+      allow read, write: if request.auth != null;
     }
   }
 }

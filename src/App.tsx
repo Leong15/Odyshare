@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { 
   Calendar, Map, Plane, DollarSign, Lock, Users, RefreshCw, UserPlus, X
 } from "lucide-react";
@@ -11,13 +11,13 @@ import HeaderWorkspace from "./components/HeaderWorkspace";
 import CreateTripModal from "./components/CreateTripModal";
 import TripDashboard from "./components/TripDashboard";
 
-// Tab Subcomponents
-import ItineraryPlanner from "./components/ItineraryPlanner";
-import ExpenseTracker from "./components/ExpenseTracker";
-import OfflineMapSimulator from "./components/OfflineMapSimulator";
-import DocumentVault from "./components/DocumentVault";
-import FlightHub from "./components/FlightHub";
-import EncryptedWorkspaceChat from "./components/EncryptedWorkspaceChat";
+// Tab Subcomponents (Lazy Loaded)
+const ItineraryPlanner = lazy(() => import("./components/ItineraryPlanner"));
+const ExpenseTracker = lazy(() => import("./components/ExpenseTracker"));
+const OfflineMapSimulator = lazy(() => import("./components/OfflineMapSimulator"));
+const FlightHub = lazy(() => import("./components/FlightHub"));
+const DocumentVault = lazy(() => import("./components/DocumentVault"));
+const EncryptedWorkspaceChat = lazy(() => import("./components/EncryptedWorkspaceChat"));
 
 // Custom Hooks for Modular Architecture
 import { useAuth } from "./hook/useAuth";
@@ -535,87 +535,95 @@ export default function App() {
                 />
               )}
 
-              {activeTab === "itinerary" && (
-                <ItineraryPlanner
-                  itineraries={trip.itineraries}
-                  participants={trip.participants}
-                  currentUser={auth.currentUser.id}
-                  onVoteItinerary={(itemId) => actions.handleVote("itinerary", itemId)}
-                  onCommentItinerary={actions.handleAddComment}
-                  onAddItineraryItem={actions.handleAddItineraryItem}
-                  lang={lang}
-                  onApplyAIOptimization={actions.handleApplyAIOptimization}
-                  onPostAISystemMessage={handlePostAISystemMessage}
-                  backupItineraries={trip.backupItineraries || []}
-                  onRestoreItineraries={handleRestoreItineraries}
-                  onDeleteItineraryItem={actions.handleDeleteItineraryItem}
-                  onUpdateItineraryItem={actions.handleUpdateItineraryItem}
-                />
-              )}
+              <Suspense fallback={
+                <div className="p-12 text-center text-slate-400 font-mono text-xs flex flex-col items-center justify-center gap-3 bg-slate-900/50 border border-white/5 rounded-2xl backdrop-blur-sm animate-pulse">
+                  <RefreshCw className="w-5 h-5 animate-spin text-indigo-400" />
+                  <span>Loading Secure Workspace Module...</span>
+                </div>
+              }>
+                {activeTab === "itinerary" && (
+                  <ItineraryPlanner
+                    itineraries={trip.itineraries}
+                    participants={trip.participants}
+                    currentUser={auth.currentUser.id}
+                    onVoteItinerary={(itemId) => actions.handleVote("itinerary", itemId)}
+                    onCommentItinerary={actions.handleAddComment}
+                    onAddItineraryItem={actions.handleAddItineraryItem}
+                    lang={lang}
+                    onApplyAIOptimization={actions.handleApplyAIOptimization}
+                    onPostAISystemMessage={handlePostAISystemMessage}
+                    backupItineraries={trip.backupItineraries || []}
+                    onRestoreItineraries={handleRestoreItineraries}
+                    onDeleteItineraryItem={actions.handleDeleteItineraryItem}
+                    onUpdateItineraryItem={actions.handleUpdateItineraryItem}
+                  />
+                )}
 
-              {activeTab === "map" && (
-                <OfflineMapSimulator
-                  destination={trip.destination}
-                  itineraries={trip.itineraries}
-                  participants={trip.participants}
-                  currentUserId={auth.currentUser.id}
-                  onSelectLocation={(item) => {
-                    console.log("Selected map checkpoint:", item);
-                  }}
-                  onAddItineraryItem={actions.handleAddItineraryItem}
-                  onUpdateItineraryItem={actions.handleUpdateItineraryItem}
-                  onDeleteItineraryItem={actions.handleDeleteItineraryItem}
-                  lang={lang}
-                  tripLat={trip.lat}
-                  tripLng={trip.lng}
-                />
-              )}
+                {activeTab === "map" && (
+                  <OfflineMapSimulator
+                    destination={trip.destination}
+                    itineraries={trip.itineraries}
+                    participants={trip.participants}
+                    currentUserId={auth.currentUser.id}
+                    onSelectLocation={(item) => {
+                      console.log("Selected map checkpoint:", item);
+                    }}
+                    onAddItineraryItem={actions.handleAddItineraryItem}
+                    onUpdateItineraryItem={actions.handleUpdateItineraryItem}
+                    onDeleteItineraryItem={actions.handleDeleteItineraryItem}
+                    lang={lang}
+                    tripLat={trip.lat}
+                    tripLng={trip.lng}
+                  />
+                )}
 
-              {activeTab === "flights" && (
-                <FlightHub
-                  tripId={trip.id}
-                  flightEstimates={trip.flightEstimates}
-                  participants={trip.participants}
-                  currentUser={auth.currentUser.id}
-                  onVoteFlight={(flightId) => actions.handleVote("flight", flightId)}
-                  onFetchAIRec={handleAIRecFlights}
-                  lang={lang}
-                />
-              )}
+                {activeTab === "flights" && (
+                  <FlightHub
+                    tripId={trip.id}
+                    flightEstimates={trip.flightEstimates}
+                    participants={trip.participants}
+                    currentUser={auth.currentUser.id}
+                    onVoteFlight={(flightId) => actions.handleVote("flight", flightId)}
+                    onFetchAIRec={handleAIRecFlights}
+                    lang={lang}
+                  />
+                )}
 
-              {activeTab === "budget" && (
-                <ExpenseTracker
-                  expenses={trip.expenses}
-                  participants={trip.participants}
-                  totalBudget={trip.totalBudget}
-                  onAddExpense={actions.handleAddExpense}
-                  onDeleteExpense={actions.handleDeleteExpense}
-                  onUpdateBudget={(num) => sync.postTripUpdate({ totalBudget: num })}
-                  onUpdateParticipants={(updatedParts) => sync.postTripUpdate({ participants: updatedParts })}
-                  activeUserId={auth.currentUser.id}
-                  lang={lang}
-                  onInviteUser={actions.handleInviteUser}
-                />
-              )}
+                {activeTab === "budget" && (
+                  <ExpenseTracker
+                    expenses={trip.expenses}
+                    participants={trip.participants}
+                    totalBudget={trip.totalBudget}
+                    onAddExpense={actions.handleAddExpense}
+                    onDeleteExpense={actions.handleDeleteExpense}
+                    onUpdateBudget={(num) => sync.postTripUpdate({ totalBudget: num })}
+                    onUpdateParticipants={(updatedParts) => sync.postTripUpdate({ participants: updatedParts })}
+                    activeUserId={auth.currentUser.id}
+                    lang={lang}
+                    onInviteUser={actions.handleInviteUser}
+                    onInviteExternalUser={actions.handleInviteExternalUser}
+                  />
+                )}
 
-              {activeTab === "vault" && (
-                <DocumentVault
-                  documents={trip.documents}
-                  currentUser={auth.currentUser.name}
-                  onUploadDocument={actions.handleUploadDocument}
-                  lang={lang}
-                />
-              )}
+                {activeTab === "vault" && (
+                  <DocumentVault
+                    documents={trip.documents}
+                    currentUser={auth.currentUser.name}
+                    onUploadDocument={actions.handleUploadDocument}
+                    lang={lang}
+                  />
+                )}
 
-              {activeTab === "chat" && (
-                <EncryptedWorkspaceChat
-                  chats={trip.chats}
-                  participants={trip.participants}
-                  currentUser={auth.currentUser.id}
-                  onSendMessage={actions.handleSendChatMessage}
-                  lang={lang}
-                />
-              )}
+                {activeTab === "chat" && (
+                  <EncryptedWorkspaceChat
+                    chats={trip.chats}
+                    participants={trip.participants}
+                    currentUser={auth.currentUser.id}
+                    onSendMessage={actions.handleSendChatMessage}
+                    lang={lang}
+                  />
+                )}
+              </Suspense>
             </div>
           )}
         </main>

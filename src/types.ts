@@ -113,19 +113,6 @@ export interface Trip {
   expenses: ExpenseItem[];
   documents: DocumentItem[];
   chats: ChatMessage[];
-  tripsList?: Array<{
-    id: string;
-    name: string;
-    destination: string;
-    startDate: string;
-    endDate: string;
-    totalBudget: number;
-    status?: "active" | "inactive";
-    lat?: number;
-    lng?: number;
-    participants?: Participant[];
-    expenses?: ExpenseItem[];
-    itineraries?: ItineraryItem[];
-  }>;
+  tripsList?: Trip[];
 }
 

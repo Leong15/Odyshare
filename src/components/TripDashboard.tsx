@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps";
 import { POPULAR_HOT_PLACES } from "./CreateTripModal";
 import { 
@@ -278,7 +278,7 @@ export default function TripDashboard({
     return groupedPins.find(g => g.key === visibleKey) || null;
   }, [lockedLocationKey, hoveredLocationKey, groupedPins]);
 
-  const handleDeleteProject = async () => {
+  const handleDeleteProject = useCallback(async () => {
     const confirmMsg = lang === "zh" 
       ? `🚨 警告：確定要永久刪除「${trip?.name}」這項協作專案嗎？此操作將使所有團員的通訊包、預算明細、離線定位數據永久消逝且不可復原！`
       : `🚨 WARNING: Are you sure you want to permanently delete workspace '${trip?.name}'? This deletes all co-travel chats, document vaults, budgets, and data for all participants and is non-reversible!`;
@@ -292,9 +292,9 @@ export default function TripDashboard({
         setIsDeleting(false);
       }
     }
-  };
+  }, [lang, trip?.id, trip?.name, onDeleteTrip]);
 
-  const handleSaveMeta = async (e: React.FormEvent) => {
+  const handleSaveMeta = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       await onEditTripMeta({
@@ -307,15 +307,15 @@ export default function TripDashboard({
     } catch (err) {
       console.error(err);
     }
-  };
+  }, [onEditTripMeta, editName, editDestination, editBudget, editStatus]);
 
-  const handleTriggerTripSwitch = async (id: string) => {
+  const handleTriggerTripSwitch = useCallback(async (id: string) => {
     setSwitchingTo(id);
     onSwitchTrip(id);
     setTimeout(() => {
       setSwitchingTo(null);
     }, 850);
-  };
+  }, [onSwitchTrip]);
 
   return (
     <div className="space-y-6">

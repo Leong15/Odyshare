@@ -5,6 +5,7 @@ import { db } from "./firebase.js";
 import { broadcastTripChange } from "./sse.js";
 import { DEFAULT_TRIP } from "./defaultTrip.js";
 import type { MemoryDB } from "../types/db";
+import { safeHash } from "../utils/crypto.js";
 
 export const DB_PATH = path.join(process.cwd(), "trips-db.json");
 
@@ -20,6 +21,20 @@ export let memoryDB: MemoryDB = {
 
 // Keep a deep copy of the last synchronized database state to correctly compute delta differences
 export let lastSyncedDB: MemoryDB = JSON.parse(JSON.stringify(memoryDB));
+
+// Asynchronously hash the default admin's password upon startup
+safeHash("123").then(hash => {
+  const admin = memoryDB.users.find(u => u.id === "u1");
+  if (admin && admin.password === "123") {
+    admin.password = hash;
+  }
+  const adminSynced = lastSyncedDB.users.find(u => u.id === "u1");
+  if (adminSynced && adminSynced.password === "123") {
+    adminSynced.password = hash;
+  }
+}).catch(err => {
+  console.error("Failed to hash default admin password on startup:", err);
+});
 
 // Synchronous fetch of current state
 export function getDB(): MemoryDB {
@@ -85,7 +100,10 @@ export function writeDB(data: Partial<MemoryDB>) {
       for (const [id, t] of newTrips.entries()) {
         const oldT = oldTrips.get(id);
         if (!oldT || JSON.stringify(oldT) !== JSON.stringify(t)) {
-          const payload = { ...t };
+          const payload = { 
+            ...t,
+            participantIds: (t.participants || []).map(p => p.id).filter(Boolean)
+          };
           delete payload.id;
           await setDoc(doc(db, "trips", id), payload);
         }

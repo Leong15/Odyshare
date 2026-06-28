@@ -7,6 +7,7 @@
 
 import { useCallback } from "react";
 import type { Trip, ItineraryItem, ExpenseItem, DocumentItem, ChatMessage, Participant } from "../types";
+import { ITEM_ID_PREFIXES, SYSTEM_SENDER_ID, SYSTEM_SENDER_NAME } from "../lib/constants";
 
 // Safe Base64 encoder that handles non-Latin1 characters (Chinese, emoji)
 function safeBtoa(str: string): string {
@@ -60,16 +61,17 @@ export function useTripActions({
           }),
         });
         const data = await res.json();
-        if (res.ok) {
-          if (data.trip?.id) localStorage.setItem("activeTripId", data.trip.id);
-          setTrip(data.trip);
-          await fetchTripData(true, data.trip?.id);
+        if (res.ok && data.success) {
+          const trip = data.data.trip;
+          if (trip?.id) localStorage.setItem("activeTripId", trip.id);
+          setTrip(trip);
+          await fetchTripData(true, trip?.id);
           return { success: true };
         }
         return {
           success: false,
           error:
-            data.error ||
+            data.error?.message ||
             (lang === "zh" ? "創立專案失敗，請重試" : "Failed to create trip, please retry."),
         };
       } catch {
@@ -92,10 +94,13 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.trip?.id) localStorage.setItem("activeTripId", data.trip.id);
-          else localStorage.removeItem("activeTripId");
-          setTrip(data.trip);
-          await fetchTripData(true, data.trip?.id);
+          if (data.success) {
+            const trip = data.data.trip;
+            if (trip?.id) localStorage.setItem("activeTripId", trip.id);
+            else localStorage.removeItem("activeTripId");
+            setTrip(trip);
+            await fetchTripData(true, trip?.id);
+          }
         }
       } catch (err) {
         console.error("handleDeleteTrip failed:", err);
@@ -119,8 +124,11 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
-          await fetchTripData(true, data.trip?.id);
+          if (data.success) {
+            const trip = data.data.trip;
+            setTrip(trip);
+            await fetchTripData(true, trip?.id);
+          }
         }
       } catch (err) {
         console.error("handleEditTripMeta failed:", err);
@@ -143,7 +151,9 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
+          if (data.success) {
+            setTrip(data.data.trip);
+          }
         }
       } catch (err) {
         console.error("handleAddItineraryItem failed:", err);
@@ -162,7 +172,9 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
+          if (data.success) {
+            setTrip(data.data.trip);
+          }
         }
       } catch (err) {
         console.error("handleUpdateItineraryItem failed:", err);
@@ -181,7 +193,9 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
+          if (data.success) {
+            setTrip(data.data.trip);
+          }
         }
       } catch (err) {
         console.error("handleDeleteItineraryItem failed:", err);
@@ -200,7 +214,9 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
+          if (data.success) {
+            setTrip(data.data.trip);
+          }
         }
       } catch (err) {
         console.error("handleVote failed:", err);
@@ -224,7 +240,9 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
+          if (data.success) {
+            setTrip(data.data.trip);
+          }
         }
       } catch (err) {
         console.error("handleAddComment failed:", err);
@@ -247,7 +265,9 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
+          if (data.success) {
+            setTrip(data.data.trip);
+          }
         }
       } catch (err) {
         console.error("handleAddExpense failed:", err);
@@ -266,7 +286,9 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
+          if (data.success) {
+            setTrip(data.data.trip);
+          }
         }
       } catch (err) {
         console.error("handleDeleteExpense failed:", err);
@@ -289,7 +311,9 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
+          if (data.success) {
+            setTrip(data.data.trip);
+          }
         }
       } catch (err) {
         console.error("handleUploadDocument failed:", err);
@@ -319,7 +343,9 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          setTrip(data.trip);
+          if (data.success) {
+            setTrip(data.data.trip);
+          }
         }
       } catch (err) {
         console.error("handleSendChatMessage failed:", err);
@@ -331,9 +357,9 @@ export function useTripActions({
   const handlePostAISystemMessage = useCallback(
     (text: string) => {
       const systemMsg: ChatMessage = {
-        id: "msg-ai-ref-" + Date.now(),
-        senderId: "system",
-        senderName: "WanderSmart AI",
+        id: ITEM_ID_PREFIXES.MESSAGE + "ai-ref-" + Date.now(),
+        senderId: SYSTEM_SENDER_ID,
+        senderName: SYSTEM_SENDER_NAME,
         avatarColor: "#8b5cf6",
         messageEncrypted: "",
         messageDecrypted: text,
@@ -373,7 +399,7 @@ export function useTripActions({
           const updated = [...currentFlightEstimates];
           flights.forEach((f: any, idx: number) => {
             updated.push({
-              id: `fl-ai-${idx}-${Date.now()}`,
+              id: `${ITEM_ID_PREFIXES.FLIGHT}${idx}-${Date.now()}`,
               carrier: f.carrier,
               carrierLogo: "⭐",
               from,
@@ -410,12 +436,34 @@ export function useTripActions({
           body: JSON.stringify({ username }),
         });
         const data = await res.json();
-        return res.ok ? { success: true } : { success: false, error: data.error };
+        return res.ok && data.success ? { success: true } : { success: false, error: data.error?.message || data.error };
       } catch {
         return { success: false, error: "Connection error" };
       }
     },
     [fetchWithAuth]
+  );
+
+  const handleInviteExternalUser = useCallback(
+    async (name: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const res = await fetchWithAuth("/api/trip/invite-external", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          postTripUpdate(data.data.trip);
+          return { success: true };
+        } else {
+          return { success: false, error: data.error?.message || data.error };
+        }
+      } catch {
+        return { success: false, error: "Connection error" };
+      }
+    },
+    [fetchWithAuth, postTripUpdate]
   );
 
   const handleKickParticipant = useCallback(
@@ -428,12 +476,15 @@ export function useTripActions({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userIdToKick }),
         });
-        const data = await res.json();
         if (res.ok) {
-          if (data.trip) setTrip(data.trip);
-          return { success: true };
+          const data = await res.json();
+          if (data.success) {
+            if (data.data?.trip) setTrip(data.data.trip);
+            return { success: true };
+          }
+          return { success: false, error: data.error?.message || "Failed to kick participant" };
         }
-        return { success: false, error: data.error || "Failed to kick participant" };
+        return { success: false, error: "Failed to kick participant" };
       } catch {
         return { success: false, error: "Connection failure" };
       }
@@ -479,6 +530,7 @@ export function useTripActions({
     handlePostAISystemMessage,
     handleAIRecFlights,
     handleInviteUser,
+    handleInviteExternalUser,
     handleKickParticipant,
     handleApplyAIOptimization,
     handleRestoreItineraries,

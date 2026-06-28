@@ -72,10 +72,14 @@ export default function LoginTerminal({
       });
       const data = await res.json();
       if (!res.ok) {
-        setRecoveryError(data.error || (lang === "zh" ? "密碼重設失敗，帳號與信箱不符" : "Reset failed. Account and Email mismatched."));
+        const errMsg = typeof data.error === "object" && data.error !== null
+          ? (data.error.message || data.error.code || (lang === "zh" ? "密碼重設失敗，帳號與信箱不符" : "Reset failed. Account and Email mismatched."))
+          : (data.error || (lang === "zh" ? "密碼重設失敗，帳號與信箱不符" : "Reset failed. Account and Email mismatched."));
+        setRecoveryError(errMsg);
         return;
       }
-      setRecoverySuccess(data.message);
+      const successMsg = data.data && data.data.message ? data.data.message : (data.message || (lang === "zh" ? "密碼已重設，請至信箱收取新密碼！" : "Password has been reset, please check your inbox!"));
+      setRecoverySuccess(successMsg);
       setForgotStep(2);
     } catch (err) {
       setRecoveryError(lang === "zh" ? "連線連線錯誤，請稍後重試" : "Network error, please retry.");

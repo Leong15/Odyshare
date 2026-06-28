@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { readTripsDB, writeTripsDB } from "../db.js";
 import { resolveCoordinates } from "../utils/geocoding.js";
+import { ok, fail } from "../utils/apiResponse.js";
 
 const router = Router();
 
@@ -37,9 +38,9 @@ router.post("/add", async (req: Request, res: Response) => {
 
     current.itineraries.push(newItem);
     writeTripsDB(current, req);
-    res.json({ success: true, trip: current });
+    res.json(ok({ trip: current }));
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Failed to add itinerary item" });
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to add itinerary item"));
   }
 });
 
@@ -78,9 +79,9 @@ router.post("/edit", async (req: Request, res: Response) => {
       };
       writeTripsDB(current, req);
     }
-    res.json({ success: true, trip: current });
+    res.json(ok({ trip: current }));
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Failed to update itinerary item" });
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to update itinerary item"));
   }
 });
 
@@ -91,9 +92,9 @@ router.post("/delete", async (req: Request, res: Response) => {
     const current = readTripsDB(req);
     current.itineraries = current.itineraries.filter((i: any) => i.id !== id);
     writeTripsDB(current, req);
-    res.json({ success: true, trip: current });
+    res.json(ok({ trip: current }));
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Failed to delete itinerary item" });
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to delete itinerary item"));
   }
 });
 
@@ -115,9 +116,9 @@ router.post("/comment", async (req: Request, res: Response) => {
       });
       writeTripsDB(current, req);
     }
-    res.json({ success: true, trip: current });
+    res.json(ok({ trip: current }));
   } catch (err: any) {
-    res.status(500).json({ error: err.message || "Failed to post comment" });
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to post comment"));
   }
 });
 
