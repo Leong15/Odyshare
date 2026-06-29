@@ -68,7 +68,12 @@ function getRefundAmount(rawTotal: number, exp: ExpenseItem): number {
     return Number(exp.taxRefundTotalAmount);
   }
   if (exp.taxRefundPercent !== undefined && Number(exp.taxRefundPercent) > 0) {
-    return rawTotal * (Number(exp.taxRefundPercent) / 100);
+    // VAT-exclusive Tax-Free Refund: use the total after tax-refund (pre-tax amount B) as the base:
+    // B = rawTotal / (1 + percent / 100)
+    // Refund = rawTotal - B
+    const pct = Number(exp.taxRefundPercent);
+    const postRefundTotal = rawTotal / (1 + pct / 100);
+    return rawTotal - postRefundTotal;
   }
   return 0;
 }

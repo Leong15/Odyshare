@@ -153,7 +153,12 @@ export default function ExpenseForm({
   if (taxRefundTotalAmount) {
     refundVal = parseFloat(taxRefundTotalAmount) || 0;
   } else if (taxRefundPercent) {
-    refundVal = rawTotalVal * ((parseFloat(taxRefundPercent) || 0) / 100);
+    // VAT-exclusive Tax-Free Refund: use the total after tax-refund (pre-tax amount B) as the base:
+    // B = rawTotalVal / (1 + percent / 100)
+    // Refund = rawTotalVal - B
+    const pct = parseFloat(taxRefundPercent) || 0;
+    const postRefundTotal = rawTotalVal / (1 + pct / 100);
+    refundVal = rawTotalVal - postRefundTotal;
   }
 
   const finalPriceVal = Math.max(0, rawTotalVal - refundVal);
@@ -540,8 +545,8 @@ export default function ExpenseForm({
         </div>
         <p className="text-xs text-slate-400 leading-normal">
           {lang === "zh"
-            ? "收據往往只有一個退稅總額，在此輸入後，系統會自動在各個成員的自付款項中，按原始金額比例分減扣除，計算出極致精準的實際付款額！"
-            : "Enter overall discount or tax back total; the ledger automatically distributes deductions according to individual raw ratios for precise splits!"}
+            ? "系統已套用專業演算法：以「退稅後費用總額」為基數計算退稅百分比，精準回推各成員對應之應付額。收據往往只有一個退稅總額，在此輸入後，系統會自動在各個成員的自付款項中，按原始金額比例分減扣除，計算出極致精準的實際付款額！"
+            : "The system utilizes advanced tax algorithm: Refund % is calculated using the post-refund actual cost as the base, precisely back-calculating individual shares. The ledger automatically distributes deductions according to individual raw ratios for precise splits!"}
         </p>
 
         {/* Country presets dropdown */}
