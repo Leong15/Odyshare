@@ -71,13 +71,16 @@ export default function ExpenseForm({
           receiptImage: receiptImage || undefined,
         }),
       });
-      const data = await res.json();
-      if (data && data.amount != null) {
-        setDescription(data.description || "OCR Receipt Expense");
-        setAmount(data.amount.toString());
-        setCategory(data.category || "food");
-        setOcrInput("");
-        setReceiptImage("");
+      const json = await res.json();
+      if (json && json.success && json.data) {
+        const ocrData = json.data;
+        if (ocrData.amount != null) {
+          setDescription(ocrData.description || "OCR Receipt Expense");
+          setAmount(ocrData.amount.toString());
+          setCategory(ocrData.category || "food");
+          setOcrInput("");
+          setReceiptImage("");
+        }
       }
     } catch (err) {
       console.error("Receipt OCR failed:", err);

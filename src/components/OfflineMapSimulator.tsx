@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { MapPin, Navigation, Download, CloudOff, RefreshCw, Signal, Search, CheckCircle, PlusCircle, Flag, Info, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import L from "leaflet";
+import type L_TYPE from "leaflet";
+let L: typeof L_TYPE | null = null;
 import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 import { resolveLatLng } from "../utils/mapHelpers";
@@ -95,6 +96,15 @@ export default function OfflineMapSimulator({
   tripLng
 }: OfflineMapSimulatorProps) {
   const [viewMode, setViewMode] = useState<"simulator" | "leaflet">("leaflet");
+  const [leafletLoaded, setLeafletLoaded] = useState(false);
+
+  useEffect(() => {
+    if (viewMode !== "leaflet" || leafletLoaded) return;
+    import("leaflet").then((leafletModule) => {
+      L = leafletModule.default;
+      setLeafletLoaded(true);
+    });
+  }, [viewMode, leafletLoaded]);
   const [selectedDayFilter, setSelectedDayFilter] = useState<number>(-1); // -1 means "All Days"
   const [offlineMode, setOfflineMode] = useState<boolean>(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
@@ -106,10 +116,10 @@ export default function OfflineMapSimulator({
 
   // Leaflet references
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<L.Map | null>(null);
-  const markersGroupRef = useRef<L.LayerGroup | null>(null);
-  const markerCacheRef = useRef<Map<string, L.Marker>>(new Map());
-  const polylineRef = useRef<L.Polyline | null>(null);
+  const mapRef = useRef<any | null>(null);
+  const markersGroupRef = useRef<any | null>(null);
+  const markerCacheRef = useRef<Map<string, any>>(new Map());
+  const polylineRef = useRef<any | null>(null);
 
   // Geolocation and navigation
   const [currentGeoLocation, setCurrentGeoLocation] = useState<{ lat: number; lng: number }>(() => {
@@ -626,7 +636,7 @@ export default function OfflineMapSimulator({
 
   // Leaflet Map Initialization Effect
   useEffect(() => {
-    if (viewMode !== "leaflet" || !mapContainerRef.current) {
+    if (viewMode !== "leaflet" || !mapContainerRef.current || !leafletLoaded || !L) {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -689,7 +699,7 @@ export default function OfflineMapSimulator({
         mapRef.current = null;
       }
     };
-  }, [viewMode, destination]);
+  }, [viewMode, destination, leafletLoaded]);
 
   // Helper to resolve coordinates
   const getSpotCoords = (spot: any): { lat: number; lng: number } => {
@@ -740,7 +750,7 @@ export default function OfflineMapSimulator({
 
   // One-time fitBounds to loaded route so user can adjust camera zoom freely afterwards
   useEffect(() => {
-    if (!mapRef.current || !routePoints || routePoints.length === 0) return;
+    if (!mapRef.current || !routePoints || routePoints.length === 0 || !L) return;
     const routePolyline = L.polyline(routePoints);
     try {
       const bounds = routePolyline.getBounds();
@@ -754,7 +764,7 @@ export default function OfflineMapSimulator({
 
   // Sync / Paint markers in Leaflet Group
   useEffect(() => {
-    if (!mapRef.current || !markersGroupRef.current) return;
+    if (!mapRef.current || !markersGroupRef.current || !L) return;
 
     const group = markersGroupRef.current;
     const activeKeys = new Set<string>();

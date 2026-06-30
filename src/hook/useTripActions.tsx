@@ -395,7 +395,7 @@ export function useTripActions({
         });
         if (res.ok) {
           const data = await res.json();
-          const flights = data.flights || [];
+          const flights = data.data?.flights || [];
           const updated = [...currentFlightEstimates];
           flights.forEach((f: any, idx: number) => {
             updated.push({

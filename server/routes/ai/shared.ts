@@ -32,7 +32,7 @@ export function getGenAI(): GoogleGenAI | null {
   return aiClient;
 }
 
-// Helper to perform Gemini generateContent calls with robust automatic retry and model fallback (e.g. to gemini-3.1-flash-lite on 503/429/high-demand)
+// Helper to perform Gemini generateContent calls with robust automatic retry and model fallback (e.g. to gemini-1.5-flash-8b on 503/429/high-demand)
 export async function generateContentWithRetry(
   ai: GoogleGenAI, 
   params: { model: string; contents: any; config?: any }, 
@@ -55,8 +55,8 @@ export async function generateContentWithRetry(
                           err?.statusCode === 429;
       
       if (isRetryable && attempt < maxRetries) {
-        console.warn(`Gemini API call failed (attempt ${attempt}/${maxRetries}): ${errorString}. Retrying with gemini-3.1-flash-lite...`);
-        params.model = "gemini-3.1-flash-lite";
+        console.warn(`Gemini API call failed (attempt ${attempt}/${maxRetries}): ${errorString}. Retrying with gemini-1.5-flash-8b...`);
+        params.model = "gemini-1.5-flash-8b";
         // Wait a bit (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, 300 * attempt));
         continue;
@@ -66,11 +66,11 @@ export async function generateContentWithRetry(
   }
 }
 
-// Helper to generate natural sounding TTS audio from a text summary using gemini-3.1-flash-tts-preview
+// Helper to generate natural sounding TTS audio from a text summary using gemini-2.5-flash-preview-tts
 export async function generateTTSAudio(ai: GoogleGenAI, text: string): Promise<string | null> {
   try {
     const ttsResponse = await ai.models.generateContent({
-      model: "gemini-3.1-flash-tts-preview",
+      model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: `Say naturally, warmly and professionally: ${text}` }] }],
       config: {
         responseModalities: ['AUDIO'],

@@ -73,6 +73,31 @@ export function getCoordinatesForDestination(dest: string, lat?: number, lng?: n
   };
 }
 
+const WorldMapGeographies = React.memo(function WorldMapGeographies({ isLightTheme }: { isLightTheme: boolean }) {
+  return (
+    <Geographies geography="https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json">
+      {({ geographies }) =>
+        geographies.map((geo) => (
+          <Geography
+            key={geo.rsmKey}
+            geography={geo}
+            style={{
+              default: {
+                fill: isLightTheme ? "#cbd5e1" : "#1e3a5f",
+                stroke: isLightTheme ? "#94a3b8" : "#0f2744",
+                strokeWidth: 0.3,
+                outline: "none",
+              },
+              hover: { fill: isLightTheme ? "#cbd5e1" : "#1e3a5f", outline: "none" },
+              pressed: { fill: isLightTheme ? "#cbd5e1" : "#1e3a5f", outline: "none" },
+            }}
+          />
+        ))
+      }
+    </Geographies>
+  );
+});
+
 export default function TripDashboard({
   trip,
   trips,
@@ -120,15 +145,20 @@ export default function TripDashboard({
   // Mouse coordinate and boundaries tracking for dynamic follow-cursor Tooltip
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const cardContainerRef = useRef<HTMLDivElement>(null);
+  const mouseMoveThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (mouseMoveThrottleRef.current) return;
+    mouseMoveThrottleRef.current = setTimeout(() => {
+      mouseMoveThrottleRef.current = null;
+    }, 16); // ~60fps cap
     if (!cardContainerRef.current) return;
     const rect = cardContainerRef.current.getBoundingClientRect();
     setMousePos({
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
     });
-  };
+  }, []);
 
   const getTooltipStyle = () => {
     if (!cardContainerRef.current) return { left: "0px", top: "0px" };
@@ -572,26 +602,7 @@ export default function TripDashboard({
                 center: [0, 0]
               }}
             >
-              <Geographies geography="https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json">
-                {({ geographies }) =>
-                  geographies.map((geo) => (
-                    <Geography
-                      key={geo.rsmKey}
-                      geography={geo}
-                      style={{
-                        default: {
-                          fill: isLightTheme ? "#cbd5e1" : "#1e3a5f",
-                          stroke: isLightTheme ? "#94a3b8" : "#0f2744",
-                          strokeWidth: 0.3,
-                          outline: "none",
-                        },
-                        hover: { fill: isLightTheme ? "#cbd5e1" : "#1e3a5f", outline: "none" },
-                        pressed: { fill: isLightTheme ? "#cbd5e1" : "#1e3a5f", outline: "none" },
-                      }}
-                    />
-                  ))
-                }
-              </Geographies>
+              <WorldMapGeographies isLightTheme={isLightTheme} />
             </ComposableMap>
 
             <svg

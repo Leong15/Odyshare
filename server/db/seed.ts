@@ -1,11 +1,26 @@
 import { setDoc, doc } from "firebase/firestore";
 import { db } from "./firebase.js";
-import { DB_PATH, setMemoryDB } from "./cache.js";
-import { DEFAULT_TRIP } from "./defaultTrip.js";
 import fs from "fs";
 import { safeHash } from "../utils/crypto.js";
 
-export { DEFAULT_TRIP };
+// Initial default group trip to showcase features immediately
+export const DEFAULT_TRIP = {
+  id: "default_trip",
+  name: "Tokyo Adventure & Cuisine",
+  destination: "Tokyo, Japan",
+  startDate: "2026-10-12",
+  endDate: "2026-10-18",
+  totalBudget: 4200,
+  status: "active",
+  lat: 35.6762,
+  lng: 139.6503,
+  participants: [],
+  flightEstimates: [],
+  itineraries: [],
+  expenses: [],
+  documents: [],
+  chats: []
+};
 
 export async function seedDefaults() {
   const hashedPassword = await safeHash("123");
@@ -31,6 +46,7 @@ export async function seedDefaults() {
     invitations: []
   };
 
+  const { setMemoryDB, DB_PATH } = await import("./cache.js");
   setMemoryDB(seeded);
   
   try {

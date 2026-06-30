@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { Type } from "@google/genai";
 import { getGenAI, callGemini } from "./shared";
 import { searchSerpApiFlights } from "../../serpapi.js";
+import { ok, fail } from "../../utils/apiResponse.js";
+import { buildGoogleFlightsUrl } from "../../utils/flightUrlBuilder.js";
 
 const router = Router();
 
@@ -62,14 +64,7 @@ function getFallbackFlights(from: string, to: string, date: string, isRoundTrip:
   const priceScale = currencyCode === "HKD" ? 7.82 : currencyCode === "TWD" ? 32.5 : currencyCode === "JPY" ? 155.0 : 1.0;
   
   // Construct robust Google Flights search URL including precise travel dates
-  let bUrl = `https://www.google.com/flights?q=flights+from+${encodeURIComponent(fCode)}+to+${encodeURIComponent(tCode)}`;
-  if (date) {
-    if (isRoundTrip && returnDate) {
-      bUrl = `https://www.google.com/flights?q=flights+from+${encodeURIComponent(fCode)}+to+${encodeURIComponent(tCode)}+on+${encodeURIComponent(date)}+return+${encodeURIComponent(returnDate)}`;
-    } else {
-      bUrl = `https://www.google.com/flights?q=flights+from+${encodeURIComponent(fCode)}+to+${encodeURIComponent(tCode)}+on+${encodeURIComponent(date)}`;
-    }
-  }
+  const bUrl = buildGoogleFlightsUrl(fCode, tCode, date, isRoundTrip ? returnDate : undefined);
 
   if (fCode === "HKG" || tCode === "HKG" || fCode.includes("HONG") || tCode.includes("HONG")) {
     return CARRIER_TEMPLATES.HKG.map(t => buildFlightFromTemplate(t, multiplier, priceScale, suffix, isRoundTrip, bUrl, currencyCode));
@@ -86,7 +81,7 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
     const serpapiFlights = await searchSerpApiFlights(from, to, date, type !== "oneway", returnDate);
     if (serpapiFlights !== null) {
       console.log("Success! Returning live flight results from SerpApi Google Flights API.");
-      return res.json({ flights: serpapiFlights });
+      return res.json(ok({ flights: serpapiFlights }));
     }
   } catch (err) {
     console.error("SerpApi API call had a network or format error, shifting to backup routes:", err);
@@ -98,7 +93,7 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
   const fallbackFlights = getFallbackFlights(from, to, date, isRoundTrip, returnDate);
 
   if (!ai) {
-    return res.json({ flights: fallbackFlights });
+    return res.json(ok({ flights: fallbackFlights }));
   }
 
   const typeLabel = isRoundTrip ? "ROUND-TRIP (來回往返)" : "ONE-WAY (單程)";
@@ -133,7 +128,7 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
   const result = await callGemini(
     ai,
     {
-      model: "gemini-3.5-flash",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -167,7 +162,7 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
     "recommend-flights"
   );
 
-  res.json(result);
+  res.json(ok(result));
 });
 
 export default router;

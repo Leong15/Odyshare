@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { Type } from "@google/genai";
 import { getGenAI, callGemini } from "./shared";
+import { ok, fail } from "../../utils/apiResponse.js";
 
 const router = Router();
 
@@ -51,13 +52,13 @@ router.post("/optimize-itinerary", async (req: Request, res: Response) => {
   ];
 
   if (!ai) {
-    return res.json({ optimizedItems: fallbackItems });
+    return res.json(ok({ optimizedItems: fallbackItems }));
   }
 
   const result = await callGemini(
     ai,
     {
-      model: "gemini-3.5-flash",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -88,7 +89,7 @@ router.post("/optimize-itinerary", async (req: Request, res: Response) => {
     "optimize-itinerary"
   );
 
-  res.json(result);
+  res.json(ok(result));
 });
 
 // Helper for TSP distance
@@ -110,7 +111,7 @@ function getEuclideanDistance(a: any, b: any): number {
 router.post("/optimize-tsp", async (req: Request, res: Response) => {
   const { items } = req.body; // Array of ItineraryItem
   if (!items || !Array.isArray(items) || items.length <= 1) {
-    return res.json({ optimized: items });
+    return res.json(ok({ optimized: items, optimizedItems: items }));
   }
 
   // Fallback nearest-neighbor heuristic
@@ -143,7 +144,8 @@ router.post("/optimize-tsp", async (req: Request, res: Response) => {
 
   const ai = getGenAI();
   if (!ai) {
-    return res.json({ optimized: runFallbackHeuristic() });
+    const fallbackVal = runFallbackHeuristic();
+    return res.json(ok({ optimized: fallbackVal, optimizedItems: fallbackVal }));
   }
 
   try {
@@ -171,7 +173,7 @@ Example Output format:
     const parsed = await callGemini(
       ai,
       {
-        model: "gemini-3.5-flash",
+        model: "gemini-1.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -211,13 +213,15 @@ Example Output format:
         time: originalTimes[idx] || item.time
       }));
 
-      return res.json({ optimized: optimizedResult });
+      return res.json(ok({ optimized: optimizedResult, optimizedItems: optimizedResult }));
     }
 
-    res.json({ optimized: runFallbackHeuristic() });
+    const fallbackVal = runFallbackHeuristic();
+    res.json(ok({ optimized: fallbackVal, optimizedItems: fallbackVal }));
   } catch (err: any) {
     console.error("Error in Gemini TSP route optimization, using local heuristic:", err);
-    res.json({ optimized: runFallbackHeuristic() });
+    const fallbackVal = runFallbackHeuristic();
+    res.json(ok({ optimized: fallbackVal, optimizedItems: fallbackVal }));
   }
 });
 

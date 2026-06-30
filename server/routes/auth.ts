@@ -1,9 +1,10 @@
 import { Router, Request, Response } from "express";
-import { getDB, writeDB } from "../db.js";
+import { getDB, writeDB, initAdminPromise } from "../db.js";
 import { sendRealEmail } from "../utils/email.js";
 import { safeHash, safeVerify } from "../utils/crypto.js";
 import crypto from "crypto";
 import { ok, fail } from "../utils/apiResponse.js";
+import { sanitizeString } from "../utils/sanitize.js";
 
 const router = Router();
 
@@ -29,14 +30,6 @@ function rateLimitLogin(ip: string): boolean {
     return false; // Blocked
   }
   return true;
-}
-
-// Input sanitization utility to strip HTML / script tags and trim whitespace
-function sanitizeString(str: any): string {
-  if (typeof str !== "string") return "";
-  return str
-    .replace(/<[^>]*>/g, "") // Strip HTML tags to prevent XSS/injection
-    .trim();
 }
 
 // ── Email Verification Endpoint ──────────────────────────────────────────────
@@ -207,6 +200,7 @@ router.post("/register", async (req: Request, res: Response) => {
 
 // 2. User Login (with Verification Check & Rate Limiter)
 router.post("/login", async (req: Request, res: Response) => {
+  await initAdminPromise;
   const ip = req.ip || req.socket.remoteAddress || "unknown";
   if (!rateLimitLogin(ip)) {
     return res.status(429).json(fail("TOO_MANY_REQUESTS", "Too many login attempts. Please try again after 1 minute (登入嘗試過於頻繁，請於 1 分鐘後再試)。"));
@@ -262,6 +256,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
 // 3. User Change Password (When already logged in)
 router.post("/change-password", async (req: Request, res: Response) => {
+  await initAdminPromise;
   const { username, currentPassword, newPassword } = req.body;
   const headerUserId = req.headers["x-user-id"];
 
@@ -325,6 +320,7 @@ router.post("/change-password", async (req: Request, res: Response) => {
 
 // 4. Forget Password (Verify registered Username and Email to generate secure random password)
 router.post("/forget-password", async (req: Request, res: Response) => {
+  await initAdminPromise;
   const { username, email } = req.body;
   if (!username || !email) {
     return res.status(400).json(fail("BAD_REQUEST", "Username and email address are required (請輸入帳號與註冊的 Email 地址)。"));
@@ -438,6 +434,7 @@ router.get("/reset-question", (req: Request, res: Response) => {
 
 // 6. Reset security check confirmation and backup trigger
 router.post("/reset-confirm", async (req: Request, res: Response) => {
+  await initAdminPromise;
   const { username, answer } = req.body;
   if (!username || !answer) {
     return res.status(400).json(fail("BAD_REQUEST", "Username and verification answer are required."));

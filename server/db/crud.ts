@@ -7,6 +7,16 @@ import { broadcastTripChange } from "./sse.js";
 import type { Trip, Participant } from "../../src/types";
 import type { DBUser, DBInvitation } from "../types/db";
 
+function enrichParticipants(participants: Participant[], users: any[]): Participant[] {
+  return participants.map((p: Participant) => {
+    const mu = users.find(u => u.id === p.id || u.email === p.email)
+    return {
+      ...p,
+      username: mu ? mu.username : (p.username || "")
+    }
+  })
+}
+
 
 // Standard Request-scoped helpers
 export function getTripForRequest(req: Request) {
@@ -82,16 +92,7 @@ export function getTripForRequest(req: Request) {
 
   // Enrich participants with their actual database username if match is found
   if (trip && trip.participants) {
-    trip = {
-      ...trip,
-      participants: trip.participants.map((p: Participant) => {
-        const mu = dbState.users.find(u => u.id === p.id || u.email === p.email);
-        return {
-          ...p,
-          username: mu ? mu.username : (p.username || "")
-        };
-      })
-    };
+    trip = { ...trip, participants: enrichParticipants(trip.participants, dbState.users) };
   }
 
   // Filter visible trips scoped strictly to user
@@ -157,16 +158,7 @@ export function readTripsDB(req?: Request) {
     writeDB(dbState);
   }
   if (active && active.participants) {
-    active = {
-      ...active,
-      participants: active.participants.map((p: Participant) => {
-        const mu = dbState.users.find(u => u.id === p.id || u.email === p.email);
-        return {
-          ...p,
-          username: mu ? mu.username : (p.username || "")
-        };
-      })
-    };
+    active = { ...active, participants: enrichParticipants(active.participants, dbState.users) };
   }
   return {
     ...active,

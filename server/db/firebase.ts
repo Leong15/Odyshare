@@ -13,7 +13,10 @@ setLogLevel("error");
 
 // Load Firebase configuration safely from root
 const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-const firebaseConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+const firebaseConfig = {
+  ...JSON.parse(fs.readFileSync(configPath, "utf-8")),
+  apiKey: process.env.FIREBASE_API_KEY || JSON.parse(fs.readFileSync(configPath, "utf-8")).apiKey
+};
 const firebaseApp = initializeApp(firebaseConfig);
 export const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || "default");
 export const storage = getStorage(firebaseApp);

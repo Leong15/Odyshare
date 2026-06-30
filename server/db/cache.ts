@@ -3,7 +3,7 @@ import fs from "fs";
 import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase.js";
 import { broadcastTripChange } from "./sse.js";
-import { DEFAULT_TRIP } from "./defaultTrip.js";
+import { DEFAULT_TRIP } from "./seed.js";
 import type { MemoryDB } from "../types/db";
 import { safeHash } from "../utils/crypto.js";
 
@@ -13,7 +13,7 @@ export const DB_PATH = path.join(process.cwd(), "trips-db.json");
 export let memoryDB: MemoryDB = {
   activeTripId: "tokyo-group-2026",
   users: [
-    { id: "u1", username: "Admin", password: "123", name: "Admin", email: "admin@gmail.com", avatarColor: "#3b82f6" },
+    { id: "u1", username: "Admin", password: "", name: "Admin", email: "admin@gmail.com", avatarColor: "#3b82f6" },
   ],
   trips: [JSON.parse(JSON.stringify(DEFAULT_TRIP))],
   invitations: []
@@ -22,14 +22,14 @@ export let memoryDB: MemoryDB = {
 // Keep a deep copy of the last synchronized database state to correctly compute delta differences
 export let lastSyncedDB: MemoryDB = JSON.parse(JSON.stringify(memoryDB));
 
-// Asynchronously hash the default admin's password upon startup
-safeHash("123").then(hash => {
+// Asynchronously hash the default admin's password upon startup and expose as a module-level promise
+export const initAdminPromise = safeHash("123").then(hash => {
   const admin = memoryDB.users.find(u => u.id === "u1");
-  if (admin && admin.password === "123") {
+  if (admin && admin.password === "") {
     admin.password = hash;
   }
   const adminSynced = lastSyncedDB.users.find(u => u.id === "u1");
-  if (adminSynced && adminSynced.password === "123") {
+  if (adminSynced && adminSynced.password === "") {
     adminSynced.password = hash;
   }
 }).catch(err => {

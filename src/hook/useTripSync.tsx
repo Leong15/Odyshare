@@ -25,6 +25,8 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
 
   // Track SSE/polling state machine
   const connectionStateRef = useRef<ConnectionState>("connecting");
+  const retryDelayRef = useRef(5000);
+  const MAX_RETRY_DELAY = 60000;
 
   // Keep a ref so the interval callback always sees the latest tripId
   const tripIdRef = useRef<string | undefined>(undefined);
@@ -196,21 +198,23 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
         connectionStateRef.current = 'polling';
         startFallbackPolling(10000);
 
-        // Schedule SSE reconnection attempt in 5 seconds
+        // Schedule SSE reconnection attempt with exponential backoff
+        const currentDelay = retryDelayRef.current;
+        retryDelayRef.current = Math.min(retryDelayRef.current * 2, MAX_RETRY_DELAY);
         reconnectTimeout = setTimeout(() => {
-          // Clear polling first, then set state to reconnecting and setupSSE
           if (fallbackInterval) {
             clearInterval(fallbackInterval);
             fallbackInterval = null;
           }
-          connectionStateRef.current = 'reconnecting';
+          connectionStateRef.current = "reconnecting";
           setupSSE();
-        }, 5000);
+        }, currentDelay);
       };
 
       // When SSE connects, we can slow down or clear the background polling entirely (rely on pushes)
       eventSource.onopen = () => {
         console.log("[SSE] Live stream connected successfully. Silencing periodic polling.");
+        retryDelayRef.current = 5000; // reset on successful connection
         if (fallbackInterval) {
           clearInterval(fallbackInterval);
           fallbackInterval = null;

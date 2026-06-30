@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { Type } from "@google/genai";
 import { getGenAI, callGemini, generateTTSAudio } from "./shared";
+import { ok, fail } from "../../utils/apiResponse.js";
 
 const router = Router();
 
@@ -70,14 +71,14 @@ router.post("/parse-voice-schedule", async (req: Request, res: Response) => {
   };
 
   if (!ai) {
-    return res.json({ items: getFallbackItems() });
+    return res.json(ok({ items: getFallbackItems() }));
   }
 
   try {
     const parsed = await callGemini(
       ai,
       {
-        model: "gemini-3.5-flash",
+        model: "gemini-1.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -125,14 +126,14 @@ router.post("/parse-voice-schedule", async (req: Request, res: Response) => {
       audio = await generateTTSAudio(ai, voiceSummary);
     }
 
-    res.json({
+    res.json(ok({
       items: parsed.items || [],
       audio,
       voiceSummary
-    });
+    }));
   } catch (err: any) {
     console.error("Error parsing voice schedule with Gemini API:", err);
-    res.json({ items: getFallbackItems() });
+    res.json(ok({ items: getFallbackItems() }));
   }
 });
 
@@ -200,14 +201,14 @@ router.post("/parse-email-confirmation", async (req: Request, res: Response) => 
   };
 
   if (!ai) {
-    return res.json({ items: getFallbackConfirmationItems() });
+    return res.json(ok({ items: getFallbackConfirmationItems() }));
   }
 
   try {
     const parsed = await callGemini(
       ai,
       {
-        model: "gemini-3.5-flash",
+        model: "gemini-1.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -254,14 +255,14 @@ router.post("/parse-email-confirmation", async (req: Request, res: Response) => 
       audio = await generateTTSAudio(ai, voiceSummary);
     }
 
-    res.json({
+    res.json(ok({
       items: parsed.items || [],
       audio,
       voiceSummary
-    });
+    }));
   } catch (err) {
     console.error("Gemini confirmation parser failed:", err);
-    res.json({ items: getFallbackConfirmationItems() });
+    res.json(ok({ items: getFallbackConfirmationItems() }));
   }
 });
 

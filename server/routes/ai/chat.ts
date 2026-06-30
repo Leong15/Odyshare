@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { getGenAI } from "./shared";
+import { ok, fail } from "../../utils/apiResponse.js";
 
 const router = Router();
 
@@ -10,13 +11,15 @@ router.post("/chat-assistant", async (req: Request, res: Response) => {
 
   if (!ai) {
     // Fail gracefully with specialized offline intelligent mock fallback
-    return res.json({
-      reply: `[AI Offline Companion Mode] I see you are asking about: "${message}". Connect your Gemini API key in Settings > Secrets to unlock full live recommendations! Here is a tip: In Tokyo, public transport (Pasmo/Suica) acts as a wallet for convenience; carry cash for small street food components.`
-    });
+    const fallbackText = `[AI Offline Companion Mode] I see you are asking about: "${message}". Connect your Gemini API key in Settings > Secrets to unlock full live recommendations! Here is a tip: In Tokyo, public transport (Pasmo/Suica) acts as a wallet for convenience; carry cash for small street food components.`;
+    return res.json(ok({
+      reply: fallbackText,
+      response: fallbackText
+    }));
   }
 
   try {
-    const model = "gemini-3.5-flash";
+    const model = "gemini-1.5-flash";
     const historyFormatted = (chatHistory || []).map((h: any) => ({
       role: h.senderId === "u1" ? "user" : "model",
       parts: [{ text: h.messageDecrypted || h.text || "" }]
@@ -44,9 +47,9 @@ router.post("/chat-assistant", async (req: Request, res: Response) => {
                           err?.statusCode === 503 ||
                           err?.statusCode === 429;
       if (isRetryable) {
-        console.warn(`Chat sendMessage failed, retrying once with gemini-3.1-flash-lite...`);
+        console.warn(`Chat sendMessage failed, retrying once with gemini-1.5-flash-8b...`);
         const fallbackChat = ai.chats.create({
-          model: "gemini-3.1-flash-lite",
+          model: "gemini-1.5-flash-8b",
           config: { systemInstruction },
           history: historyFormatted
         });
@@ -56,12 +59,14 @@ router.post("/chat-assistant", async (req: Request, res: Response) => {
       }
     }
 
-    res.json({ reply: response.text });
+    res.json(ok({ response: response.text, reply: response.text }));
   } catch (err: any) {
     console.error("Error calling Gemini API for travel chat, falling back to helper mode:", err);
-    res.json({
-      reply: `[Standby Mode] Tokyo possesses legendary travel infrastructure! Pasmo and Suica work smoothly as electronic transit money. Carry some yen cash for small street stalls/izakayas.`
-    });
+    const standbyText = `[Standby Mode] Tokyo possesses legendary travel infrastructure! Pasmo and Suica work smoothly as electronic transit money. Carry some yen cash for small street stalls/izakayas.`;
+    res.json(ok({
+      reply: standbyText,
+      response: standbyText
+    }));
   }
 });
 

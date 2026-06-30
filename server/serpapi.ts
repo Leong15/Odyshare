@@ -1,4 +1,5 @@
 // SerpApi Google Flights Integration Module
+import { buildGoogleFlightsUrl } from "./utils/flightUrlBuilder.js";
 
 export async function searchSerpApiFlights(
   from: string,
@@ -99,10 +100,7 @@ export async function searchSerpApiFlights(
         }
       }
 
-      let bUrl = `https://www.google.com/travel/flights?q=flights+from+${encodeURIComponent(origin)}+to+${encodeURIComponent(dest)}+on+${encodeURIComponent(depDate)}`;
-      if (isRoundTrip && returnDate) {
-        bUrl = `https://www.google.com/travel/flights?q=flights+from+${encodeURIComponent(origin)}+to+${encodeURIComponent(dest)}+on+${encodeURIComponent(depDate)}+return+${encodeURIComponent(returnDate.trim().split("T")[0])}`;
-      }
+      const bUrl = buildGoogleFlightsUrl(origin, dest, depDate, isRoundTrip ? returnDate : undefined);
 
       return {
         id: `serp-${index}-${Date.now()}`,

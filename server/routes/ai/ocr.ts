@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { Type } from "@google/genai";
 import { getGenAI, callGemini } from "./shared";
+import { ok, fail } from "../../utils/apiResponse.js";
 
 const router = Router();
 
@@ -68,7 +69,7 @@ router.post("/ocr-receipt", async (req: Request, res: Response) => {
   };
 
   if (!ai) {
-    return res.json(getFallbackReceipt());
+    return res.json(ok(getFallbackReceipt()));
   }
 
   try {
@@ -89,7 +90,7 @@ router.post("/ocr-receipt", async (req: Request, res: Response) => {
     const parsed = await callGemini(
       ai,
       {
-        model: "gemini-3.5-flash",
+        model: "gemini-1.5-flash",
         contents,
         config: {
           responseMimeType: "application/json",
@@ -110,10 +111,10 @@ router.post("/ocr-receipt", async (req: Request, res: Response) => {
       "ocr-receipt"
     );
 
-    res.json(parsed);
+    res.json(ok(parsed));
   } catch (err) {
     console.error("Gemini receipt OCR failed:", err);
-    res.json(getFallbackReceipt());
+    res.json(ok(getFallbackReceipt()));
   }
 });
 
