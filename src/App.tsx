@@ -602,6 +602,7 @@ export default function App() {
                     lang={lang}
                     onInviteUser={actions.handleInviteUser}
                     onInviteExternalUser={actions.handleInviteExternalUser}
+                    onUpgradeExternalUser={actions.handleUpgradeExternalUser}
                   />
                 )}
 

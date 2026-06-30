@@ -73,7 +73,13 @@ function getRefundAmount(rawTotal: number, exp: ExpenseItem): number {
     // Refund = rawTotal - B
     const pct = Number(exp.taxRefundPercent);
     const postRefundTotal = rawTotal / (1 + pct / 100);
-    return rawTotal - postRefundTotal;
+    let refund = rawTotal - postRefundTotal;
+
+    if (exp.taxRefundDeductFee) {
+      const feePct = exp.taxRefundFeePercent !== undefined ? Number(exp.taxRefundFeePercent) : 1.5;
+      refund = refund * (1 - feePct / 100);
+    }
+    return refund;
   }
   return 0;
 }
@@ -122,6 +128,26 @@ export function calculateSettleMatrix(
     });
   });
 
+  // 1. Adjust initial balances to sum to exactly 0 (absorb rounding/floating discrepancies)
+  // We attribute any tiny residue to the person who paid the most net (largest creditor)
+  let largestCreditorId = "";
+  let maxBal = -Infinity;
+  Object.entries(balances).forEach(([uid, bal]) => {
+    if (bal > maxBal) {
+      maxBal = bal;
+      largestCreditorId = uid;
+    }
+  });
+
+  let sumOfBalances = 0;
+  Object.values(balances).forEach((bal) => {
+    sumOfBalances += bal;
+  });
+
+  if (largestCreditorId && Math.abs(sumOfBalances) > 0.0001) {
+    balances[largestCreditorId] -= sumOfBalances;
+  }
+
   const creditors: { id: string; amount: number }[] = [];
   const debtors: { id: string; amount: number }[] = [];
 
@@ -142,12 +168,27 @@ export function calculateSettleMatrix(
   while (ci < cList.length && di < dList.length) {
     const creditor = cList[ci];
     const debtor = dList[di];
-    const deal = Math.min(creditor.amount, debtor.amount);
+
+    const isLastPair = (cList.length - ci === 1) && (dList.length - di === 1);
+    let deal = Math.min(creditor.amount, debtor.amount);
+
+    if (isLastPair) {
+      const diff = Math.abs(creditor.amount - debtor.amount);
+      if (diff <= 1.0) {
+        // Automatically reconcile rounding/tail-end error (<= 1.0) by matching the final debtor and creditor perfectly
+        deal = creditor.amount;
+      }
+    }
 
     transactions.push({ from: debtor.id, to: creditor.id, amount: Math.round(deal * 100) / 100 });
 
     creditor.amount -= deal;
     debtor.amount -= deal;
+
+    if (isLastPair && Math.abs(creditor.amount - debtor.amount) <= 1.0) {
+      creditor.amount = 0;
+      debtor.amount = 0;
+    }
 
     if (creditor.amount <= 0.01) ci++;
     if (debtor.amount <= 0.01) di++;

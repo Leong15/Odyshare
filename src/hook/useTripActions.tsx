@@ -466,6 +466,31 @@ export function useTripActions({
     [fetchWithAuth, postTripUpdate]
   );
 
+  const handleUpgradeExternalUser = useCallback(
+    async (
+      externalId: string,
+      targetUsername: string
+    ): Promise<{ success: boolean; error?: string }> => {
+      try {
+        const res = await fetchWithAuth("/api/trip/upgrade-external", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ externalId, targetUsername }),
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          postTripUpdate(data.data.trip);
+          return { success: true };
+        } else {
+          return { success: false, error: data.error?.message || data.error };
+        }
+      } catch {
+        return { success: false, error: "Connection error" };
+      }
+    },
+    [fetchWithAuth, postTripUpdate]
+  );
+
   const handleKickParticipant = useCallback(
     async (
       userIdToKick: string
@@ -531,6 +556,7 @@ export function useTripActions({
     handleAIRecFlights,
     handleInviteUser,
     handleInviteExternalUser,
+    handleUpgradeExternalUser,
     handleKickParticipant,
     handleApplyAIOptimization,
     handleRestoreItineraries,

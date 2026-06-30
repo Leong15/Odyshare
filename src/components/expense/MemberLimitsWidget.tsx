@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ChevronRight, Users, Pencil } from "lucide-react";
+import { ChevronRight, Users, Pencil, Sparkles } from "lucide-react";
 import { ExpenseItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
 import { getParticipantAdjustedSpent } from "../../utils/expensecalculator";
@@ -13,6 +13,7 @@ interface MemberLimitsWidgetProps {
   onUpdateParticipants?: (updated: Participant[]) => void;
   onInviteUser?: (username: string) => Promise<{ success: boolean; error?: string }>;
   onInviteExternalUser?: (name: string) => Promise<{ success: boolean; error?: string }>;
+  onUpgradeExternalUser?: (externalId: string, targetUsername: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export default function MemberLimitsWidget({
@@ -24,6 +25,7 @@ export default function MemberLimitsWidget({
   onUpdateParticipants,
   onInviteUser,
   onInviteExternalUser,
+  onUpgradeExternalUser,
 }: MemberLimitsWidgetProps) {
   const t = translations[lang];
 
@@ -40,6 +42,12 @@ export default function MemberLimitsWidget({
   const [extError, setExtError] = useState<string | null>(null);
   const [extSuccess, setExtSuccess] = useState<string | null>(null);
   const [isAddingExt, setIsAddingExt] = useState(false);
+
+  // Upgrade / Merge states
+  const [upgradingId, setUpgradingId] = useState<string | null>(null);
+  const [upgradeUsername, setUpgradeUsername] = useState("");
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+  const [isUpgrading, setIsUpgrading] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
@@ -86,6 +94,26 @@ export default function MemberLimitsWidget({
       setExtError(lang === "zh" ? "連接失敗" : "Server error");
     } finally {
       setIsAddingExt(false);
+    }
+  };
+
+  const handleUpgradeSubmit = async (e: React.FormEvent, externalId: string) => {
+    e.preventDefault();
+    if (!upgradeUsername.trim() || !onUpgradeExternalUser) return;
+    setUpgradeError(null);
+    setIsUpgrading(true);
+    try {
+      const res = await onUpgradeExternalUser(externalId, upgradeUsername.trim());
+      if (res.success) {
+        setUpgradingId(null);
+        setUpgradeUsername("");
+      } else {
+        setUpgradeError(res.error || (lang === "zh" ? "綁定失敗，請確認該註冊帳號存在且不重複" : "Binding failed"));
+      }
+    } catch (err) {
+      setUpgradeError(lang === "zh" ? "連接失敗" : "Server error");
+    } finally {
+      setIsUpgrading(false);
     }
   };
 
@@ -246,6 +274,30 @@ export default function MemberLimitsWidget({
                       <span className="font-bold text-[11px] text-slate-200">
                         {p.name} {p.id === activeUserId && (lang === "zh" ? "(你)" : "(You)")}
                       </span>
+                      {p.id.startsWith("ext-") && onUpgradeExternalUser && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (upgradingId === p.id) {
+                              setUpgradingId(null);
+                            } else {
+                              setUpgradingId(p.id);
+                              setUpgradeUsername("");
+                              setUpgradeError(null);
+                            }
+                          }}
+                          className={`text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 transition-all duration-200 ${
+                            upgradingId === p.id
+                              ? "bg-amber-500 text-slate-950 font-bold"
+                              : "bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 border border-amber-500/20"
+                          } cursor-pointer`}
+                          title={lang === "zh" ? "綁定/升級至註冊帳戶" : "Upgrade to Registered Account"}
+                        >
+                          <Sparkles size={8} />
+                          <span>{lang === "zh" ? "綁定/升級" : "Upgrade"}</span>
+                        </button>
+                      )}
                     </div>
 
                     {isEditing ? (
@@ -310,6 +362,48 @@ export default function MemberLimitsWidget({
                       </p>
                     )}
                   </div>
+
+                  {/* Inline upgrading collapsible form */}
+                  {upgradingId === p.id && (
+                    <form
+                      onSubmit={(e) => handleUpgradeSubmit(e, p.id)}
+                      className="mt-2.5 p-2 bg-slate-950/60 rounded-lg border border-amber-500/15 space-y-2 animate-fade-in text-[10px]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <p className="text-slate-400 leading-normal">
+                        {lang === "zh"
+                          ? "將此臨時旅伴的歷史全部記帳與代墊、應付細目，無縫移轉合併至另一個註冊會員！"
+                          : "Seamlessly merge all transaction history of this temporary traveler to a registered traveler's account!"}
+                      </p>
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          placeholder={lang === "zh" ? "請輸入註冊帳號 (Username)" : "Registered username"}
+                          value={upgradeUsername}
+                          onChange={(e) => setUpgradeUsername(e.target.value)}
+                          className="flex-1 bg-slate-900 rounded border border-white/10 p-1 px-2 text-white font-mono text-[10px] outline-none focus:border-amber-500"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={isUpgrading || !upgradeUsername.trim()}
+                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] p-1 px-2.5 rounded cursor-pointer disabled:opacity-50"
+                        >
+                          {isUpgrading ? "..." : lang === "zh" ? "合併" : "Merge"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setUpgradingId(null)}
+                          className="text-slate-400 hover:text-white text-[10px] p-1 cursor-pointer"
+                        >
+                          {lang === "zh" ? "取消" : "Cancel"}
+                        </button>
+                      </div>
+                      {upgradeError && (
+                        <p className="text-rose-400 font-bold font-mono text-[9px] pt-0.5">{upgradeError}</p>
+                      )}
+                    </form>
+                  )}
                 </div>
               );
             })}

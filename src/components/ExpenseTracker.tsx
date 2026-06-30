@@ -26,6 +26,7 @@ interface ExpenseTrackerProps {
   lang?: "en" | "zh";
   onInviteUser?: (username: string) => Promise<{ success: boolean; error?: string }>;
   onInviteExternalUser?: (name: string) => Promise<{ success: boolean; error?: string }>;
+  onUpgradeExternalUser?: (externalId: string, targetUsername: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export default function ExpenseTracker({
@@ -40,6 +41,7 @@ export default function ExpenseTracker({
   lang = "en",
   onInviteUser,
   onInviteExternalUser,
+  onUpgradeExternalUser,
 }: ExpenseTrackerProps) {
   const t = translations[lang];
 
@@ -48,6 +50,15 @@ export default function ExpenseTracker({
   const [isSettlementCollapsed, setIsSettlementCollapsed] = useState<boolean>(false);
   const [showSettlementModal, setShowSettlementModal] = useState<boolean>(false);
   const [uncheckedExpenseIds, setUncheckedExpenseIds] = useState<string[]>([]);
+
+  interface SettleSnapshot {
+    balances: Record<string, number>;
+    transactions: Array<{ from: string; to: string; amount: number }>;
+    uncheckedExpenseIds: string[];
+    timestamp: string;
+  }
+
+  const [lockedSnapshot, setLockedSnapshot] = useState<SettleSnapshot | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 1024) {
@@ -64,18 +75,23 @@ export default function ExpenseTracker({
     }
   };
 
-  const activeExpenses = expenses.filter((exp) => !uncheckedExpenseIds.includes(exp.id));
-  const totalSpent = activeExpenses.reduce((sum, exp) => sum + getExpenseActualTotal(exp), 0);
+  // Live split calculations
+  const liveCalculations = calculateSettleMatrix(expenses, participants, new Set(uncheckedExpenseIds));
 
-  // Split calculations
-  const { balances, transactions } = calculateSettleMatrix(expenses, participants, new Set(uncheckedExpenseIds));
+  // Determine active parameters based on whether we are viewing a locked simulation snapshot
+  const balances = lockedSnapshot ? lockedSnapshot.balances : liveCalculations.balances;
+  const transactions = lockedSnapshot ? lockedSnapshot.transactions : liveCalculations.transactions;
+  const effectiveUncheckedIds = lockedSnapshot ? lockedSnapshot.uncheckedExpenseIds : uncheckedExpenseIds;
+
+  const activeExpenses = expenses.filter((exp) => !effectiveUncheckedIds.includes(exp.id));
+  const totalSpent = activeExpenses.reduce((sum, exp) => sum + getExpenseActualTotal(exp), 0);
 
   // Personal metrics
   const { paidByMe, myOwedShare, netOwed, netSpentAdjusted } = calculatePersonalMetrics(
     expenses,
     activeUserId,
     balances,
-    new Set(uncheckedExpenseIds)
+    new Set(effectiveUncheckedIds)
   );
 
   const getLocalizedCategoryName = (cat: string) => {
@@ -378,6 +394,7 @@ export default function ExpenseTracker({
           onUpdateParticipants={onUpdateParticipants}
           onInviteUser={onInviteUser}
           onInviteExternalUser={onInviteExternalUser}
+          onUpgradeExternalUser={onUpgradeExternalUser}
         />
 
         {/* Widget 4: Automatic Settlements */}
@@ -414,7 +431,63 @@ export default function ExpenseTracker({
           </div>
 
           {!isSettlementCollapsed && (
-            <div className="p-4 space-y-3 animate-fadeIn text-left">
+            <div className="p-4 space-y-4 animate-fadeIn text-left">
+              {/* Simulation Mode / Settlement Snapshot Filter */}
+              <div className={`p-3 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300 ${
+                lockedSnapshot 
+                  ? "bg-amber-500/10 border-amber-500/20" 
+                  : "bg-white/3 border-white/5"
+              }`}>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${lockedSnapshot ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
+                    <span className="text-[11px] font-extrabold text-slate-200">
+                      {lockedSnapshot 
+                        ? (lang === "zh" ? "模擬鎖定模式 (Simulation Snapshot)" : "Simulation Snapshot Locked")
+                        : (lang === "zh" ? "即時拆帳模式 (Real-time Split)" : "Real-time Split Mode")
+                      }
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 leading-normal max-w-[280px] sm:max-w-[420px]">
+                    {lockedSnapshot
+                      ? (lang === "zh" 
+                          ? `已鎖定於 ${lockedSnapshot.timestamp} 的結算快照。後續記帳異動不會干擾此還款方案。`
+                          : `Snapshot locked on ${lockedSnapshot.timestamp}. Subsequent ledger edits won't disrupt this view.`)
+                      : (lang === "zh"
+                          ? "記帳、退稅或勾選狀態若有異動，下方拆帳矩陣將會即時動態重新計算。"
+                          : "Calculated dynamically in real-time as you check/uncheck ledger items or add new bills.")
+                    }
+                  </p>
+                </div>
+
+                {lockedSnapshot ? (
+                  <button
+                    type="button"
+                    onClick={() => setLockedSnapshot(null)}
+                    className="h-8 px-3 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/25 text-amber-300 font-bold rounded-lg text-[10.5px] cursor-pointer flex items-center gap-1 transition shrink-0"
+                  >
+                    <span>🔓 {lang === "zh" ? "解除鎖定" : "Unlock Live"}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const now = new Date();
+                      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                      setLockedSnapshot({
+                        balances: { ...balances },
+                        transactions: [...transactions],
+                        uncheckedExpenseIds: [...uncheckedExpenseIds],
+                        timestamp: timeStr,
+                      });
+                    }}
+                    className="h-8 px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold rounded-lg text-[10.5px] cursor-pointer flex items-center gap-1 transition shrink-0"
+                  >
+                    <span>🔒 {lang === "zh" ? "鎖定快照" : "Save Snapshot"}</span>
+                  </button>
+                )}
+              </div>
+
               <p className="text-[11px] text-slate-400 mb-1 leading-relaxed font-sans">
                 {lang === "zh"
                   ? "以左側勾選的帳目計出的自動化費用拆帳結算書："

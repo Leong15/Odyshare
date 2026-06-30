@@ -33,6 +33,8 @@ export default function ExpenseForm({
   const [individualAmounts, setIndividualAmounts] = useState<Record<string, string>>({});
   const [taxRefundPercent, setTaxRefundPercent] = useState<string>("");
   const [taxRefundTotalAmount, setTaxRefundTotalAmount] = useState<string>("");
+  const [taxRefundDeductFee, setTaxRefundDeductFee] = useState<boolean>(false);
+  const [taxRefundFeePercent, setTaxRefundFeePercent] = useState<string>("1.5");
 
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -114,6 +116,8 @@ export default function ExpenseForm({
       individualAmounts: splitType === "individual" ? finalIndividualAmounts : undefined,
       taxRefundPercent: taxRefundPercent ? parseFloat(taxRefundPercent) : undefined,
       taxRefundTotalAmount: taxRefundTotalAmount ? parseFloat(taxRefundTotalAmount) : undefined,
+      taxRefundDeductFee: taxRefundPercent ? taxRefundDeductFee : undefined,
+      taxRefundFeePercent: (taxRefundPercent && taxRefundDeductFee) ? parseFloat(taxRefundFeePercent) : undefined,
     });
 
     setDescription("");
@@ -121,6 +125,8 @@ export default function ExpenseForm({
     setIndividualAmounts({});
     setTaxRefundPercent("");
     setTaxRefundTotalAmount("");
+    setTaxRefundDeductFee(false);
+    setTaxRefundFeePercent("1.5");
     setSplitType("equal");
     onClose();
   };
@@ -158,7 +164,12 @@ export default function ExpenseForm({
     // Refund = rawTotalVal - B
     const pct = parseFloat(taxRefundPercent) || 0;
     const postRefundTotal = rawTotalVal / (1 + pct / 100);
-    refundVal = rawTotalVal - postRefundTotal;
+    let tempRefund = rawTotalVal - postRefundTotal;
+    if (taxRefundDeductFee) {
+      const feePct = parseFloat(taxRefundFeePercent) || 1.5;
+      tempRefund = tempRefund * (1 - feePct / 100);
+    }
+    refundVal = tempRefund;
   }
 
   const finalPriceVal = Math.max(0, rawTotalVal - refundVal);
@@ -613,6 +624,43 @@ export default function ExpenseForm({
             </div>
           </div>
         </div>
+
+        {/* Handling Fee option when percentage-based tax refund is specified */}
+        {!!taxRefundPercent && (
+          <div className="bg-slate-950/40 border border-white/5 p-3 rounded-lg flex flex-col sm:flex-row sm:items-center gap-3 justify-between text-xs transition-all animate-fade-in">
+            <label className="flex items-center gap-2 text-slate-300 font-medium cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={taxRefundDeductFee}
+                onChange={(e) => setTaxRefundDeductFee(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-white/10 bg-slate-900 text-amber-500 focus:ring-0 cursor-pointer"
+              />
+              <span>
+                {lang === "zh"
+                  ? "扣除平台/百貨手續費 (例如 Global Blue / 門市 1.5% - 2%)"
+                  : "Deduct processing fee (e.g. Global Blue 1.5% - 2%)"}
+              </span>
+            </label>
+            {taxRefundDeductFee && (
+              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                <span className="text-slate-400">{lang === "zh" ? "手續費率:" : "Fee rate:"}</span>
+                <div className="relative w-20">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    placeholder="1.5"
+                    value={taxRefundFeePercent}
+                    onChange={(e) => setTaxRefundFeePercent(e.target.value)}
+                    className="w-full bg-slate-950 border border-white/10 rounded px-1.5 py-0.5 text-white font-mono text-xs focus:outline-none focus:border-amber-500"
+                  />
+                  <span className="absolute inset-y-0 right-1.5 flex items-center text-slate-500 text-[10px]">%</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Dynamically calculated share preview box */}
         {rawTotalVal > 0 && (

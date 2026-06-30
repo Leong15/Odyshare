@@ -108,6 +108,95 @@ router.post("/invite-external", async (req: Request, res: Response) => {
   }
 });
 
+// Upgrade/Merge an external (temporary) traveler to a registered user
+router.post("/upgrade-external", async (req: Request, res: Response) => {
+  try {
+    const { externalId, targetUsername } = req.body;
+    if (!externalId || !targetUsername || !targetUsername.trim()) {
+      return res.status(400).json(fail("BAD_REQUEST", "External traveler ID and registered username are required (請提供外部旅伴ID與註冊帳號)。"));
+    }
+
+    const db = getDB();
+    const user = db.users.find(
+      (u: any) => u.username.toLowerCase() === targetUsername.trim().toLowerCase()
+    );
+
+    if (!user) {
+      return res.status(404).json(fail("NOT_FOUND", "Registered user not found (該註冊帳號不存在)。"));
+    }
+
+    const current = readTripsDB(req);
+    if (!current.participants) current.participants = [];
+
+    const externalIdx = current.participants.findIndex((p: Participant) => p.id === externalId);
+    if (externalIdx === -1) {
+      return res.status(404).json(fail("NOT_FOUND", "External traveler not found in this trip (找不到該臨時旅伴)。"));
+    }
+
+    const extName = current.participants[externalIdx].name;
+
+    // Check if the registered user is already a participant in the trip
+    const alreadyParticipant = current.participants.some((p: Participant) => p.id === user.id);
+
+    if (alreadyParticipant) {
+      // Remove external from participants list
+      current.participants.splice(externalIdx, 1);
+    } else {
+      // Replace external traveler entry with the registered user's real entry
+      current.participants[externalIdx] = {
+        id: user.id,
+        name: user.name,
+        email: user.email || `${user.username}@example.com`,
+        avatarColor: user.avatarColor || "#3b82f6",
+        publicKey: "pub_key_" + Math.random().toString(36).substring(7),
+        budgetLimit: current.participants[externalIdx].budgetLimit || 1500,
+      };
+    }
+
+    // Merge history: rewrite expenses referencing externalId to user.id
+    if (!current.expenses) current.expenses = [];
+    current.expenses.forEach((exp: any) => {
+      // Who paid
+      if (exp.paidById === externalId) {
+        exp.paidById = user.id;
+      }
+      // Who split among
+      if (exp.splitAmongIds && exp.splitAmongIds.includes(externalId)) {
+        exp.splitAmongIds = exp.splitAmongIds.map((id: string) => id === externalId ? user.id : id);
+        exp.splitAmongIds = Array.from(new Set(exp.splitAmongIds));
+      }
+      // Individual amounts
+      if (exp.individualAmounts && exp.individualAmounts[externalId] !== undefined) {
+        const val = exp.individualAmounts[externalId];
+        delete exp.individualAmounts[externalId];
+        if (exp.individualAmounts[user.id] !== undefined) {
+          exp.individualAmounts[user.id] += val;
+        } else {
+          exp.individualAmounts[user.id] = val;
+        }
+      }
+    });
+
+    // Add trip system update chat message
+    if (!current.chats) current.chats = [];
+    current.chats.push({
+      id: "msg-upgrade-ext-" + Date.now(),
+      senderId: "system",
+      senderName: "System",
+      avatarColor: "#10b981",
+      messageEncrypted: "",
+      messageDecrypted: `🎉 臨時旅伴「${extName}」已成功綁定/升級為正式帳號「${user.name}」！歷史代墊與應付帳目已無縫合併。`,
+      timestamp: new Date().toISOString(),
+      isTripUpdate: true,
+    });
+
+    writeTripsDB(current, req);
+    res.json(ok({ trip: current }));
+  } catch (err: any) {
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Upgrade failed"));
+  }
+});
+
 // Kick a collaborator from a trip project
 router.post("/kick", async (req: Request, res: Response) => {
   try {

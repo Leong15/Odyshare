@@ -70,6 +70,8 @@ export interface ExpenseItem {
   individualAmounts?: Record<string, number>;
   taxRefundPercent?: number;
   taxRefundTotalAmount?: number;
+  taxRefundDeductFee?: boolean;
+  taxRefundFeePercent?: number;
 }
 
 export interface DocumentItem {
