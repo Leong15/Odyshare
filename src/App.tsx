@@ -33,6 +33,9 @@ export default function App() {
     return (localStorage.getItem("theme") as "light" | "dark") || "dark";
   });
 
+  // Local state for actions error reporting
+  const [errorState, setErrorState] = useState<string | null>(null);
+
   // 1. Initialize Auth State Engine
   const auth = useAuth(lang);
 
@@ -50,6 +53,7 @@ export default function App() {
     setTrip: sync.setTrip,
     currentUser: auth.currentUser,
     lang,
+    onError: (msg) => setErrorState(msg),
   });
 
   // Modal overlays setup
@@ -182,7 +186,7 @@ export default function App() {
   }
 
   const isLight = theme === "light";
-  const { trip, syncing, errorState, pendingInvitations, isOffline } = sync;
+  const { trip, syncing, errorState: syncErrorState, pendingInvitations, isOffline } = sync;
 
   return (
     <div className={`min-h-screen flex flex-col font-sans selection:bg-blue-600/35 antialiased overflow-x-hidden relative transition-colors duration-300 ${
@@ -399,10 +403,10 @@ export default function App() {
         )}
 
         {/* 3. Error warnings */}
-        {errorState && (
+        {(errorState || syncErrorState) && (
           <div className="bg-rose-500/10 border-b border-rose-500/20 p-3.5 text-center text-xs text-rose-300 font-sans tracking-wide flex items-center justify-center gap-2 animate-fadeIn z-30">
             <RefreshCw size={13} className="animate-spin text-rose-400" />
-            <span>{errorState}</span>
+            <span>{errorState || syncErrorState}</span>
             <button
               onClick={() => sync.fetchTripData(true)}
               className="ml-3 px-2.5 py-0.5 bg-rose-500/20 border border-rose-500/30 hover:bg-rose-500/35 text-white font-bold rounded cursor-pointer transition text-[10.5px]"

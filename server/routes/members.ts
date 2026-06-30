@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import type { Participant } from "../../src/types";
-import { getDB, readTripsDB, writeTripsDB } from "../db.js";
+import { getDB, readTripsDB, writeTripsDB } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
 
 const router = Router();

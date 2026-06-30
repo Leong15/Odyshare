@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getDB, writeDB, initAdminPromise } from "../db.js";
+import { getDB, writeDB, initAdminPromise } from "../db/index.js";
 import { sendRealEmail } from "../utils/email.js";
 import { safeHash, safeVerify } from "../utils/crypto.js";
 import crypto from "crypto";

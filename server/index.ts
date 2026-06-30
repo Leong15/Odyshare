@@ -4,7 +4,7 @@ import fs from "fs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { startScheduler } from "./scheduler.js";
-import { initFirebase } from "./db.js";
+import { initFirebase } from "./db/index.js";
 
 // Routes inside modular files
 import authRouter from "./routes/auth";

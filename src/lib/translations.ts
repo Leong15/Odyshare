@@ -134,7 +134,35 @@ export const translations = {
     upgradeTip: "3 premium coordinates have been injected with customized Google traffic alerts. Check your day calendars!",
     readyToCompile: "Ready to compile group preference parameters.",
     OdyShareSmartConc: "OdyShareSmart Conversation Box",
-    askAiPlaceholder: "Ask AI: 'suggest sashimi under ¥3000' or 'how do I greet in Tokyo?'..."
+    askAiPlaceholder: "Ask AI: 'suggest sashimi under ¥3000' or 'how do I greet in Tokyo?'...",
+    
+    // Missing keys
+    sessionExpired: "Your session has expired (12 hours), please log in again.",
+    connectionFailed: "Connection failed, please try again.",
+    fillAllFields: "Please fill in all fields.",
+    fillNameAndEmail: "Please fill in display name and email.",
+    tripCreateFailed: "Failed to create trip, please retry.",
+    budgetOverLimit: "Over limit!",
+    memberAdded: "Member added successfully!",
+    memberNotFound: "User not found",
+    addExternalSuccess: "Added external traveler!",
+    mergeFailed: "Merge failed",
+    saveSnapshot: "Save Snapshot",
+    unlockLive: "Unlock Live",
+    simulationLocked: "Simulation Snapshot Locked",
+    realtimeSplitMode: "Real-time Split Mode",
+    checkedTotal: "Checked Total",
+    locationFilters: "Filter by Day",
+    allDays: "All Days",
+    getGpsLocation: "Get Live GPS Location",
+    locating: "Locating...",
+    editNode: "Edit Node",
+    removePin: "Remove Pin",
+    saveToSchedule: "Save to Schedule",
+    routeCalculating: "Calculating...",
+    shortestWalk: "Shortest Walk",
+    drivingRoute: "Driving Route",
+    publicTransit: "Public Transit"
   },
   zh: {
     // Nav tabs
@@ -271,6 +299,34 @@ export const translations = {
     upgradeTip: "3個具有熱門度與 Google 地圖交通預警的推薦景點已精準插入到你們的日程表，請至行程頁籤查看！",
     readyToCompile: "已準備好接收組員偏好參數，等待指令發送中。",
     OdyShareSmartConc: "OdyShareSmart 隨身智慧問答箱",
-    askAiPlaceholder: "問問 AI：‘推薦日幣3000元以下的高檔壽司’ 或是 ‘基礎東京日常會話有哪些？’..."
+    askAiPlaceholder: "問問 AI：‘推薦日幣3000元以下的高檔壽司’ 或是 ‘基礎東京日常會話有哪些？’...",
+    
+    // Missing keys
+    sessionExpired: "您的工作階段已過期 (12 小時)，請重新登入。",
+    connectionFailed: "連線伺服器失敗，請稍後再試",
+    fillAllFields: "請填寫所有欄位",
+    fillNameAndEmail: "請填寫旅伴顯示名稱與電子信箱",
+    tripCreateFailed: "創立專案失敗，請重試",
+    budgetOverLimit: "已超預算上限！",
+    memberAdded: "🎉 成功拉入成員！",
+    memberNotFound: "找不到此帳號",
+    addExternalSuccess: "🎉 成功新增臨時虛擬旅伴！",
+    mergeFailed: "綁定失敗，請確認該註冊帳號存在且不重複",
+    saveSnapshot: "鎖定快照",
+    unlockLive: "解除鎖定",
+    simulationLocked: "模擬鎖定模式 (Simulation Snapshot)",
+    realtimeSplitMode: "即時拆帳模式 (Real-time Split)",
+    checkedTotal: "已勾選總支出",
+    locationFilters: "選擇查看天數",
+    allDays: "全部天數",
+    getGpsLocation: "獲得實時 GPS 定位",
+    locating: "取得定位中...",
+    editNode: "編輯行程",
+    removePin: "移除自訂標記",
+    saveToSchedule: "儲存至行程",
+    routeCalculating: "計算中...",
+    shortestWalk: "步行最短",
+    drivingRoute: "自駕路線",
+    publicTransit: "公眾交通"
   }
 };

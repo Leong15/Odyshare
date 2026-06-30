@@ -1,14 +1,17 @@
 // OdyShareSmart Scheduled Background Scheduler Module
 import cron from "node-cron";
-import { getDB, writeDB } from "./db.js";
+import { getDB, writeDB } from "./db/index.js";
 import { searchSerpApiFlights } from "./serpapi.js";
 
+const isDev = process.env.NODE_ENV !== "production"
+const log = (...args: any[]) => { if (isDev) console.log(...args) }
+
 export function startScheduler() {
-  console.log("OdyShareSmart Custom Background scheduler loaded. Scheduled sequence: '0 12 * * 1,4' (Mondays and Thursdays at 12:00 PM)");
+  log("OdyShareSmart Custom Background scheduler loaded. Scheduled sequence: '0 12 * * 1,4' (Mondays and Thursdays at 12:00 PM)");
 
   // Schedule task for every Monday and Thursday at 12:00 PM (noon)
   cron.schedule("0 12 * * 1,4", async () => {
-    console.log("⏰ [Cron Triggered] Starting Scheduled flights price evaluation (Mon/Thu @ 12:00 PM)...");
+    log("⏰ [Cron Triggered] Starting Scheduled flights price evaluation (Mon/Thu @ 12:00 PM)...");
 
     const db = getDB();
     let activeChecksCount = 0;
@@ -112,7 +115,7 @@ export function startScheduler() {
 
     if (activeChecksCount > 0) {
       writeDB(db);
-      console.log(`[Cron Complete] Evaluated ${activeChecksCount} active subscriptions successfully.`);
+      log(`[Cron Complete] Evaluated ${activeChecksCount} active subscriptions successfully.`);
     }
   });
 }

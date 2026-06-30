@@ -29,6 +29,7 @@ interface UseTripActionsOptions {
   setTrip: (t: Trip) => void;
   currentUser: Participant | null;
   lang: "en" | "zh";
+  onError?: (message: string) => void;
 }
 
 export function useTripActions({
@@ -38,6 +39,7 @@ export function useTripActions({
   setTrip,
   currentUser,
   lang,
+  onError,
 }: UseTripActionsOptions) {
 
   // ---------------------------------------------------------------------------
@@ -104,9 +106,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleDeleteTrip failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, fetchTripData, setTrip]
+    [fetchWithAuth, fetchTripData, setTrip, lang, onError]
   );
 
   const handleEditTripMeta = useCallback(
@@ -132,9 +135,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleEditTripMeta failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, fetchTripData, setTrip]
+    [fetchWithAuth, fetchTripData, setTrip, lang, onError]
   );
 
   // ---------------------------------------------------------------------------
@@ -157,9 +161,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleAddItineraryItem failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, setTrip]
+    [fetchWithAuth, setTrip, lang, onError]
   );
 
   const handleUpdateItineraryItem = useCallback(
@@ -178,9 +183,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleUpdateItineraryItem failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, setTrip]
+    [fetchWithAuth, setTrip, lang, onError]
   );
 
   const handleDeleteItineraryItem = useCallback(
@@ -199,9 +205,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleDeleteItineraryItem failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, setTrip]
+    [fetchWithAuth, setTrip, lang, onError]
   );
 
   const handleVote = useCallback(
@@ -220,9 +227,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleVote failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, setTrip, currentUser]
+    [fetchWithAuth, setTrip, currentUser, lang, onError]
   );
 
   const handleAddComment = useCallback(
@@ -246,9 +254,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleAddComment failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, setTrip, currentUser]
+    [fetchWithAuth, setTrip, currentUser, lang, onError]
   );
 
   // ---------------------------------------------------------------------------
@@ -271,9 +280,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleAddExpense failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, setTrip]
+    [fetchWithAuth, setTrip, lang, onError]
   );
 
   const handleDeleteExpense = useCallback(
@@ -292,9 +302,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleDeleteExpense failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, setTrip]
+    [fetchWithAuth, setTrip, lang, onError]
   );
 
   // ---------------------------------------------------------------------------
@@ -317,9 +328,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleUploadDocument failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, setTrip]
+    [fetchWithAuth, setTrip, lang, onError]
   );
 
   // ---------------------------------------------------------------------------
@@ -349,9 +361,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleSendChatMessage failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, setTrip, currentUser]
+    [fetchWithAuth, setTrip, currentUser, lang, onError]
   );
 
   const handlePostAISystemMessage = useCallback(
@@ -418,9 +431,10 @@ export function useTripActions({
         }
       } catch (err) {
         console.error("handleAIRecFlights failed:", err);
+        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
       }
     },
-    [fetchWithAuth, postTripUpdate]
+    [fetchWithAuth, postTripUpdate, lang, onError]
   );
 
   // ---------------------------------------------------------------------------

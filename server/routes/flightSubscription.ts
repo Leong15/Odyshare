@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { readTripsDB, writeTripsDB } from "../db.js";
+import { readTripsDB, writeTripsDB } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
 import type { Trip } from "../../src/types";
 

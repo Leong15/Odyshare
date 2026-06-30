@@ -8,7 +8,7 @@ import { Router, Request, Response } from "express";
 import type { Trip, Participant } from "../../src/types";
 import {
   readTripsDB, writeTripsDB, getDB, writeDB, registerSSEClient, unregisterSSEClient,
-} from "../db.js";
+} from "../db/index.js";
 import { resolveCoordinates } from "../utils/geocoding.js";
 import { ok, fail } from "../utils/apiResponse.js";
 
@@ -284,7 +284,7 @@ router.post("/document/upload", async (req: Request, res: Response) => {
 
       // Lazily import firebase/storage components
       const { ref: storageRefLoc, uploadBytes: uploadBytesLoc, getDownloadURL: getDownloadURLLoc } = await import("firebase/storage");
-      const { storage: storageInstance } = await import("../db.js");
+      const { storage: storageInstance } = await import("../db/index.js");
 
       const storagePath = `trips/${current.id}/documents/${Date.now()}_${name}`;
       const fileRef = storageRefLoc(storageInstance, storagePath);
