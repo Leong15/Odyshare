@@ -2,6 +2,7 @@ import { setDoc, doc } from "firebase/firestore";
 import { db } from "./firebase.js";
 import fs from "fs";
 import { safeHash } from "../utils/crypto.js";
+import { DEFAULT_ACTIVE_TRIP_ID } from "../utils/constants.js";
 
 // Initial default group trip to showcase features immediately
 export const DEFAULT_TRIP = {
@@ -37,10 +38,10 @@ export async function seedDefaults() {
     participantIds: ((DEFAULT_TRIP.participants as any[]) || []).map((p: any) => p.id).filter(Boolean)
   };
   await setDoc(doc(db, "trips", DEFAULT_TRIP.id), tripPayload);
-  await setDoc(doc(db, "config", "active"), { activeTripId: "tokyo-group-2026" });
+  await setDoc(doc(db, "config", "active"), { activeTripId: DEFAULT_ACTIVE_TRIP_ID });
 
   const seeded = {
-    activeTripId: "tokyo-group-2026",
+    activeTripId: DEFAULT_ACTIVE_TRIP_ID,
     users: defaultUsers,
     trips: [JSON.parse(JSON.stringify(DEFAULT_TRIP))],
     invitations: []

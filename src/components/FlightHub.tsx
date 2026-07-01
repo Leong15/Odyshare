@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Plane, Star, Clock, ThumbsUp, AlertCircle, RefreshCw, Sparkles, Calendar, Bell, BellOff, ArrowRight, ShieldCheck, TrendingDown } from "lucide-react";
 import { FlightEstimate, Participant } from "../types";
 import { translations } from "../lib/translations";
+import { convertToUSD } from "../lib/constants";
 
 interface FlightHubProps {
   flightEstimates: FlightEstimate[];
@@ -187,22 +188,13 @@ export default function FlightHub({
 
   const t = translations[lang];
 
-  const getPriceInUSD = (price: number, currency?: string): number => {
-    const cur = (currency || "USD").toUpperCase();
-    if (cur === "TWD") return price / 32.0;
-    if (cur === "JPY") return price / 155.0;
-    if (cur === "HKD") return price / 7.8;
-    if (cur === "EUR") return price / 0.92;
-    return price;
-  };
-
   const getCheapestFlightId = () => {
     if (flightEstimates.length === 0) return null;
     let cheapest = flightEstimates[0];
-    let cheapestUSD = getPriceInUSD(cheapest.price, cheapest.currency);
+    let cheapestUSD = convertToUSD(cheapest.price, cheapest.currency || "USD");
     
     flightEstimates.forEach(f => {
-      const fUSD = getPriceInUSD(f.price, f.currency);
+      const fUSD = convertToUSD(f.price, f.currency || "USD");
       if (fUSD < cheapestUSD) {
         cheapest = f;
         cheapestUSD = fUSD;
@@ -213,8 +205,8 @@ export default function FlightHub({
 
   const sortedEstimates = [...flightEstimates].sort((a, b) => {
     if (sortBy === "price") {
-      const aUSD = getPriceInUSD(a.price, a.currency);
-      const bUSD = getPriceInUSD(b.price, b.currency);
+      const aUSD = convertToUSD(a.price, a.currency || "USD");
+      const bUSD = convertToUSD(b.price, b.currency || "USD");
       return aUSD - bUSD;
     }
     if (sortBy === "rating") return b.rating - a.rating;

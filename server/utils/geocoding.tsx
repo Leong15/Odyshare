@@ -5,6 +5,10 @@
  */
 
 import { CITY_COORDS } from "../../src/lib/constants/cityCoords.js";
+import { createLogger } from "./logger.js";
+
+const logger = createLogger("Geocoding");
+
 
 /**
  * Look up coordinates from the static table using fuzzy matching.
@@ -64,6 +68,8 @@ async function fetchFromNominatim(destination: string): Promise<{ lat: number; l
   return null;
 }
 
+const geocodeCache = new Map<string, { lat: number; lng: number } | null>();
+
 /**
  * Main entry point used by both db.ts and routes/trip.ts.
  * 1. Try static table (instant, no network)
@@ -74,13 +80,27 @@ export async function resolveCoordinates(
 ): Promise<{ lat: number; lng: number } | null> {
   if (!destination || destination === "Unknown Destination") return null;
 
-  const cached = lookupCityCoords(destination);
-  if (cached) return cached;
+  const cacheKey = destination.toLowerCase().trim();
+  if (geocodeCache.has(cacheKey)) {
+    logger.debug(`Geocoding cache hit for: ${destination}`);
+    return geocodeCache.get(cacheKey)!;
+  }
 
-  return Promise.race([
+  const staticCoords = lookupCityCoords(destination);
+  if (staticCoords) {
+    logger.debug(`Geocoding static lookup hit for: ${destination}`);
+    geocodeCache.set(cacheKey, staticCoords);
+    return staticCoords;
+  }
+
+  logger.info(`Fetching coordinates from external geocoder for: ${destination}`);
+  const result = await Promise.race([
     fetchFromNominatim(destination),
     new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
   ]);
+
+  geocodeCache.set(cacheKey, result);
+  return result;
 }
 
 /**

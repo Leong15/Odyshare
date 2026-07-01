@@ -116,5 +116,6 @@ export interface Trip {
   documents: DocumentItem[];
   chats: ChatMessage[];
   tripsList?: Trip[];
+  updatedAt?: string;
 }
 

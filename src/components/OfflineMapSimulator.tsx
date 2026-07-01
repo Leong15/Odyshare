@@ -7,6 +7,11 @@ import { ItineraryItem, Participant } from "../types";
 import { translations } from "../lib/translations";
 import { resolveLatLng } from "../utils/mapHelpers";
 import { MAP_CONFIG, isItineraryItem } from "../lib/constants";
+import { MapTarget } from "../hooks/map/types";
+import { useMapGeolocation } from "../hooks/map/useMapGeolocation";
+import { useLeafletMap } from "../hooks/map/useLeafletMap";
+import { useMapRouting } from "../hooks/map/useMapRouting";
+import { useMapPins } from "../hooks/map/useMapPins";
 
 // Polyline decoder to convert Google Maps Encoded Polyline algorithm format to latlng arrays
 const decodePolyline = (encoded: string): [number, number][] => {
@@ -53,19 +58,7 @@ interface OfflineMapSimulatorProps {
   tripLng?: number;
 }
 
-interface MapTarget {
-  name: string;
-  x: number;
-  y: number;
-  lat?: number;
-  lng?: number;
-  type: string;
-  traffic: "smooth" | "moderate" | "congested";
-  isCustom?: boolean;
-  isItinerary?: boolean;
-  originalItem?: ItineraryItem;
-  dayIndex?: number;
-}
+
 
 // Helper to assign a unique, high-contrast color for each itinerary day
 export const getDayColor = (dayIndex: number): string => {
@@ -96,41 +89,12 @@ export default function OfflineMapSimulator({
   tripLng
 }: OfflineMapSimulatorProps) {
   const [viewMode, setViewMode] = useState<"simulator" | "leaflet">("leaflet");
-  const [leafletLoaded, setLeafletLoaded] = useState(false);
-
-  useEffect(() => {
-    if (viewMode !== "leaflet" || leafletLoaded) return;
-    import("leaflet").then((leafletModule) => {
-      L = leafletModule.default;
-      setLeafletLoaded(true);
-    });
-  }, [viewMode, leafletLoaded]);
-  const [selectedDayFilter, setSelectedDayFilter] = useState<number>(-1); // -1 means "All Days"
   const [offlineMode, setOfflineMode] = useState<boolean>(false);
   const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const [isDownloaded, setIsDownloaded] = useState<boolean>(true);
-  const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeItem, setActiveItem] = useState<ItineraryItem | null>(null);
   const [isNavigating, setIsNavigating] = useState<boolean>(false);
   const [navStep, setNavStep] = useState<number>(0);
-
-  // Leaflet references
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<any | null>(null);
-  const markersGroupRef = useRef<any | null>(null);
-  const markerCacheRef = useRef<Map<string, any>>(new Map());
-  const polylineRef = useRef<any | null>(null);
-
-  // Geolocation and navigation
-  const [currentGeoLocation, setCurrentGeoLocation] = useState<{ lat: number; lng: number }>(() => {
-    if (tripLat !== undefined && tripLat !== null && tripLng !== undefined && tripLng !== null && !isNaN(Number(tripLat)) && !isNaN(Number(tripLng))) {
-      return { lat: Number(tripLat), lng: Number(tripLng) };
-    }
-    return resolveLatLng(destination, destination, 34, 65);
-  });
-  const [geoError, setGeoError] = useState<string | null>(null);
-  const [isLocating, setIsLocating] = useState<boolean>(false);
-  const [isSimulatedMoving, setIsSimulatedMoving] = useState<boolean>(true); // Walking loop simulation starts active by default
 
   // Form states for adding or editing itinerary plans
   const [isEditingActiveItem, setIsEditingActiveItem] = useState<boolean>(false);
@@ -142,138 +106,123 @@ export default function OfflineMapSimulator({
   const [editCategory, setEditCategory] = useState<"sight" | "food" | "hotel">("sight");
   const [editCost, setEditCost] = useState<number>(0);
 
-  // Custom user-dropped landmarks/pins
-  const [customHotspots, setCustomHotspots] = useState<MapTarget[]>([]);
-
-  // Google Routes API States
-  const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
-  const [routeMeta, setRouteMeta] = useState<{ distanceMsg: string; durationMsg: string; mode: "WALKING" | "DRIVE" | null } | null>(null);
-  const [routeLoading, setRouteLoading] = useState<boolean>(false);
-  const [routeError, setRouteError] = useState<string | null>(null);
-
-  const clearRouteState = () => {
-    setRoutePoints([]);
-    setRouteMeta(null);
-    setRouteError(null);
-  };
-
   const t = translations[lang];
 
-  // Helper to convert real Lat/Lng standard coordinates to pseudo canvas X/Y
-  const getSvgCoordsFromLatLng = (lat: number, lng: number): { x: number; y: number } => {
-    let center = resolveLatLng("", destination, 50, 50);
-    if (tripLat !== undefined && tripLat !== null && tripLng !== undefined && tripLng !== null && !isNaN(Number(tripLat)) && !isNaN(Number(tripLng))) {
-      center = { lat: Number(tripLat), lng: Number(tripLng) };
-    }
-
-    const y = 50 - (lat - center.lat) / 0.0015;
-    const x = 50 + (lng - center.lng) / 0.0018;
-
-    return {
-      x: Math.round(Math.min(Math.max(5, x), 95)),
-      y: Math.round(Math.min(Math.max(5, y), 95))
+  const handleSelectObject = (spot: MapTarget) => {
+    clearRouteState();
+    const mockItem: ItineraryItem = spot.originalItem || {
+      id: "spot-" + spot.name,
+      dayIndex: 0,
+      time: "10:00",
+      title: spot.name,
+      description: lang === "zh"
+        ? `偵測到該地區的熱門推薦！`
+        : `Explore local hotspot '${spot.name}' in active destination ${destination}.`,
+      locationName: spot.lat && spot.lng && spot.isCustom ? `${spot.lat.toFixed(6)}, ${spot.lng.toFixed(6)}` : spot.name,
+      category: spot.type === "food" ? "restaurant" : "sight",
+      cost: 0,
+      votes: [],
+      comments: [],
+      coordinates: { x: spot.x, y: spot.y },
+      trafficStatus: spot.traffic as any,
+      lat: spot.lat,
+      lng: spot.lng
     };
+
+    setActiveItem(mockItem);
+    if (onSelectLocation) onSelectLocation(mockItem);
   };
 
-  // Synchronise edit form values whenever the active node focuses
-  useEffect(() => {
-    if (activeItem) {
-      setEditTitle(activeItem.title || "");
-      
-      const isPlaceholderName = activeItem.title?.startsWith("自訂") || activeItem.title?.startsWith("Dropped Pin") || !activeItem.locationName;
-      if (isPlaceholderName && activeItem.lat && activeItem.lng) {
-        setEditLocation(`${activeItem.lat.toFixed(6)}, ${activeItem.lng.toFixed(6)}`);
-      } else {
-        setEditLocation(activeItem.locationName || "");
-      }
+  // 1. Pins Custom Hook (Pins, custom dropped hotspots, filters, searches)
+  const {
+    customHotspots,
+    setCustomHotspots,
+    selectedDayFilter,
+    setSelectedDayFilter,
+    searchQuery,
+    setSearchQuery,
+    itineraryPins,
+    allMapObjects,
+    filteredObjects,
+    handleAddSearchLocation,
+    handleSvgMapClick
+  } = useMapPins({
+    itineraries,
+    destination,
+    lang,
+    handleSelectObject: (spot) => handleSelectObject(spot)
+  });
 
-      setEditDesc(activeItem.description || "");
-      setEditTime(activeItem.time || "12:00");
-      setEditDay(activeItem.dayIndex || 0);
-      setEditCategory(activeItem.category === "restaurant" ? "food" : activeItem.category === "hotel" ? "hotel" : "sight");
-      setEditCost(activeItem.cost || 0);
-      setIsEditingActiveItem(false);
-    } else {
-      setIsEditingActiveItem(false);
-    }
-  }, [activeItem]);
+  // 2. Geolocation Hook
+  const mapRef = useRef<any | null>(null);
+  const {
+    currentGeoLocation,
+    setCurrentGeoLocation,
+    geoError,
+    isLocating,
+    isSimulatedMoving,
+    setIsSimulatedMoving,
+    requestUserLocation
+  } = useMapGeolocation({
+    destination,
+    tripLat,
+    tripLng,
+    currentUserId,
+    lang,
+    setCustomHotspots,
+    handleSelectObject: (spot) => handleSelectObject(spot),
+    mapRef
+  });
 
-  // Automated simulated walking movement loop updates
-  useEffect(() => {
-    if (!isSimulatedMoving || !currentGeoLocation) return;
+  // 3. Routing Hook
+  const {
+    routePoints,
+    routeMeta,
+    routeLoading,
+    routeError,
+    fetchGoogleRoute,
+    clearRouteState,
+    getPublicTransitUrl
+  } = useMapRouting({
+    currentGeoLocation,
+    activeItem,
+    destination,
+    lang
+  });
 
-    let angle = Math.random() * 2 * Math.PI;
-    const interval = setInterval(() => {
-      const stepSize = MAP_CONFIG.WALK_STEP_SIZE; // smooth increment step
-      angle += (Math.random() - 0.5) * MAP_CONFIG.WALK_ANGLE_DRIFT; // random OdyShareing course drift
-      
-      setCurrentGeoLocation(prev => {
-        if (!prev) return prev;
-        const nextLat = prev.lat + Math.sin(angle) * stepSize;
-        const nextLng = prev.lng + Math.cos(angle) * stepSize;
-        return { lat: nextLat, lng: nextLng };
-      });
-    }, MAP_CONFIG.WALK_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, [isSimulatedMoving]);
-
-  // Actual Browser GPS watcher
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const coords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-        setCurrentGeoLocation(coords);
-        setGeoError(null);
-      },
-      (err) => {
-        console.warn("watchPosition telemetry warning:", err);
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+  // Derived other participants with geolocations
+  const otherParticipants = React.useMemo(() => {
+    return (participants || []).filter(
+      p => p.id !== currentUserId && p.lat !== undefined && p.lng !== undefined
     );
+  }, [participants, currentUserId]);
 
-    return () => {
-      navigator.geolocation.clearWatch(watchId);
-    };
-  }, []);
-
-  // Debounce and report our live location telemetry to the server
-  useEffect(() => {
-    if (!currentGeoLocation) return;
-    
-    const targetUserId = currentUserId || localStorage.getItem("loggedInUserId");
-    if (!targetUserId) return;
-
-    const timer = setTimeout(() => {
-      fetch("/api/trip/update-location", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-user-id": targetUserId
-        },
-        body: JSON.stringify({
-          lat: currentGeoLocation.lat,
-          lng: currentGeoLocation.lng
-        })
-      }).catch(err => {
-        console.warn("Telemetry reporting error:", err);
-      });
-    }, MAP_CONFIG.LOCATION_REPORT_DEBOUNCE_MS);
-
-    return () => clearTimeout(timer);
-  }, [currentGeoLocation, currentUserId]);
+  // 4. Leaflet Map Hook
+  const {
+    mapContainerRef,
+    leafletLoaded
+  } = useLeafletMap({
+    viewMode,
+    destination,
+    tripLat,
+    tripLng,
+    allMapObjects,
+    activeItem,
+    currentGeoLocation,
+    otherParticipants,
+    routePoints,
+    routeMeta,
+    onSelectObject: (spot) => handleSelectObject(spot),
+    setCustomHotspots,
+    lang,
+    mapRef
+  });
 
   // Reset active node, routes and custom user landmarks when destination changes
   useEffect(() => {
     setActiveItem(null);
     clearRouteState();
     setCustomHotspots([]);
-    setCurrentGeoLocation(resolveLatLng(destination, destination, 34, 65));
   }, [destination]);
 
   // Dynamic list of unique days in the itinerary
@@ -291,134 +240,7 @@ export default function OfflineMapSimulator({
     return daysList;
   }, [itineraries]);
 
-  // Combine dynamic local itinerary plans so they display on map!
-  const itineraryPins = React.useMemo(() => {
-    return (itineraries || []).map((item, index) => {
-      return {
-        name: item.title,
-        // Distribute pseudo-coordinates around the quadrant nicely
-        x: item.coordinates?.x || (18 + (index * 19) % 65),
-        y: item.coordinates?.y || (22 + (index * 23) % 55),
-        lat: item.lat,
-        lng: item.lng,
-        type: item.category === "hotel" ? "hotel" : item.category === "restaurant" ? "food" : "sight",
-        traffic: (index % 3 === 0 ? "congested" : index % 3 === 1 ? "moderate" : "smooth") as any,
-        isItinerary: true,
-        originalItem: item,
-        dayIndex: item.dayIndex || 0
-      };
-    });
-  }, [itineraries, destination]);
 
-  // Master merged map objects - NO HARDCODED LANDMARKS (AS REQUESTED: "hard code data不要了")
-  const allMapObjects = React.useMemo(() => {
-    const filteredPins = selectedDayFilter === -1
-      ? itineraryPins
-      : itineraryPins.filter(pin => pin.dayIndex === selectedDayFilter);
-    return [...filteredPins, ...customHotspots];
-  }, [itineraryPins, customHotspots, selectedDayFilter]);
-
-  // Cache other active participants with broadcast geolocations
-  const otherParticipants = React.useMemo(() => {
-    return (participants || []).filter(
-      p => p.id !== currentUserId && p.lat !== undefined && p.lng !== undefined
-    );
-  }, [participants, currentUserId]);
-
-  // Filter map list based on search query
-  const filteredObjects = React.useMemo(() => {
-    return allMapObjects.filter(item =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [allMapObjects, searchQuery]);
-
-  // Fetch route parameters and decode polyline from our secure Google Routes API proxy
-  const fetchGoogleRoute = async (mode: "WALKING" | "DRIVE") => {
-    if (!currentGeoLocation || !activeItem) return;
-
-    // Toggle off if clicking the already active route mode
-    if (routeMeta?.mode === mode) {
-      clearRouteState();
-      return;
-    }
-
-    setRouteLoading(true);
-    setRouteError(null);
-    setRoutePoints([]);
-    setRouteMeta(null);
-
-    // Resolve lat/lng for activeItem
-    const activeCoords = activeItem.coordinates 
-      ? resolveLatLng(activeItem.locationName || activeItem.title, destination, activeItem.coordinates.x, activeItem.coordinates.y, activeItem.lat, activeItem.lng)
-      : null;
-
-    if (!activeCoords) {
-      setRouteError(lang === "zh" ? "無法解析目的地座標。" : "Unable to resolve target coordinates.");
-      setRouteLoading(false);
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/trip/google-route", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          origin: currentGeoLocation,
-          destination: activeCoords,
-          travelMode: mode
-        })
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        const errMsg = typeof data.error === "object" && data.error !== null
-          ? (data.error.message || data.error.code || (lang === "zh" ? "獲取路線規劃失敗" : "Failed to retrieve route."))
-          : (data.error || (lang === "zh" ? "獲取路線規劃失敗" : "Failed to retrieve route."));
-        throw new Error(errMsg);
-      }
-
-      const jsonRes = await res.json();
-      const backendData = jsonRes.success && jsonRes.data ? jsonRes.data : jsonRes;
-      if (backendData.routes && backendData.routes[0]) {
-        const route = backendData.routes[0];
-        const encoded = route.polyline?.encodedPolyline;
-        if (encoded) {
-          const decoded = decodePolyline(encoded);
-          setRoutePoints(decoded);
-          
-          const distKm = (route.distanceMeters / 1000).toFixed(2);
-          const durationSec = parseInt(route.duration.replace("s", ""), 10);
-          const durationMin = Math.round(durationSec / 60);
-          
-          setRouteMeta({
-            distanceMsg: lang === "zh" ? `${distKm} 公里` : `${distKm} km`,
-            durationMsg: lang === "zh" ? `${durationMin} 分鐘` : `${durationMin} mins`,
-            mode: mode
-          });
-        } else {
-          throw new Error(lang === "zh" ? "無效的二進位路徑資料。" : "No polyline data found in the response.");
-        }
-      } else {
-        throw new Error(lang === "zh" ? "本區域兩起終點間暫無可用路線規劃。" : "No routes found between these locations.");
-      }
-    } catch (err: any) {
-      console.error("fetchGoogleRoute error:", err);
-      setRouteError(err.message || "Route calculation failed");
-    } finally {
-      setRouteLoading(false);
-    }
-  };
-
-  const getPublicTransitUrl = () => {
-    if (!currentGeoLocation || !activeItem) return "";
-    const activeCoords = activeItem.coordinates 
-      ? resolveLatLng(activeItem.locationName || activeItem.title, destination, activeItem.coordinates.x, activeItem.coordinates.y, activeItem.lat, activeItem.lng)
-      : null;
-    if (!activeCoords) return "";
-    return `https://www.google.com/maps/dir/?api=1&origin=${currentGeoLocation.lat},${currentGeoLocation.lng}&destination=${activeCoords.lat},${activeCoords.lng}&travelmode=transit`;
-  };
 
   const startDownload = () => {
     setDownloadProgress(0);
@@ -536,81 +358,7 @@ export default function OfflineMapSimulator({
     setIsEditingActiveItem(false);
   };
 
-  const handleSelectObject = (spot: MapTarget) => {
-    clearRouteState();
-    const mockItem: ItineraryItem = spot.originalItem || {
-      id: "spot-" + spot.name,
-      dayIndex: 0,
-      time: "10:00",
-      title: spot.name,
-      description: lang === "zh"
-        ? `偵測到該地區的熱門推薦！`
-        : `Explore local hotspot '${spot.name}' in active destination ${destination}.`,
-      locationName: spot.lat && spot.lng && spot.isCustom ? `${spot.lat.toFixed(6)}, ${spot.lng.toFixed(6)}` : spot.name,
-      category: spot.type === "food" ? "restaurant" : "sight",
-      cost: 0,
-      votes: [],
-      comments: [],
-      coordinates: { x: spot.x, y: spot.y },
-      trafficStatus: spot.traffic as any,
-      lat: spot.lat,
-      lng: spot.lng
-    };
-
-    setActiveItem(mockItem);
-    if (onSelectLocation) onSelectLocation(mockItem);
-  };
-
-  // Click directly on canvas map to drop a custom pinpoint pin
-  const handleMapClick = (e: React.MouseEvent<SVGSVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
-
-    setCustomHotspots(prev => {
-      const newName = lang === "zh"
-        ? `自訂地標 #${prev.length + 1}`
-        : `Dropped Pin #${prev.length + 1}`;
-      const resolved = resolveLatLng(newName, destination, x, y);
-      const droppedTarget: MapTarget = {
-        name: newName,
-        x,
-        y,
-        lat: resolved.lat,
-        lng: resolved.lng,
-        type: "sight",
-        traffic: "smooth",
-        isCustom: true
-      };
-
-      setTimeout(() => {
-        handleSelectObject(droppedTarget);
-      }, 0);
-
-      return [droppedTarget, ...prev];
-    });
-  };
-
-  // Search input register as a custom pin onto the layout
-  const handleAddSearchLocation = () => {
-    if (!searchQuery.trim()) return;
-    const rx = Math.round(25 + Math.random() * 50);
-    const ry = Math.round(25 + Math.random() * 50);
-    const resolved = resolveLatLng(searchQuery.trim(), destination, rx, ry);
-    const newTarget: MapTarget = {
-      name: searchQuery.trim(),
-      x: rx,
-      y: ry,
-      lat: resolved.lat,
-      lng: resolved.lng,
-      type: "sight",
-      traffic: "smooth",
-      isCustom: true
-    };
-    setCustomHotspots(prev => [newTarget, ...prev]);
-    handleSelectObject(newTarget);
-    setSearchQuery("");
-  };
+  const handleMapClick = handleSvgMapClick;
 
   const startSimulatedNavigation = () => {
     if (!activeItem) return;
@@ -634,347 +382,7 @@ export default function OfflineMapSimulator({
     return () => clearInterval(timer);
   }, [isNavigating]);
 
-  // Leaflet Map Initialization Effect
-  useEffect(() => {
-    if (viewMode !== "leaflet" || !mapContainerRef.current || !leafletLoaded || !L) {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-      return;
-    }
 
-    if (!mapRef.current) {
-      const centerLat = tripLat !== undefined && tripLat !== null && !isNaN(Number(tripLat)) ? Number(tripLat) : resolveLatLng(destination, destination, 50, 50).lat;
-      const centerLng = tripLng !== undefined && tripLng !== null && !isNaN(Number(tripLng)) ? Number(tripLng) : resolveLatLng(destination, destination, 50, 50).lng;
-      const mapInstance = L.map(mapContainerRef.current, {
-        center: [centerLat, centerLng],
-        zoom: 12,
-        attributionControl: false
-      });
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: '© OpenStreetMap'
-      }).addTo(mapInstance);
-
-      const group = L.layerGroup().addTo(mapInstance);
-      markersGroupRef.current = group;
-      mapRef.current = mapInstance;
-
-      // Drop pin on double-click or simple click
-      mapInstance.on("click", (e: L.LeafletMouseEvent) => {
-        const latlng = e.latlng;
-        // Dynamically map standard Lat/Lng coords to grid x/y coords for perfect cross-view persistence
-        const pseudoCoords = getSvgCoordsFromLatLng(latlng.lat, latlng.lng);
-
-        setCustomHotspots(prev => {
-          const newName = lang === "zh"
-            ? `自訂標定 #${prev.length + 1}`
-            : `Dropped Pin #${prev.length + 1}`;
-
-          const droppedTarget: MapTarget = {
-            name: newName,
-            x: pseudoCoords.x,
-            y: pseudoCoords.y,
-            lat: latlng.lat,
-            lng: latlng.lng,
-            type: "sight",
-            traffic: "smooth",
-            isCustom: true
-          };
-
-          setTimeout(() => {
-            handleSelectObject(droppedTarget);
-          }, 0);
-
-          return [droppedTarget, ...prev];
-        });
-      });
-    }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, [viewMode, destination, leafletLoaded]);
-
-  // Helper to resolve coordinates
-  const getSpotCoords = (spot: any): { lat: number; lng: number } => {
-    if (!spot) {
-      return resolveLatLng("", destination || "", 50, 50);
-    }
-
-    // Check direct lat/lng fields first
-    const latNum = Number(spot.lat);
-    const lngNum = Number(spot.lng);
-    if (spot.lat !== undefined && spot.lat !== null && !isNaN(latNum) &&
-        spot.lng !== undefined && spot.lng !== null && !isNaN(lngNum)) {
-      return { lat: latNum, lng: lngNum };
-    }
-
-    // Calculate x & y mapping onto the city canvas
-    let x = 50;
-    let y = 50;
-    if (spot.coordinates && typeof spot.coordinates === "object") {
-      const cx = Number(spot.coordinates.x);
-      const cy = Number(spot.coordinates.y);
-      if (!isNaN(cx)) x = cx;
-      if (!isNaN(cy)) y = cy;
-    } else {
-      const sx = Number(spot.x);
-      const sy = Number(spot.y);
-      if (spot.x !== undefined && !isNaN(sx)) x = sx;
-      if (spot.y !== undefined && !isNaN(sy)) y = sy;
-    }
-
-    const pinName = spot.locationName || spot.title || spot.name || "";
-    const resolved = resolveLatLng(pinName, destination || "", x, y);
-
-    if (isNaN(resolved.lat) || isNaN(resolved.lng)) {
-      return resolveLatLng("", destination || "", 50, 50);
-    }
-    return resolved;
-  };
-
-  // Sync / Paint markers in Leaflet Group
-  // One-time pan to active landmark selection
-  useEffect(() => {
-    if (!activeItem) return;
-    if (!mapRef.current) return;
-    const pos = getSpotCoords(activeItem);
-    mapRef.current.panTo([pos.lat, pos.lng], { animate: true });
-  }, [activeItem?.id, activeItem?.title, activeItem?.coordinates?.x, activeItem?.coordinates?.y]);
-
-  // One-time fitBounds to loaded route so user can adjust camera zoom freely afterwards
-  useEffect(() => {
-    if (!mapRef.current || !routePoints || routePoints.length === 0 || !L) return;
-    const routePolyline = L.polyline(routePoints);
-    try {
-      const bounds = routePolyline.getBounds();
-      if (bounds.isValid()) {
-        mapRef.current.fitBounds(bounds, { padding: [40, 40] });
-      }
-    } catch (err) {
-      console.warn("Leaflet fitBounds error:", err);
-    }
-  }, [routePoints]);
-
-  // Sync / Paint markers in Leaflet Group
-  useEffect(() => {
-    if (!mapRef.current || !markersGroupRef.current || !L) return;
-
-    const group = markersGroupRef.current;
-    const activeKeys = new Set<string>();
-
-    // 1. Paint current real GPS geolocation if available
-    if (currentGeoLocation) {
-      const key = "gps-user";
-      activeKeys.add(key);
-
-      const geoIcon = L.divIcon({
-        className: "custom-leaflet-geo-pin",
-        html: `
-          <div class="flex flex-col items-center">
-            <div class="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center animate-pulse border border-blue-400">
-              <div class="w-3.5 h-3.5 rounded-full bg-blue-500 border-2 border-white shadow-md"></div>
-            </div>
-            <div class="mt-0.5 px-2 py-0.5 rounded-md bg-blue-900 border border-blue-400 text-white text-[9.5px] font-black leading-none shadow-lg whitespace-nowrap">
-              ${lang === "zh" ? "我的位置 (HTTPS)" : "My Location (HTTPS)"}
-            </div>
-          </div>
-        `,
-        iconSize: [32, 48],
-        iconAnchor: [16, 24]
-      });
-
-      const existing = markerCacheRef.current.get(key);
-      if (existing) {
-        existing.setLatLng([currentGeoLocation.lat, currentGeoLocation.lng]);
-        existing.setIcon(geoIcon);
-      } else {
-        const marker = L.marker([currentGeoLocation.lat, currentGeoLocation.lng], { icon: geoIcon })
-          .addTo(group);
-        markerCacheRef.current.set(key, marker);
-      }
-    }
-
-    // 2. Paint other active participants' live positions in team project
-    otherParticipants.forEach(p => {
-      if (p.lat == null || p.lng == null) return;
-      const key = `participant-${p.id}`;
-      activeKeys.add(key);
-
-      const pColor = p.avatarColor || "#10b981";
-      const initials = (p.name || "").substring(0, 2).toUpperCase() || "?";
-      
-      const pIcon = L.divIcon({
-        className: "custom-leaflet-participant-pin",
-        html: `
-          <div class="flex flex-col items-center select-none">
-            <div class="relative flex items-center justify-center">
-              <div class="w-8 h-8 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-md transform hover:scale-110 active:scale-95 transition-all text-white text-[9.5px] font-black" style="background-color: ${pColor}">
-                ${initials}
-              </div>
-              <div class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-slate-900 animate-ping"></div>
-              <div class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-500 rounded-full border border-slate-900"></div>
-            </div>
-            <div class="mt-1 px-1.5 py-0.5 rounded bg-slate-950 border border-white/10 text-white text-[8px] font-extrabold whitespace-nowrap leading-none shadow-sm">
-              ${p.name}
-            </div>
-          </div>
-        `,
-        iconSize: [36, 52],
-        iconAnchor: [18, 26]
-      });
-
-      const existing = markerCacheRef.current.get(key);
-      if (existing) {
-        existing.setLatLng([p.lat, p.lng]);
-        existing.setIcon(pIcon);
-      } else {
-        const marker = L.marker([p.lat, p.lng], { icon: pIcon })
-          .addTo(group)
-          .bindPopup(`<strong>${p.name}</strong><br/>${lang === "zh" ? "成員即時位置" : "Participant Live Location"}`);
-        markerCacheRef.current.set(key, marker);
-      }
-    });
-
-    // 3. Paint other targets (spots/itinerary items)
-    allMapObjects.forEach(spot => {
-      const key = `spot-${spot.id || spot.name}`;
-      activeKeys.add(key);
-
-      const pos = getSpotCoords(spot);
-      const isSpotActive = activeItem?.locationName === spot.name;
-
-      const markerColor = spot.isItinerary
-        ? getDayColor(spot.dayIndex || 0) // dynamic color for different days
-        : spot.isCustom
-        ? "#ec4899" // hot pink for custom pins
-        : "#64748b";
-
-      const badgeIcon = spot.isItinerary
-        ? `D${(spot.dayIndex || 0) + 1}`
-        : spot.type === "food"
-        ? "🍴"
-        : "📍";
-
-      const pinIcon = L.divIcon({
-        className: `custom-leaflet-pin-wrapper`,
-        html: `
-          <div class="flex flex-col items-center ${isSpotActive ? 'scale-115 z-50' : 'opacity-90'} transition-transform duration-200">
-            <div class="w-7.5 h-7.5 rounded-full border-2 border-white flex items-center justify-center shadow-md text-white text-[9.5px] font-black font-mono leading-none" style="background-color: ${markerColor}; ${isSpotActive ? 'box-shadow: 0 0 10px ' + markerColor + '; border-color: #fbbf24;' : ''}">
-              ${badgeIcon}
-            </div>
-            <div class="mt-1 px-1.5 py-0.5 rounded bg-slate-900 border border-white/10 text-white text-[9px] font-bold whitespace-nowrap leading-none shadow-sm ${isSpotActive ? 'text-amber-300 border-amber-400 font-extrabold bg-slate-950 scale-105' : ''}">
-              ${spot.name.split(" (")[0]}
-            </div>
-          </div>
-        `,
-        iconSize: [30, 46],
-        iconAnchor: [15, 46]
-      });
-
-      const existing = markerCacheRef.current.get(key);
-      if (existing) {
-        existing.setLatLng([pos.lat, pos.lng]);
-        existing.setIcon(pinIcon);
-        existing.off("click");
-        existing.on("click", () => {
-          handleSelectObject(spot);
-        });
-      } else {
-        const marker = L.marker([pos.lat, pos.lng], { icon: pinIcon })
-          .addTo(group)
-          .on("click", () => {
-            handleSelectObject(spot);
-          });
-        markerCacheRef.current.set(key, marker);
-      }
-    });
-
-    // Remove any markers from group and cache that are no longer active
-    for (const [key, marker] of markerCacheRef.current.entries()) {
-      if (!activeKeys.has(key)) {
-        group.removeLayer(marker);
-        markerCacheRef.current.delete(key);
-      }
-    }
-
-    // 4. Draw calculated Google-Routes-API polyline path on Leaflet
-    if (polylineRef.current) {
-      group.removeLayer(polylineRef.current);
-      polylineRef.current = null;
-    }
-    if (routePoints && routePoints.length > 0) {
-      const pl = L.polyline(routePoints, {
-        color: routeMeta?.mode === "WALKING" ? "#3b82f6" : "#10b981",
-        weight: 6,
-        opacity: 0.85,
-        lineCap: "round",
-        lineJoin: "round",
-        dashArray: routeMeta?.mode === "WALKING" ? "5, 10" : undefined
-      }).addTo(group);
-      polylineRef.current = pl;
-    }
-
-  }, [allMapObjects, activeItem, currentGeoLocation, viewMode, routePoints, routeMeta, otherParticipants]);
-
-  // Request actual Geolocation using navigator.geolocation
-  const requestUserLocation = () => {
-    setIsLocating(true);
-    setGeoError(null);
-
-    if (!navigator.geolocation) {
-      setGeoError(lang === "zh" ? "流覽器不支援 GPS 定位服務。" : "Geolocation is not supported by your browser.");
-      setIsLocating(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude
-        };
-        setCurrentGeoLocation(coords);
-        setIsLocating(false);
-
-        if (mapRef.current) {
-          mapRef.current.setView([coords.lat, coords.lng], 14, { animate: true });
-        }
-
-        // Drop user position custom spot
-        const userSpot: MapTarget = {
-          name: lang === "zh" ? "實時定位 (My Location)" : "My GPS Location",
-          x: 50,
-          y: 50,
-          lat: coords.lat,
-          lng: coords.lng,
-          type: "sight",
-          traffic: "smooth",
-          isCustom: true
-        };
-        setCustomHotspots(prev => [userSpot, ...prev]);
-        handleSelectObject(userSpot);
-      },
-      (error) => {
-        console.warn("Geolocation failure:", error);
-        let errMsg = lang === "zh" ? "無法取得您的位置。請確認已開啟定位權限。" : "Unable to retrieve position. Check location permission.";
-        if (window.location.protocol !== "https:" && window.location.hostname !== "localhost") {
-          errMsg = lang === "zh"
-            ? "安全限制：手機瀏覽器要求必須在加密安全連線 (HTTPS) 協定下，才允許呼叫 GPS 定位服務！請使用 HTTPS 連線。"
-            : "HTTPS Required: Mobile browsers strictly require HTTPS secure protocols to summon live GPS geolocation.";
-        }
-        setGeoError(errMsg);
-        setIsLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  };
 
   return (
     <div className="glass-container rounded-2xl p-0 shadow-xl overflow-visible md:overflow-hidden flex flex-col md:flex-row h-auto md:h-[580px] border border-white/10 animate-fadeIn font-sans">

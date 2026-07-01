@@ -6,6 +6,10 @@ import { DEFAULT_TRIP } from "./seed.js";
 import { broadcastTripChange } from "./sse.js";
 import type { Trip, Participant } from "../../src/types";
 import type { DBUser, DBInvitation } from "../types/db";
+import { createLogger } from "../utils/logger.js";
+
+const logger = createLogger("CRUD");
+
 
 function enrichParticipants(participants: Participant[], users: any[]): Participant[] {
   return participants.map((p: Participant) => {
@@ -126,6 +130,7 @@ export function saveTripForRequest(req: Request, updatedTrip: Trip) {
   const dbState = getDB();
   const cleanData = { ...updatedTrip };
   delete cleanData.tripsList;
+  cleanData.updatedAt = new Date().toISOString();
   
   const idx = dbState.trips.findIndex(t => t.id === cleanData.id);
   if (idx !== -1) {
@@ -190,6 +195,7 @@ export function writeTripsDB(data: Trip, req?: Request) {
   const dbState = getDB();
   const cleanData = { ...data };
   delete cleanData.tripsList;
+  cleanData.updatedAt = new Date().toISOString();
   const idx = dbState.trips.findIndex(t => t.id === dbState.activeTripId);
   if (idx !== -1) {
     dbState.trips[idx] = cleanData;
@@ -207,21 +213,21 @@ export function writeTripsDB(data: Trip, req?: Request) {
 // Explicit Firestore CRUD functions to ensure physical cloud database integrations are called and awaited synchronously
 
 export async function createFirestoreUser(userId: string, userData: Partial<DBUser>) {
-  console.log(`[Firebase db.ts] Creating user document in Firestore: ${userId}`);
+  logger.info(`[Firebase db.ts] Creating user document in Firestore: ${userId}`);
   const payload = { ...userData };
   delete payload.id;
   await setDoc(doc(db, "users", userId), payload);
 }
 
 export async function updateFirestoreUser(userId: string, userData: Partial<DBUser>) {
-  console.log(`[Firebase db.ts] Updating user document in Firestore: ${userId}`);
+  logger.info(`[Firebase db.ts] Updating user document in Firestore: ${userId}`);
   const payload = { ...userData };
   delete payload.id;
   await setDoc(doc(db, "users", userId), payload);
 }
 
 export async function createFirestoreTrip(tripId: string, tripData: Partial<Trip>) {
-  console.log(`[Firebase db.ts] Creating trip document in Firestore: ${tripId}`);
+  logger.info(`[Firebase db.ts] Creating trip document in Firestore: ${tripId}`);
   const payload = { ...tripData };
   delete payload.id;
   delete payload.tripsList;
@@ -229,7 +235,7 @@ export async function createFirestoreTrip(tripId: string, tripData: Partial<Trip
 }
 
 export async function updateFirestoreTrip(tripId: string, tripData: Partial<Trip>) {
-  console.log(`[Firebase db.ts] Updating trip document in Firestore: ${tripId}`);
+  logger.info(`[Firebase db.ts] Updating trip document in Firestore: ${tripId}`);
   const payload = { ...tripData };
   delete payload.id;
   delete payload.tripsList;
@@ -237,25 +243,25 @@ export async function updateFirestoreTrip(tripId: string, tripData: Partial<Trip
 }
 
 export async function deleteFirestoreTrip(tripId: string) {
-  console.log(`[Firebase db.ts] Deleting trip document from Firestore: ${tripId}`);
+  logger.info(`[Firebase db.ts] Deleting trip document from Firestore: ${tripId}`);
   await deleteDoc(doc(db, "trips", tripId));
 }
 
 export async function createFirestoreInvitation(invitationId: string, invitationData: Partial<DBInvitation>) {
-  console.log(`[Firebase db.ts] Creating invitation document in Firestore: ${invitationId}`);
+  logger.info(`[Firebase db.ts] Creating invitation document in Firestore: ${invitationId}`);
   const payload = { ...invitationData };
   delete payload.id;
   await setDoc(doc(db, "invitations", invitationId), payload);
 }
 
 export async function updateFirestoreInvitation(invitationId: string, invitationData: Partial<DBInvitation>) {
-  console.log(`[Firebase db.ts] Updating invitation document in Firestore: ${invitationId}`);
+  logger.info(`[Firebase db.ts] Updating invitation document in Firestore: ${invitationId}`);
   const payload = { ...invitationData };
   delete payload.id;
   await setDoc(doc(db, "invitations", invitationId), payload);
 }
 
 export async function deleteFirestoreInvitation(invitationId: string) {
-  console.log(`[Firebase db.ts] Deleting invitation document from Firestore: ${invitationId}`);
+  logger.info(`[Firebase db.ts] Deleting invitation document from Firestore: ${invitationId}`);
   await deleteDoc(doc(db, "invitations", invitationId));
 }

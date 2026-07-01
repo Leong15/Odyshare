@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, Download, QrCode, CreditCard, Check, AlertCircle } from "lucide-react";
 import { ExpenseItem, Participant } from "../types";
+import { getCategoryLabel, getCategoryDotColor } from "../utils/categoryUtils";
 
 interface SettlementModalProps {
   isOpen: boolean;
@@ -42,18 +43,6 @@ export default function SettlementModal({
     value: val,
     percent: totalSpent > 0 ? (val / totalSpent) * 100 : 0,
   }));
-
-  const getCategoryColor = (cat: string) => {
-    switch (cat) {
-      case "flight": return "bg-blue-500";
-      case "lodging": return "bg-indigo-500";
-      case "food": return "bg-emerald-500";
-      case "activities": return "bg-amber-500";
-      case "transit": return "bg-purple-500";
-      case "shopping": return "bg-pink-500";
-      default: return "bg-slate-500";
-    }
-  };
 
   // Helper to generate and download a plain text receipt file (.txt)
   const handleDownloadTxt = () => {
@@ -247,7 +236,7 @@ export default function SettlementModal({
                   <div
                     key={c.name}
                     style={{ width: `${c.percent}%` }}
-                    className={`${getCategoryColor(c.name)} h-full`}
+                    className={`${getCategoryDotColor(c.name)} h-full`}
                     title={`${c.name}: ${c.percent.toFixed(1)}%`}
                   />
                 ))}
@@ -255,8 +244,8 @@ export default function SettlementModal({
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-[10px] text-slate-400 font-mono pt-1">
                 {categories.map((c) => (
                   <div key={c.name} className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${getCategoryColor(c.name)}`} />
-                    <span className="uppercase text-slate-200">{c.name}:</span>
+                    <span className={`w-2 h-2 rounded-full ${getCategoryDotColor(c.name)}`} />
+                    <span className="text-slate-200">{getCategoryLabel(c.name, lang)}:</span>
                     <span className="font-bold text-white">${c.value.toFixed(0)} ({c.percent.toFixed(0)}%)</span>
                   </div>
                 ))}

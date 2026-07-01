@@ -5,6 +5,7 @@ import { safeHash, safeVerify } from "../utils/crypto.js";
 import crypto from "crypto";
 import { ok, fail } from "../utils/apiResponse.js";
 import { sanitizeString } from "../utils/sanitize.js";
+import { LOGIN_RATE_LIMIT_WINDOW_MS, LOGIN_RATE_LIMIT_MAX_ATTEMPTS } from "../utils/constants.js";
 
 const router = Router();
 
@@ -19,14 +20,14 @@ function rateLimitLogin(ip: string): boolean {
     return true;
   }
 
-  if (now - attempt.firstAttempt > 60000) {
+  if (now - attempt.firstAttempt > LOGIN_RATE_LIMIT_WINDOW_MS) {
     // Reset window after 1 minute
     loginAttempts.set(ip, { count: 1, firstAttempt: now });
     return true;
   }
 
   attempt.count++;
-  if (attempt.count > 5) {
+  if (attempt.count > LOGIN_RATE_LIMIT_MAX_ATTEMPTS) {
     return false; // Blocked
   }
   return true;

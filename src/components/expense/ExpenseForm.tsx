@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import { FileText, Upload, Camera, Image, X, Sparkles, Zap, Users, Percent, ShoppingBag } from "lucide-react";
 import { ExpenseItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
+import { getCategoryLabel, EXPENSE_CATEGORIES } from "../../utils/categoryUtils";
 
 interface ExpenseFormProps {
   participants: Participant[];
@@ -132,25 +133,6 @@ export default function ExpenseForm({
     setTaxRefundFeePercent("1.5");
     setSplitType("equal");
     onClose();
-  };
-
-  const getLocalizedCategoryName = (cat: string) => {
-    switch (cat) {
-      case "flight":
-        return lang === "zh" ? "機票航空" : "Flight";
-      case "lodging":
-        return lang === "zh" ? "旅宿飯店" : "Lodging";
-      case "food":
-        return lang === "zh" ? "餐飲美食" : "Food";
-      case "activities":
-        return lang === "zh" ? "景點行程" : "Activity";
-      case "transit":
-        return lang === "zh" ? "本地交通" : "Transit";
-      case "shopping":
-        return lang === "zh" ? "本地商鋪" : "Shopping";
-      default:
-        return lang === "zh" ? "其他雜支" : "Other";
-    }
   };
 
   const rawTotalVal =
@@ -499,24 +481,11 @@ export default function ExpenseForm({
             onChange={(e: any) => setCategory(e.target.value)}
             className="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-white bg-slate-900 outline-none focus:border-blue-500 cursor-pointer"
           >
-            <option value="food" className="bg-slate-900">
-              {getLocalizedCategoryName("food")}
-            </option>
-            <option value="activities" className="bg-slate-900">
-              {getLocalizedCategoryName("activities")}
-            </option>
-            <option value="lodging" className="bg-slate-900">
-              {getLocalizedCategoryName("lodging")}
-            </option>
-            <option value="transit" className="bg-slate-900">
-              {getLocalizedCategoryName("transit")}
-            </option>
-            <option value="flight" className="bg-slate-900">
-              {getLocalizedCategoryName("flight")}
-            </option>
-            <option value="shopping" className="bg-slate-900">
-              {getLocalizedCategoryName("shopping")}
-            </option>
+            {EXPENSE_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat} className="bg-slate-900">
+                {getCategoryLabel(cat, lang)}
+              </option>
+            ))}
           </select>
         </div>
 

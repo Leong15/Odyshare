@@ -4,6 +4,7 @@ import { getGenAI, callGemini } from "./shared";
 import { searchSerpApiFlights } from "../../serpapi.js";
 import { ok, fail } from "../../utils/apiResponse.js";
 import { buildGoogleFlightsUrl } from "../../utils/flightUrlBuilder.js";
+import { EXCHANGE_RATES } from "../../utils/exchangeRates.js";
 
 const router = Router();
 
@@ -61,7 +62,7 @@ function getFallbackFlights(from: string, to: string, date: string, isRoundTrip:
   }
 
   // Set prices accordingly based on currency scale relative to USD
-  const priceScale = currencyCode === "HKD" ? 7.82 : currencyCode === "TWD" ? 32.5 : currencyCode === "JPY" ? 155.0 : 1.0;
+  const priceScale = EXCHANGE_RATES[currencyCode] || 1.0;
   
   // Construct robust Google Flights search URL including precise travel dates
   const bUrl = buildGoogleFlightsUrl(fCode, tCode, date, isRoundTrip ? returnDate : undefined);

@@ -6,12 +6,16 @@ import { broadcastTripChange } from "./sse.js";
 import { DEFAULT_TRIP } from "./seed.js";
 import type { MemoryDB } from "../types/db";
 import { safeHash } from "../utils/crypto.js";
+import { createLogger } from "../utils/logger.js";
+import { DEFAULT_ACTIVE_TRIP_ID } from "../utils/constants.js";
+
+const logger = createLogger("Cache");
 
 export const DB_PATH = path.join(process.cwd(), "trips-db.json");
 
 // Global memory cache representing our database state
 export let memoryDB: MemoryDB = {
-  activeTripId: "tokyo-group-2026",
+  activeTripId: DEFAULT_ACTIVE_TRIP_ID,
   users: [
     { id: "u1", username: "Admin", password: "", name: "Admin", email: "admin@gmail.com", avatarColor: "#3b82f6" },
   ],
@@ -33,8 +37,9 @@ export const initAdminPromise = safeHash("123").then(hash => {
     adminSynced.password = hash;
   }
 }).catch(err => {
-  console.error("Failed to hash default admin password on startup:", err);
+  logger.error("Failed to hash default admin password on startup:", err);
 });
+
 
 // Synchronous fetch of current state
 export function getDB(): MemoryDB {
@@ -99,7 +104,7 @@ export function writeDB(data: Partial<MemoryDB>) {
 
       for (const [id, t] of newTrips.entries()) {
         const oldT = oldTrips.get(id);
-        if (!oldT || JSON.stringify(oldT) !== JSON.stringify(t)) {
+        if (!oldT || oldT.updatedAt !== t.updatedAt) {
           const payload = { 
             ...t,
             participantIds: (t.participants || []).map(p => p.id).filter(Boolean)
@@ -138,7 +143,7 @@ export function writeDB(data: Partial<MemoryDB>) {
       } catch (e) {}
 
     } catch (error) {
-      console.error("[Firebase db.ts] Failed to synchronize delta states to Cloud Firestore:", error);
+      logger.error("[Firebase db.ts] Failed to synchronize delta states to Cloud Firestore:", error);
     }
   })();
 }

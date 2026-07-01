@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import type { Participant } from "../../src/types";
 import { getDB, readTripsDB, writeTripsDB } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
+import { DEFAULT_PARTICIPANT_BUDGET_LIMIT } from "../utils/constants.js";
 
 const router = Router();
 
@@ -33,7 +34,7 @@ router.post("/invite", async (req: Request, res: Response) => {
       email: user.email || `${user.username}@example.com`,
       avatarColor: user.avatarColor || "#3b82f6",
       publicKey: "pub_key_" + Math.random().toString(36).substring(7),
-      budgetLimit: 1500,
+      budgetLimit: DEFAULT_PARTICIPANT_BUDGET_LIMIT,
     });
 
     // Post a welcome system chat alert
@@ -83,7 +84,7 @@ router.post("/invite-external", async (req: Request, res: Response) => {
       email: `${name.trim().toLowerCase().replace(/\s+/g, "")}@external.com`,
       avatarColor,
       publicKey: "pub_key_external_" + Math.random().toString(36).substring(7),
-      budgetLimit: 1500,
+      budgetLimit: DEFAULT_PARTICIPANT_BUDGET_LIMIT,
     };
 
     current.participants.push(newParticipant);
@@ -149,7 +150,7 @@ router.post("/upgrade-external", async (req: Request, res: Response) => {
         email: user.email || `${user.username}@example.com`,
         avatarColor: user.avatarColor || "#3b82f6",
         publicKey: "pub_key_" + Math.random().toString(36).substring(7),
-        budgetLimit: current.participants[externalIdx].budgetLimit || 1500,
+        budgetLimit: current.participants[externalIdx].budgetLimit || DEFAULT_PARTICIPANT_BUDGET_LIMIT,
       };
     }
 

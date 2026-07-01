@@ -1,0 +1,5 @@
+export const DEFAULT_ACTIVE_TRIP_ID = "tokyo-group-2026";
+export const LOGIN_RATE_LIMIT_WINDOW_MS = 60_000;
+export const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 5;
+export const DEFAULT_PARTICIPANT_BUDGET_LIMIT = 1500;
+export const SSE_KEEPALIVE_INTERVAL_MS = 30_000;

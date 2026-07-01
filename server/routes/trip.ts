@@ -11,6 +11,10 @@ import {
 } from "../db/index.js";
 import { resolveCoordinates } from "../utils/geocoding.js";
 import { ok, fail } from "../utils/apiResponse.js";
+import { createLogger } from "../utils/logger.js";
+import { SSE_KEEPALIVE_INTERVAL_MS } from "../utils/constants.js";
+
+const logger = createLogger("TripRoute");
 
 // Sub-routers
 import itineraryRouter from "./itinerary.js";
@@ -127,7 +131,7 @@ router.get("/", async (req: Request, res: Response) => {
 // ── POST /api/trip/update ────────────────────────────────────────────────────
 router.post("/update", async (req: Request, res: Response) => {
   const current = readTripsDB(req);
-  const updated = { ...current, ...req.body };
+  const updated = { ...current, ...req.body, updatedAt: new Date().toISOString() };
   writeTripsDB(updated, req);
   res.json(ok({ trip: readTripsDB(req) }));
 });
@@ -294,9 +298,9 @@ router.post("/document/upload", async (req: Request, res: Response) => {
         contentType: type || "application/octet-stream"
       });
       downloadUrl = await getDownloadURLLoc(snapshot.ref);
-      console.log(`[Firebase Storage] Uploaded '${name}' to '${storagePath}' successfully -> ${downloadUrl}`);
+      logger.info(`[Firebase Storage] Uploaded '${name}' to '${storagePath}' successfully -> ${downloadUrl}`);
     } catch (storageErr) {
-      console.error("[Firebase Storage] Upload failed:", storageErr);
+      logger.error("[Firebase Storage] Upload failed:", storageErr);
     }
   }
 
@@ -370,7 +374,7 @@ router.get("/events", (req: Request, res: Response) => {
   // Setup interval to keep connection alive (prevent intermediate reverse proxy timeout)
   const keepAliveInterval = setInterval(() => {
     res.write(": keepalive\n\n");
-  }, 30000);
+  }, SSE_KEEPALIVE_INTERVAL_MS);
 
   // Clean up registration on disconnect
   req.on("close", () => {

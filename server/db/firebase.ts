@@ -7,9 +7,14 @@ import { seedDefaults } from "./seed.js";
 import { DB_PATH, setMemoryDB } from "./cache.js";
 import type { DBUser, DBInvitation } from "../types/db";
 import type { Trip } from "../../src/types";
+import { createLogger } from "../utils/logger.js";
+import { DEFAULT_ACTIVE_TRIP_ID } from "../utils/constants.js";
+
+const logger = createLogger("Firebase");
 
 // Set Firestore log level to 'error' to silent 'CANCELLED: Disconnecting idle stream' logs
 setLogLevel("error");
+
 
 // Load Firebase configuration safely from root
 const configPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -30,7 +35,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
 }
 
 export async function initFirebase() {
-  console.log("[Firebase db.ts] Fetching stored documents from Cloud Firestore...");
+  logger.info("[Firebase db.ts] Fetching stored documents from Cloud Firestore...");
   try {
     const [usersSnapshot, tripsSnapshot, invSnapshot, configDoc] = await withTimeout(
       Promise.all([
@@ -58,13 +63,13 @@ export async function initFirebase() {
       invitations.push({ id: doc.id, ...doc.data() } as DBInvitation);
     });
 
-    let activeTripId = "tokyo-group-2026";
+    let activeTripId = DEFAULT_ACTIVE_TRIP_ID;
     if (configDoc.exists()) {
       activeTripId = configDoc.data().activeTripId || activeTripId;
     }
 
     if (trips.length === 0) {
-      console.log("[Firebase db.ts] Firestore collection is blank. Seeding with high-fidelity defaults...");
+      logger.info("[Firebase db.ts] Firestore collection is blank. Seeding with high-fidelity defaults...");
       await seedDefaults();
     } else {
       setMemoryDB({
@@ -73,10 +78,10 @@ export async function initFirebase() {
         trips,
         invitations
       });
-      console.log(`[Firebase db.ts] Loaded Firestore dataset: Users (${users.length}), Trips (${trips.length}), Invitations (${invitations.length})`);
+      logger.info(`[Firebase db.ts] Loaded Firestore dataset: Users (${users.length}), Trips (${trips.length}), Invitations (${invitations.length})`);
     }
   } catch (err) {
-    console.error("[Firebase db.ts] Failed to establish active session with Firestore on boot:", err);
+    logger.error("[Firebase db.ts] Failed to establish active session with Firestore on boot:", err);
     // Fall back to local file if available
     if (fs.existsSync(DB_PATH)) {
       try {
@@ -84,7 +89,7 @@ export async function initFirebase() {
         const parsed = JSON.parse(raw);
         if (parsed?.trips) {
           setMemoryDB(parsed);
-          console.log("[Firebase db.ts] Safely failed back to cached local DB state.");
+          logger.info("[Firebase db.ts] Safely failed back to cached local DB state.");
         }
       } catch (e) {}
     }

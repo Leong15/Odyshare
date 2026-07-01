@@ -2,16 +2,16 @@
 import cron from "node-cron";
 import { getDB, writeDB } from "./db/index.js";
 import { searchSerpApiFlights } from "./serpapi.js";
+import { createLogger } from "./utils/logger.js";
 
-const isDev = process.env.NODE_ENV !== "production"
-const log = (...args: any[]) => { if (isDev) console.log(...args) }
+const logger = createLogger("Scheduler");
 
 export function startScheduler() {
-  log("OdyShareSmart Custom Background scheduler loaded. Scheduled sequence: '0 12 * * 1,4' (Mondays and Thursdays at 12:00 PM)");
+  logger.info("OdyShareSmart Custom Background scheduler loaded. Scheduled sequence: '0 12 * * 1,4' (Mondays and Thursdays at 12:00 PM)");
 
   // Schedule task for every Monday and Thursday at 12:00 PM (noon)
   cron.schedule("0 12 * * 1,4", async () => {
-    log("⏰ [Cron Triggered] Starting Scheduled flights price evaluation (Mon/Thu @ 12:00 PM)...");
+    logger.info("⏰ [Cron Triggered] Starting Scheduled flights price evaluation (Mon/Thu @ 12:00 PM)...");
 
     const db = getDB();
     let activeChecksCount = 0;
@@ -108,14 +108,15 @@ export function startScheduler() {
 
           activeChecksCount++;
         } catch (err) {
-          console.error(`[Scheduler Error] Processing trip ${trip.id} subscription failed:`, err);
+          logger.error(`[Scheduler Error] Processing trip ${trip.id} subscription failed:`, err);
         }
       }
     }
 
     if (activeChecksCount > 0) {
       writeDB(db);
-      log(`[Cron Complete] Evaluated ${activeChecksCount} active subscriptions successfully.`);
+      logger.info(`[Cron Complete] Evaluated ${activeChecksCount} active subscriptions successfully.`);
     }
   });
 }
+
