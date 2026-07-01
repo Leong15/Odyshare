@@ -12,6 +12,7 @@ import { useMapGeolocation } from "../hooks/map/useMapGeolocation";
 import { useLeafletMap } from "../hooks/map/useLeafletMap";
 import { useMapRouting } from "../hooks/map/useMapRouting";
 import { useMapPins } from "../hooks/map/useMapPins";
+import { mapEditCategoryToItemCategory } from "../utils/categoryUtils";
 
 // Polyline decoder to convert Google Maps Encoded Polyline algorithm format to latlng arrays
 const decodePolyline = (encoded: string): [number, number][] => {
@@ -268,7 +269,7 @@ export default function OfflineMapSimulator({
         description: editDesc,
         time: editTime,
         dayIndex: Number(editDay) || 0,
-        category: editCategory === "food" ? "restaurant" : editCategory === "hotel" ? "hotel" : "sight",
+        category: mapEditCategoryToItemCategory(editCategory),
         cost: Number(editCost) || 0,
         coordinates: activeItem?.coordinates || { x: 50, y: 50 },
         lat: activeItem?.lat,
@@ -299,7 +300,7 @@ export default function OfflineMapSimulator({
         description: editDesc,
         time: editTime,
         dayIndex: Number(editDay) || 0,
-        category: editCategory === "food" ? ("restaurant" as const) : editCategory === "hotel" ? ("hotel" as const) : ("sight" as const),
+        category: mapEditCategoryToItemCategory(editCategory),
         cost: Number(editCost) || 0,
         lat: localCoords.lat,
         lng: localCoords.lng,
@@ -334,7 +335,7 @@ export default function OfflineMapSimulator({
       description: editDesc,
       time: editTime,
       cost: editCost,
-      category: editCategory === "food" ? "restaurant" as const : editCategory === "hotel" ? "hotel" as const : "sight" as const
+      category: mapEditCategoryToItemCategory(editCategory)
     };
     setActiveItem(updated);
     setIsEditingActiveItem(false);

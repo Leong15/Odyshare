@@ -195,20 +195,26 @@ Example Output format:
 
     const optimizedIndices = parsed.optimizedIndices;
 
-    if (optimizedIndices && Array.isArray(optimizedIndices) && optimizedIndices.length > 0) {
+    let isValid = Array.isArray(optimizedIndices) && optimizedIndices.length === items.length;
+    if (isValid && optimizedIndices) {
+      const seen = new Set<number>();
+      for (const idx of optimizedIndices) {
+        if (typeof idx !== "number" || idx < 0 || idx >= items.length || seen.has(idx)) {
+          isValid = false;
+          break;
+        }
+        seen.add(idx);
+      }
+    }
+
+    if (isValid && optimizedIndices) {
       const originalTimes = items.map(item => item.time).sort((a, b) => a.localeCompare(b));
       
       // Remap based on optimized indices
-      const reorderedItems = optimizedIndices
-        .map((idx: number) => items[idx])
-        .filter(Boolean);
-
-      // Protect against any missed items
-      const missed = items.filter((_, idx) => !optimizedIndices.includes(idx));
-      const fullTour = [...reorderedItems, ...missed];
+      const reorderedItems = optimizedIndices.map((idx: number) => items[idx]);
 
       // Assign the original chronological times to the newly ordered sequence
-      const optimizedResult = fullTour.map((item, idx) => ({
+      const optimizedResult = reorderedItems.map((item, idx) => ({
         ...item,
         time: originalTimes[idx] || item.time
       }));

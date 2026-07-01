@@ -6,6 +6,7 @@
  */
 import { Router, Request, Response } from "express";
 import type { Trip, Participant } from "../../src/types";
+import type { MemoryDB } from "../types/db";
 import {
   readTripsDB, writeTripsDB, getDB, writeDB, registerSSEClient, unregisterSSEClient,
 } from "../db/index.js";
@@ -109,10 +110,10 @@ router.get("/", async (req: Request, res: Response) => {
     for (const { id, dest } of toResolve) {
       const coords = await resolveCoordinates(dest);
       if (!coords) continue;
-      const idx = db.trips.findIndex((t: Trip) => t.id === id);
+      const idx = (db as MemoryDB).trips.findIndex((t: Trip) => t.id === id);
       if (idx !== -1) {
-        db.trips[idx].lat = coords.lat;
-        db.trips[idx].lng = coords.lng;
+        (db as MemoryDB).trips[idx].lat = coords.lat;
+        (db as MemoryDB).trips[idx].lng = coords.lng;
         dirty = true;
       }
     }
@@ -140,7 +141,7 @@ router.post("/update", async (req: Request, res: Response) => {
 router.post("/select", (req: Request, res: Response) => {
   const { tripId } = req.body;
   const db = getDB();
-  if (!db.trips.some((t: Trip) => t.id === tripId)) {
+  if (!(db as MemoryDB).trips.some((t: Trip) => t.id === tripId)) {
     return res.status(404).json(fail("NOT_FOUND", "Trip not found"));
   }
   db.activeTripId = tripId;
@@ -196,7 +197,7 @@ router.post("/create", async (req: Request, res: Response) => {
     }],
   };
 
-  db.trips.push(newTrip);
+  (db as MemoryDB).trips.push(newTrip);
   db.activeTripId = newTripId;
   writeDB(db);
 
@@ -225,9 +226,9 @@ router.post("/update-meta", async (req: Request, res: Response) => {
   }
 
   const db = getDB();
-  const idx = db.trips.findIndex((t: Trip) => t.id === current.id);
+  const idx = (db as MemoryDB).trips.findIndex((t: Trip) => t.id === current.id);
   if (idx !== -1) {
-    db.trips[idx] = current;
+    (db as MemoryDB).trips[idx] = current;
     writeDB(db);
   }
 
@@ -238,11 +239,11 @@ router.post("/update-meta", async (req: Request, res: Response) => {
 router.post("/delete", async (req: Request, res: Response) => {
   const { tripId } = req.body;
   const db = getDB();
-  if (db.trips.length <= 1) {
+  if ((db as MemoryDB).trips.length <= 1) {
     return res.status(400).json(fail("BAD_REQUEST", "Cannot delete the last remaining trip"));
   }
-  db.trips = db.trips.filter((t: Trip) => t.id !== tripId);
-  if (db.activeTripId === tripId) db.activeTripId = db.trips[0].id;
+  (db as MemoryDB).trips = (db as MemoryDB).trips.filter((t: Trip) => t.id !== tripId);
+  if (db.activeTripId === tripId) db.activeTripId = (db as MemoryDB).trips[0].id;
   writeDB(db);
   res.json(ok({ trip: readTripsDB(req) }));
 });

@@ -1,3 +1,5 @@
+import { ItineraryItem } from "../types";
+
 export type ExpenseCategory =
   | "flight"
   | "lodging"
@@ -73,3 +75,17 @@ export function getCategoryDotColor(cat: string): string {
       return "bg-slate-500";
   }
 }
+
+export function mapEditCategoryToItemCategory(editCat: "food" | "sight" | "hotel"): ItineraryItem["category"] {
+  switch (editCat) {
+    case "food":
+      return "restaurant";
+    case "sight":
+      return "sight";
+    case "hotel":
+      return "hotel";
+    default:
+      return "other";
+  }
+}
+

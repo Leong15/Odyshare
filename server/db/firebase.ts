@@ -34,6 +34,18 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
+function isValidUser(data: unknown): data is Omit<DBUser, "id"> {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, any>;
+  return typeof d.username === "string" && d.username.length > 0;
+}
+
+function isValidTrip(data: unknown): data is Omit<Trip, "id"> {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, any>;
+  return typeof d.name === "string" && d.name.length > 0 && typeof d.destination === "string" && d.destination.length > 0;
+}
+
 export async function initFirebase() {
   logger.info("[Firebase db.ts] Fetching stored documents from Cloud Firestore...");
   try {
@@ -50,12 +62,22 @@ export async function initFirebase() {
 
     const users: DBUser[] = [];
     usersSnapshot.forEach((doc) => {
-      users.push({ id: doc.id, ...doc.data() } as DBUser);
+      const data = doc.data();
+      if (isValidUser(data)) {
+        users.push({ id: doc.id, ...data } as DBUser);
+      } else {
+        logger.warn(`Skipping invalid user document: ${doc.id}`);
+      }
     });
 
     const trips: Trip[] = [];
     tripsSnapshot.forEach((doc) => {
-      trips.push({ id: doc.id, ...doc.data() } as unknown as Trip);
+      const data = doc.data();
+      if (isValidTrip(data)) {
+        trips.push({ id: doc.id, ...data } as unknown as Trip);
+      } else {
+        logger.warn(`Skipping invalid trip document: ${doc.id}`);
+      }
     });
 
     const invitations: DBInvitation[] = [];

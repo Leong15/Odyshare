@@ -3,6 +3,7 @@ import cron from "node-cron";
 import { getDB, writeDB } from "./db/index.js";
 import { searchSerpApiFlights } from "./serpapi.js";
 import { createLogger } from "./utils/logger.js";
+import type { MemoryDB } from "./types/db";
 
 const logger = createLogger("Scheduler");
 
@@ -16,7 +17,7 @@ export function startScheduler() {
     const db = getDB();
     let activeChecksCount = 0;
 
-    for (const trip of db.trips) {
+    for (const trip of (db as MemoryDB).trips) {
       const sub = trip.flightSubscription;
       if (sub && sub.isActive) {
         try {
