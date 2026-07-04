@@ -1,5 +1,5 @@
 {
-  "name": "Co-Travel Group Workspace",
+  "name": "OdyShareSync",
   "description": "Collaborative travel workspace to vote on flight routes, build daily itineraries, track and auto-split budgets among friends, view traffic maps, chat with AI and lock travel documents.",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

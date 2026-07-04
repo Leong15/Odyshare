@@ -6,8 +6,8 @@ import { translations } from "../lib/translations";
 interface HeaderWorkspaceProps {
   lang: "en" | "zh";
   setLang: (l: "en" | "zh") => void;
-  theme: string;
-  setTheme: React.Dispatch<React.SetStateAction<any>>;
+  theme: "light" | "dark";
+  setTheme: React.Dispatch<React.SetStateAction<"light" | "dark">>;
   syncing: boolean;
   trip: Trip;
   currentUser: Participant | null;

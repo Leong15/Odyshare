@@ -58,9 +58,11 @@ export default function ItineraryPlanner({
     }
   }, [itineraries]);
 
-  const filteredItems = itineraries
-    .filter((item) => item.dayIndex === activeDay)
-    .sort((a, b) => a.time.localeCompare(b.time));
+  const filteredItems = React.useMemo(() => {
+    return itineraries
+      .filter((item) => item.dayIndex === activeDay)
+      .sort((a, b) => a.time.localeCompare(b.time));
+  }, [itineraries, activeDay]);
 
   const handleMoveItem = async (idx: number, direction: "up" | "down") => {
     const targetIdx = direction === "up" ? idx - 1 : idx + 1;

@@ -77,23 +77,36 @@ export default function ExpenseTracker({
   };
 
   // Live split calculations
-  const liveCalculations = calculateSettleMatrix(expenses, participants, new Set(uncheckedExpenseIds));
+  const liveCalculations = React.useMemo(() => {
+    return calculateSettleMatrix(expenses, participants, new Set(uncheckedExpenseIds));
+  }, [expenses, participants, uncheckedExpenseIds]);
 
   // Determine active parameters based on whether we are viewing a locked simulation snapshot
   const balances = lockedSnapshot ? lockedSnapshot.balances : liveCalculations.balances;
   const transactions = lockedSnapshot ? lockedSnapshot.transactions : liveCalculations.transactions;
   const effectiveUncheckedIds = lockedSnapshot ? lockedSnapshot.uncheckedExpenseIds : uncheckedExpenseIds;
 
-  const activeExpenses = expenses.filter((exp) => !effectiveUncheckedIds.includes(exp.id));
-  const totalSpent = activeExpenses.reduce((sum, exp) => sum + getExpenseActualTotal(exp), 0);
+  const activeExpenses = React.useMemo(() => {
+    return expenses.filter((exp) => !effectiveUncheckedIds.includes(exp.id));
+  }, [expenses, effectiveUncheckedIds]);
+
+  const totalSpent = React.useMemo(() => {
+    return activeExpenses.reduce((sum, exp) => sum + getExpenseActualTotal(exp), 0);
+  }, [activeExpenses]);
 
   // Personal metrics
-  const { paidByMe, myOwedShare, netOwed, netSpentAdjusted } = calculatePersonalMetrics(
-    expenses,
-    activeUserId,
-    balances,
-    new Set(effectiveUncheckedIds)
-  );
+  const { paidByMe, myOwedShare, netOwed, netSpentAdjusted } = React.useMemo(() => {
+    return calculatePersonalMetrics(
+      expenses,
+      activeUserId,
+      balances,
+      new Set(effectiveUncheckedIds)
+    );
+  }, [expenses, activeUserId, balances, effectiveUncheckedIds]);
+
+  const reversedExpenses = React.useMemo(() => {
+    return [...expenses].reverse();
+  }, [expenses]);
 
   const getParticipantName = (id: string) => {
     return participants.find((p) => p.id === id)?.name || "Group Friend";
@@ -146,8 +159,7 @@ export default function ExpenseTracker({
                 </p>
               </div>
             ) : (
-              [...expenses]
-                .reverse()
+              reversedExpenses
                 .map((expenseData) => {
                   const isChecked = !uncheckedExpenseIds.includes(expenseData.id);
                   return (

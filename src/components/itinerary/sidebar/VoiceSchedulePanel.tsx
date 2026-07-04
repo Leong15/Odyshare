@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Sparkles, RefreshCw, Zap } from "lucide-react";
 import { translations } from "../../../lib/translations";
+import { Toast } from "../../common/Toast";
 
 interface VoiceSchedulePanelProps {
   lang: "en" | "zh";
@@ -18,6 +19,11 @@ export default function VoiceSchedulePanel({
   const [voiceInput, setVoiceInput] = useState<string>("");
   const [voiceParsing, setVoiceParsing] = useState<boolean>(false);
   const [isVoiceCollapsed, setIsVoiceCollapsed] = useState<boolean>(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error" | "info" | "warning";
+    title: string;
+    message: string;
+  } | null>(null);
 
   const handleVoiceScheduleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,15 +63,23 @@ export default function VoiceSchedulePanel({
           }
           setVoiceInput("");
         } else {
-          alert(
-            lang === "zh"
-              ? "無法在輸入內容中辨識到明確的時間與項目"
-              : "Could not map explicit items or times from the voice input"
-          );
+          setToast({
+            type: "warning",
+            title: lang === "zh" ? "解析提醒" : "Parsing Notice",
+            message:
+              lang === "zh"
+                ? "無法在輸入內容中辨識到明確的時間與項目"
+                : "Could not map explicit items or times from the voice input",
+          });
         }
       }
     } catch (err) {
       console.error(err);
+      setToast({
+        type: "error",
+        title: lang === "zh" ? "解析錯誤" : "Parsing Error",
+        message: lang === "zh" ? "系統解析時發生未知錯誤" : "An unknown error occurred during parsing",
+      });
     } finally {
       setVoiceParsing(false);
     }
@@ -137,6 +151,14 @@ export default function VoiceSchedulePanel({
             </div>
           </form>
         </div>
+      )}
+      {toast && (
+        <Toast
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

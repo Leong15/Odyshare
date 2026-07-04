@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Calendar, RefreshCw, Send } from "lucide-react";
+import { Toast } from "../../common/Toast";
 
 interface EmailImportPanelProps {
   lang: "en" | "zh";
@@ -17,6 +18,11 @@ export default function EmailImportPanel({
   const [emailInput, setEmailInput] = useState<string>("");
   const [emailParsing, setEmailParsing] = useState<boolean>(false);
   const [isEmailCollapsed, setIsEmailCollapsed] = useState<boolean>(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error" | "info" | "warning";
+    title: string;
+    message: string;
+  } | null>(null);
 
   const handleEmailConfirmationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,13 +62,23 @@ export default function EmailImportPanel({
           }
           setEmailInput("");
         } else {
-          alert(
-            lang === "zh" ? "未能成功解析機票或飯店詳情" : "Could not map explicit reservation fields"
-          );
+          setToast({
+            type: "warning",
+            title: lang === "zh" ? "解析提醒" : "Parsing Notice",
+            message:
+              lang === "zh"
+                ? "未能成功解析機票或飯店詳情"
+                : "Could not map explicit reservation fields",
+          });
         }
       }
     } catch (err) {
       console.error(err);
+      setToast({
+        type: "error",
+        title: lang === "zh" ? "解析錯誤" : "Parsing Error",
+        message: lang === "zh" ? "系統解析時發生未知錯誤" : "An unknown error occurred during parsing",
+      });
     } finally {
       setEmailParsing(false);
     }
@@ -136,6 +152,14 @@ export default function EmailImportPanel({
             </div>
           </form>
         </div>
+      )}
+      {toast && (
+        <Toast
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

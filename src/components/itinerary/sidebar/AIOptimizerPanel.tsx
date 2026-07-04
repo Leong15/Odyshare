@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Sparkles, RefreshCw } from "lucide-react";
 import { ItineraryItem } from "../../../types";
 import { translations } from "../../../lib/translations";
+import { Toast } from "../../common/Toast";
 
 interface AIOptimizerPanelProps {
   lang: "en" | "zh";
@@ -24,6 +25,11 @@ export default function AIOptimizerPanel({
   const [optimizing, setOptimizing] = useState<boolean>(false);
   const [tspOptimizing, setTspOptimizing] = useState<boolean>(false);
   const [isOptimizerCollapsed, setIsOptimizerCollapsed] = useState<boolean>(false);
+  const [toast, setToast] = useState<{
+    type: "success" | "error" | "info" | "warning";
+    title: string;
+    message: string;
+  } | null>(null);
 
   const handleOptimize = async () => {
     if (optimizing) return;
@@ -72,6 +78,11 @@ export default function AIOptimizerPanel({
       }
     } catch (err) {
       console.error(err);
+      setToast({
+        type: "error",
+        title: lang === "zh" ? "優化失敗" : "Optimization Failed",
+        message: lang === "zh" ? "升級行程時發生伺服器錯誤" : "A server error occurred during itinerary upgrade",
+      });
     } finally {
       setOptimizing(false);
     }
@@ -83,11 +94,14 @@ export default function AIOptimizerPanel({
     try {
       const currentDayItems = itineraries.filter((i) => i.dayIndex === activeDay);
       if (currentDayItems.length < 2) {
-        alert(
-          lang === "zh"
-            ? "當天項目少於 2 個，無須進行 TSP 最短路徑排列！"
-            : "Requires at least 2 items on the active day to calculate TSP route!"
-        );
+        setToast({
+          type: "warning",
+          title: lang === "zh" ? "路徑優化提示" : "Route Notice",
+          message:
+            lang === "zh"
+              ? "當天項目少於 2 個，無須進行 TSP 最短路徑排列！"
+              : "Requires at least 2 items on the active day to calculate TSP route!",
+        });
         return;
       }
 
@@ -197,6 +211,14 @@ export default function AIOptimizerPanel({
             </div>
           </div>
         </div>
+      )}
+      {toast && (
+        <Toast
+          type={toast.type}
+          title={toast.title}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

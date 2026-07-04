@@ -88,9 +88,6 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
       if (showSpinner) setSyncing(true);
       if (overrideTripId) localStorage.setItem("activeTripId", overrideTripId);
 
-      // Fire-and-forget invitations check alongside main request
-      fetchInvitations();
-
       try {
         const tid =
           overrideTripId ||
@@ -327,6 +324,21 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
       window.removeEventListener("offline", handleOffline);
     };
   }, [flushOfflineQueue]);
+
+  // Low-frequency checking of invitations (every 45 seconds) to avoid high HTTP request density
+  useEffect(() => {
+    const uid = localStorage.getItem("loggedInUserId") || loggedInUserId;
+    if (!uid) return;
+
+    // Run once immediately
+    fetchInvitations();
+
+    const interval = setInterval(() => {
+      fetchInvitations();
+    }, 45000); // 45 seconds interval
+
+    return () => clearInterval(interval);
+  }, [loggedInUserId, fetchInvitations]);
 
   /** Post a partial trip update and refresh local state from server response. */
   const postTripUpdate = useCallback(

@@ -3,8 +3,8 @@ import React from "react";
 interface LoginTerminalProps {
   lang: "en" | "zh";
   setLang: (l: "en" | "zh") => void;
-  theme: string;
-  setTheme: React.Dispatch<React.SetStateAction<any>>;
+  theme: "light" | "dark";
+  setTheme: React.Dispatch<React.SetStateAction<"light" | "dark">>;
   authMode: "login" | "register";
   setAuthMode: (mode: "login" | "register") => void;
   authUsername: string;

@@ -7,6 +7,7 @@ import { AggregateStatsRow } from "./dashboard/AggregateStatsRow";
 import { TripMetaEditForm } from "./dashboard/TripMetaEditForm";
 import { ProjectListPanel } from "./dashboard/ProjectListPanel";
 import { WorldMapPanel } from "./dashboard/WorldMapPanel";
+import { ConfirmModal } from "./common/ConfirmModal";
 
 export interface DashboardTrip {
   id: string;
@@ -69,6 +70,7 @@ export default function TripDashboard({
   const [isEditing, setIsEditing] = useState(false);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const aggregateStats = useMemo(() => {
     const totalWorkspaces = trips.length;
@@ -141,21 +143,20 @@ export default function TripDashboard({
     });
   }, [mappedProjects, trip]);
 
-  const handleDeleteProject = useCallback(async () => {
-    const confirmMsg = lang === "zh" 
-      ? `🚨 警告：確定要永久刪除「${trip?.name}」這項協作專案嗎？此操作將使所有團員的通訊包、預算明細、離線定位數據永久消逝且不可復原！`
-      : `🚨 WARNING: Are you sure you want to permanently delete workspace '${trip?.name}'? This deletes all co-travel chats, document vaults, budgets, and data for all participants and is non-reversible!`;
-    if (window.confirm(confirmMsg)) {
-      setIsDeleting(true);
-      try {
-        await onDeleteTrip(trip.id);
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setIsDeleting(false);
-      }
+  const handleDeleteProject = useCallback(() => {
+    setShowDeleteConfirm(true);
+  }, []);
+
+  const performDeleteProject = useCallback(async () => {
+    setIsDeleting(true);
+    try {
+      await onDeleteTrip(trip.id);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsDeleting(false);
     }
-  }, [lang, trip?.id, trip?.name, onDeleteTrip]);
+  }, [trip?.id, onDeleteTrip]);
 
   const handleSaveMeta = useCallback(async (updatedData: { name: string; destination: string; totalBudget: number; status?: "active" | "inactive" }) => {
     try {
@@ -288,6 +289,19 @@ export default function TripDashboard({
           onCreateTrip={onCreateTrip} 
         />
       </div>
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title={lang === "zh" ? "確認刪除專案" : "Delete Project Workspace"}
+        message={
+          lang === "zh" 
+            ? `確定要永久刪除「${trip?.name}」這項協作專案嗎？此操作將使所有團員的通訊包、預算明細、離線定位數據永久消逝且不可復原！`
+            : `Are you sure you want to permanently delete workspace '${trip?.name}'? This deletes all co-travel chats, document vaults, budgets, and data for all participants and is non-reversible!`
+        }
+        confirmText={lang === "zh" ? "確認刪除" : "Confirm Delete"}
+        cancelText={lang === "zh" ? "取消" : "Cancel"}
+        onConfirm={performDeleteProject}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

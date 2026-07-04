@@ -81,6 +81,7 @@ export default function EncryptedWorkspaceChat({
             ref={chatScrollRef}
             className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin text-xs"
           >
+            {/* TODO: 訊息數量大時考慮 virtualization (react-window) 列為待辦 */}
             {chats.map((msg) => {
               const isSystem = isSystemMessage(msg.senderId);
               const isMe = msg.senderId === currentUser;

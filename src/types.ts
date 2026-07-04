@@ -96,6 +96,36 @@ export interface ChatMessage {
   isTripUpdate?: boolean; // system notification flag
 }
 
+export interface FlightSubscriptionHistory {
+  price: number;
+  score: number;
+  checkedAt: string;
+  message: string;
+}
+
+export interface FlightSubscription {
+  isActive: boolean;
+  from: string;
+  to: string;
+  date: string;
+  baselinePrice: number;
+  currentPrice: number;
+  lastCheckedPrice: number;
+  carrier: string;
+  stops: number;
+  score: number;
+  currency: string;
+  history: FlightSubscriptionHistory[];
+}
+
+export interface PushNotification {
+  id: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  isRead: boolean;
+}
+
 export interface Trip {
   id: string;
   name: string;
@@ -110,8 +140,8 @@ export interface Trip {
   flightEstimates: FlightEstimate[];
   itineraries: ItineraryItem[];
   backupItineraries?: ItineraryItem[];
-  flightSubscription?: any;
-  pushNotifications?: any[];
+  flightSubscription?: FlightSubscription;
+  pushNotifications?: PushNotification[];
   expenses: ExpenseItem[];
   documents: DocumentItem[];
   chats: ChatMessage[];
