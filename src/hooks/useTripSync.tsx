@@ -13,11 +13,12 @@ interface UseTripSyncOptions {
   loggedInUserId: string | null;
   /** Called when the fetched trip contains user data we can populate currentUser from. */
   onUserResolved?: (participant: any) => void;
+  onSessionExpired?: () => void;
 }
 
 type ConnectionState = 'connecting' | 'connected' | 'polling' | 'reconnecting';
 
-export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptions) {
+export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }: UseTripSyncOptions) {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [errorState, setErrorState] = useState<string | null>(null);
@@ -44,7 +45,15 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
         localStorage.getItem("activeTripId") ||
         tripIdRef.current ||
         "";
-      return { "x-user-id": uid, "x-trip-id": tid };
+      const token = localStorage.getItem("sessionToken") || "";
+      const headers: Record<string, string> = {
+        "x-user-id": uid,
+        "x-trip-id": tid,
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      return headers;
     },
     [loggedInUserId]
   );
@@ -56,6 +65,10 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
       const res = await fetch("/api/trip/invitations", {
         headers: buildHeaders(),
       });
+      if (res.status === 401 && onSessionExpired) {
+        onSessionExpired();
+        return;
+      }
       if (!res.ok) return;
       const ct = res.headers.get("content-type") || "";
       if (!ct.includes("application/json")) return;
@@ -63,7 +76,7 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
     } catch {
       // Silently ignore — invitations are non-critical
     }
-  }, [loggedInUserId, buildHeaders]);
+  }, [loggedInUserId, buildHeaders, onSessionExpired]);
 
   const fetchTripData = useCallback(
     async (showSpinner = false, overrideTripId?: string) => {
@@ -86,8 +99,13 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
           "";
 
         const res = await fetch("/api/trip", {
-          headers: { "x-user-id": uid, "x-trip-id": tid },
+          headers: buildHeaders(overrideTripId),
         });
+
+        if (res.status === 401 && onSessionExpired) {
+          onSessionExpired();
+          return;
+        }
 
         if (!res.ok) throw new Error("Server responded with error status");
         const ct = res.headers.get("content-type") || "";
@@ -121,7 +139,7 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
         if (showSpinner) setSyncing(false);
       }
     },
-    [loggedInUserId, fetchInvitations, onUserResolved]
+    [loggedInUserId, fetchInvitations, onUserResolved, buildHeaders, onSessionExpired]
   );
 
   // ---------------------------------------------------------------------------
@@ -166,7 +184,8 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
         eventSource.close();
       }
 
-      eventSource = new EventSource(`/api/trip/events?tripId=${activeTripId}`);
+      const token = localStorage.getItem("sessionToken") || "";
+      eventSource = new EventSource(`/api/trip/events?tripId=${activeTripId}&token=${token}`);
 
       eventSource.onmessage = (event) => {
         try {
@@ -353,7 +372,7 @@ export function useTripSync({ loggedInUserId, onUserResolved }: UseTripSyncOptio
     async (id: string) => {
       localStorage.setItem("activeTripId", id);
       try {
-        const res = await fetch("/api/trip/select", {
+        const res = await fetchWithAuth("/api/trip/select", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ tripId: id }),

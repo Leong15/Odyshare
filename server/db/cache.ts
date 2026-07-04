@@ -1,6 +1,5 @@
 import path from "path";
 import fs from "fs";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase.js";
 import { broadcastTripChange } from "./sse.js";
 import { DEFAULT_TRIP } from "./seed.js";
@@ -77,7 +76,7 @@ export function writeDB(data: Partial<MemoryDB>) {
     try {
       // 1. Sync Active Config
       if (memoryDB.activeTripId !== oldDB.activeTripId) {
-        await setDoc(doc(db, "config", "active"), { activeTripId: memoryDB.activeTripId });
+        await db.collection("config").doc("active").set({ activeTripId: memoryDB.activeTripId });
       }
 
       // 2. Sync Users
@@ -89,12 +88,12 @@ export function writeDB(data: Partial<MemoryDB>) {
         if (!oldU || JSON.stringify(oldU) !== JSON.stringify(u)) {
           const payload = { ...u };
           delete payload.id;
-          await setDoc(doc(db, "users", id), payload);
+          await db.collection("users").doc(id).set(payload);
         }
       }
       for (const id of oldUsers.keys()) {
         if (!newUsers.has(id)) {
-          await deleteDoc(doc(db, "users", id));
+          await db.collection("users").doc(id).delete();
         }
       }
 
@@ -110,12 +109,12 @@ export function writeDB(data: Partial<MemoryDB>) {
             participantIds: (t.participants || []).map(p => p.id).filter(Boolean)
           };
           delete payload.id;
-          await setDoc(doc(db, "trips", id), payload);
+          await db.collection("trips").doc(id).set(payload);
         }
       }
       for (const id of oldTrips.keys()) {
         if (!newTrips.has(id)) {
-          await deleteDoc(doc(db, "trips", id));
+          await db.collection("trips").doc(id).delete();
         }
       }
 
@@ -128,12 +127,12 @@ export function writeDB(data: Partial<MemoryDB>) {
         if (!oldI || JSON.stringify(oldI) !== JSON.stringify(i)) {
           const payload = { ...i };
           delete payload.id;
-          await setDoc(doc(db, "invitations", id), payload);
+          await db.collection("invitations").doc(id).set(payload);
         }
       }
       for (const id of oldInvs.keys()) {
         if (!newInvs.has(id)) {
-          await deleteDoc(doc(db, "invitations", id));
+          await db.collection("invitations").doc(id).delete();
         }
       }
 

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ItineraryItem } from "../../types";
 import { translations } from "../../lib/translations";
+import { getItineraryCategoryLabel } from "../../utils/categoryUtils";
 
 interface AddActivityFormProps {
   activeDay: number;
@@ -23,23 +24,6 @@ export default function AddActivityForm({
   const [time, setTime] = useState<string>("09:00");
   const [category, setCategory] = useState<ItineraryItem["category"]>("restaurant");
   const [cost, setCost] = useState<string>("35");
-
-  const getLocalizedCategoryName = (cat: string) => {
-    switch (cat) {
-      case "restaurant":
-        return t.restaurant;
-      case "shop":
-        return t.shop;
-      case "sight":
-        return t.landmark;
-      case "transit":
-        return t.transit;
-      case "hotel":
-        return t.hotel;
-      default:
-        return t.other;
-    }
-  };
 
   const handleCreateActivity = (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,19 +115,19 @@ export default function AddActivityForm({
             className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900"
           >
             <option value="sight" className="bg-slate-900">
-              {getLocalizedCategoryName("sight")}
+              {getItineraryCategoryLabel("sight", lang)}
             </option>
             <option value="restaurant" className="bg-slate-900">
-              {getLocalizedCategoryName("restaurant")}
+              {getItineraryCategoryLabel("restaurant", lang)}
             </option>
             <option value="shop" className="bg-slate-900">
-              {getLocalizedCategoryName("shop")}
+              {getItineraryCategoryLabel("shop", lang)}
             </option>
             <option value="transit" className="bg-slate-900">
-              {getLocalizedCategoryName("transit")}
+              {getItineraryCategoryLabel("transit", lang)}
             </option>
             <option value="hotel" className="bg-slate-900">
-              {getLocalizedCategoryName("hotel")}
+              {getItineraryCategoryLabel("hotel", lang)}
             </option>
           </select>
         </div>

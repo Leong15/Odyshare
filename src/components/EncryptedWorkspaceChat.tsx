@@ -19,6 +19,7 @@ export default function EncryptedWorkspaceChat({
   onSendMessage,
   lang = "en"
 }: EncryptedWorkspaceChatProps) {
+  // TODO: Currently just base64 encoding, not true encryption...
   const [chatInput, setChatInput] = useState<string>("");
   const [showEncryptedState, setShowEncryptedState] = useState<{ [key: string]: boolean }>({});
   const [securityStandard, setSecurityStandard] = useState<string>("ECDH + AESGCM-256");

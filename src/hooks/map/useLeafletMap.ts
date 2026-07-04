@@ -1,24 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import type L_TYPE from "leaflet";
-import { resolveLatLng } from "../../utils/mapHelpers";
+import { resolveLatLng, getDayColor } from "../../utils/mapHelpers";
 import { MapTarget } from "./types";
 import { Participant } from "../../types";
 
 let L: typeof L_TYPE | null = null;
 
-const getDayColor = (dayIndex: number): string => {
-  const colors = [
-    "#6366f1", // Day 1: Indigo
-    "#f59e0b", // Day 2: Amber
-    "#ec4899", // Day 3: Pink
-    "#10b981", // Day 4: Emerald
-    "#a855f7", // Day 5: Purple
-    "#06b6d4", // Day 6: Cyan
-    "#f97316", // Day 7: Orange
-    "#14b8a6", // Day 8: Teal
-  ];
-  return colors[dayIndex % colors.length];
-};
+
 
 interface UseLeafletMapProps {
   viewMode: "simulator" | "leaflet";

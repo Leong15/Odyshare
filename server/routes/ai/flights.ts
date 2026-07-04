@@ -4,7 +4,7 @@ import { getGenAI, callGemini } from "./shared";
 import { searchSerpApiFlights } from "../../serpapi.js";
 import { ok, fail } from "../../utils/apiResponse.js";
 import { buildGoogleFlightsUrl } from "../../utils/flightUrlBuilder.js";
-import { EXCHANGE_RATES } from "../../utils/exchangeRates.js";
+import { EXCHANGE_RATES } from "../../../src/lib/constants/exchangeRates.js";
 
 const router = Router();
 

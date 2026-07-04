@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { POPULAR_HOT_PLACES } from "../CreateTripModal";
+import { POPULAR_HOT_PLACES } from "../../lib/constants/places";
 import { Trip } from "../../types";
+import { AutocompleteInput } from "../common/AutocompleteInput";
 
 interface TripMetaEditFormProps {
   trip: Trip;
@@ -14,7 +15,6 @@ export function TripMetaEditForm({ trip, lang, onSave, onCancel }: TripMetaEditF
   const [editDestination, setEditDestination] = useState(trip?.destination || "Tokyo");
   const [editBudget, setEditBudget] = useState(trip?.totalBudget || 3000);
   const [editStatus, setEditStatus] = useState<"active" | "inactive">(trip?.status || "active");
-  const [showEditSuggestions, setShowEditSuggestions] = useState(false);
 
   const filteredEditSuggestions = POPULAR_HOT_PLACES.filter(place => {
     if (!editDestination) return true;
@@ -53,45 +53,28 @@ export function TripMetaEditForm({ trip, lang, onSave, onCancel }: TripMetaEditF
             required
           />
         </div>
-        <div className="space-y-1 relative">
+        <div className="space-y-1">
           <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wide">
             {lang === "zh" ? "目的地 (可任意輸入任何地方)" : "Destination (Any Location)"}
           </span>
-          <input
+          <AutocompleteInput
             id="edit-project-destination"
-            type="text"
             value={editDestination}
-            onChange={(e) => {
-              setEditDestination(e.target.value);
-              setShowEditSuggestions(true);
-            }}
-            onFocus={() => setShowEditSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowEditSuggestions(false), 200)}
-            className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+            onChange={setEditDestination}
+            onSelect={(place) => setEditDestination(lang === "zh" ? place.zh : place.en)}
+            suggestions={filteredEditSuggestions}
             required
             placeholder="e.g. 宜蘭, 沖繩, 巴黎"
+            className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 font-sans"
+            renderSuggestion={(place) => (
+              <div className="w-full text-left px-3.5 py-2 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs">
+                <span>{lang === "zh" ? `${place.zh} (${place.countryZh})` : `${place.en} (${place.countryEn})`}</span>
+                <span className="text-[10px] text-slate-400 font-mono italic">
+                  {lang === "zh" ? place.en : place.zh}
+                </span>
+              </div>
+            )}
           />
-          {showEditSuggestions && filteredEditSuggestions.length > 0 && (
-            <div id="edit-destination-suggestions" className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-[200] divide-y divide-white/5 scrollbar-thin">
-              {filteredEditSuggestions.map((place, idx) => (
-                <button
-                  key={idx}
-                  id={`edit-suggestion-item-${idx}`}
-                  type="button"
-                  onMouseDown={() => {
-                    setEditDestination(lang === "zh" ? place.zh : place.en);
-                    setShowEditSuggestions(false);
-                  }}
-                  className="w-full text-left px-3.5 py-2 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
-                >
-                  <span>{lang === "zh" ? `${place.zh} (${place.countryZh})` : `${place.en} (${place.countryEn})`}</span>
-                  <span className="text-[10px] text-slate-400 font-mono italic">
-                    {lang === "zh" ? place.en : place.zh}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         <div className="space-y-1">
           <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wide">

@@ -1,8 +1,16 @@
 import path from "path";
 import fs from "fs";
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, doc, getDocs, getDoc, setLogLevel } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { 
+  initializeFirestore, 
+  collection as getCol, 
+  doc as getDocRef, 
+  getDocs, 
+  getDoc, 
+  setDoc, 
+  deleteDoc 
+} from "firebase/firestore";
 import { seedDefaults } from "./seed.js";
 import { DB_PATH, setMemoryDB } from "./cache.js";
 import type { DBUser, DBInvitation } from "../types/db";
@@ -12,9 +20,6 @@ import { DEFAULT_ACTIVE_TRIP_ID } from "../utils/constants.js";
 
 const logger = createLogger("Firebase");
 
-// Set Firestore log level to 'error' to silent 'CANCELLED: Disconnecting idle stream' logs
-setLogLevel("error");
-
 
 // Load Firebase configuration safely from root
 const configPath = path.join(process.cwd(), "firebase-applet-config.json");
@@ -22,8 +27,61 @@ const firebaseConfig = {
   ...JSON.parse(fs.readFileSync(configPath, "utf-8")),
   apiKey: process.env.FIREBASE_API_KEY || JSON.parse(fs.readFileSync(configPath, "utf-8")).apiKey
 };
+
 const firebaseApp = initializeApp(firebaseConfig);
-export const db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || "default");
+
+// Initialize Client Firestore with custom database ID and forcing long polling to bypass sandbox environment limitations
+const clientDb = initializeFirestore(
+  firebaseApp,
+  { experimentalForceLongPolling: true },
+  firebaseConfig.firestoreDatabaseId || "ai-studio-0434fc47-5e16-4d10-b891-81f7bf4003e7"
+);
+
+// Polyfill Firestore Admin SDK interface using client SDK methods
+export const db = {
+  collection(collectionName: string) {
+    return {
+      async get() {
+        const colRef = getCol(clientDb, collectionName);
+        const querySnapshot = await getDocs(colRef);
+        const docs = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          data: () => doc.data(),
+          exists: doc.exists()
+        }));
+        return {
+          forEach(callback: (doc: any) => void) {
+            docs.forEach(callback);
+          },
+          docs,
+          size: docs.length
+        };
+      },
+      doc(docId: string) {
+        return {
+          async get() {
+            const docRef = getDocRef(clientDb, collectionName, docId);
+            const docSnap = await getDoc(docRef);
+            return {
+              id: docSnap.id,
+              exists: docSnap.exists(),
+              data: () => docSnap.data()
+            };
+          },
+          async set(data: any) {
+            const docRef = getDocRef(clientDb, collectionName, docId);
+            await setDoc(docRef, data);
+          },
+          async delete() {
+            const docRef = getDocRef(clientDb, collectionName, docId);
+            await deleteDoc(docRef);
+          }
+        };
+      }
+    };
+  }
+} as any;
+
 export const storage = getStorage(firebaseApp);
 
 // Helper to race a promise against a timeout
@@ -51,10 +109,10 @@ export async function initFirebase() {
   try {
     const [usersSnapshot, tripsSnapshot, invSnapshot, configDoc] = await withTimeout(
       Promise.all([
-        getDocs(collection(db, "users")),
-        getDocs(collection(db, "trips")),
-        getDocs(collection(db, "invitations")),
-        getDoc(doc(db, "config", "active"))
+        db.collection("users").get(),
+        db.collection("trips").get(),
+        db.collection("invitations").get(),
+        db.collection("config").doc("active").get()
       ]),
       4000,
       "Firestore initial fetch timed out"
@@ -86,8 +144,8 @@ export async function initFirebase() {
     });
 
     let activeTripId = DEFAULT_ACTIVE_TRIP_ID;
-    if (configDoc.exists()) {
-      activeTripId = configDoc.data().activeTripId || activeTripId;
+    if (configDoc.exists) {
+      activeTripId = configDoc.data()?.activeTripId || activeTripId;
     }
 
     if (trips.length === 0) {

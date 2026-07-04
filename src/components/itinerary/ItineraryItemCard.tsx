@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Clock, MapPin, MessageSquare, ThumbsUp, Plus, Pencil, Utensils, ShoppingBag, Landmark, Route, Bed, ChevronLeft } from "lucide-react";
 import { ItineraryItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
+import { getItineraryCategoryLabel } from "../../utils/categoryUtils";
 
 interface ItineraryItemCardProps {
   key?: string | number;
@@ -52,23 +53,6 @@ export default function ItineraryItemCard({
   const [editTime, setEditTime] = useState<string>(item.time);
   const [editCategory, setEditCategory] = useState<ItineraryItem["category"]>(item.category);
   const [editCost, setEditCost] = useState<string>(item.cost.toString());
-
-  const getLocalizedCategoryName = (cat: string) => {
-    switch (cat) {
-      case "restaurant":
-        return t.restaurant;
-      case "shop":
-        return t.shop;
-      case "sight":
-        return t.landmark;
-      case "transit":
-        return t.transit;
-      case "hotel":
-        return t.hotel;
-      default:
-        return t.other;
-    }
-  };
 
   const getCategoryIcon = (cat: string) => {
     switch (cat) {
@@ -185,11 +169,11 @@ export default function ItineraryItemCard({
               onChange={(e: any) => setEditCategory(e.target.value)}
               className="w-full glass-input px-3 py-2 rounded-xl text-white bg-slate-900 border border-white/10"
             >
-              <option value="sight">{getLocalizedCategoryName("sight")}</option>
-              <option value="restaurant">{getLocalizedCategoryName("restaurant")}</option>
-              <option value="shop">{getLocalizedCategoryName("shop")}</option>
-              <option value="transit">{getLocalizedCategoryName("transit")}</option>
-              <option value="hotel">{getLocalizedCategoryName("hotel")}</option>
+              <option value="sight">{getItineraryCategoryLabel("sight", lang)}</option>
+              <option value="restaurant">{getItineraryCategoryLabel("restaurant", lang)}</option>
+              <option value="shop">{getItineraryCategoryLabel("shop", lang)}</option>
+              <option value="transit">{getItineraryCategoryLabel("transit", lang)}</option>
+              <option value="hotel">{getItineraryCategoryLabel("hotel", lang)}</option>
             </select>
           </div>
 
@@ -260,7 +244,7 @@ export default function ItineraryItemCard({
               )}`}
             >
               {getCategoryIcon(item.category)}
-              <span>{getLocalizedCategoryName(item.category)}</span>
+              <span>{getItineraryCategoryLabel(item.category, lang)}</span>
             </span>
 
             {/* Drag / Reorder Operations Panel */}

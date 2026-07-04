@@ -1,4 +1,23 @@
 import { ItineraryItem } from "../types";
+import { translations } from "../lib/translations";
+
+export function getItineraryCategoryLabel(cat: string, lang: "en" | "zh"): string {
+  const t = translations[lang];
+  switch (cat) {
+    case "restaurant":
+      return t.restaurant;
+    case "shop":
+      return t.shop;
+    case "sight":
+      return t.landmark;
+    case "transit":
+      return t.transit;
+    case "hotel":
+      return t.hotel;
+    default:
+      return t.other;
+  }
+}
 
 export type ExpenseCategory =
   | "flight"

@@ -93,3 +93,18 @@ export function resolveLatLng(
     lng: center.lng + lngOffset
   };
 }
+
+// Helper to assign a unique, high-contrast color for each itinerary day
+export const getDayColor = (dayIndex: number): string => {
+  const colors = [
+    "#6366f1", // Day 1: Indigo
+    "#f59e0b", // Day 2: Amber
+    "#ec4899", // Day 3: Pink
+    "#10b981", // Day 4: Emerald
+    "#a855f7", // Day 5: Purple
+    "#06b6d4", // Day 6: Cyan
+    "#f97316", // Day 7: Orange
+    "#14b8a6", // Day 8: Teal
+  ];
+  return colors[dayIndex % colors.length];
+};

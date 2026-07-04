@@ -3,6 +3,7 @@ import { Plane, Star, Clock, ThumbsUp, AlertCircle, RefreshCw, Sparkles, Calenda
 import { FlightEstimate, Participant } from "../types";
 import { translations } from "../lib/translations";
 import { convertToUSD } from "../lib/constants";
+import { AutocompleteInput } from "./common/AutocompleteInput";
 
 interface FlightHubProps {
   flightEstimates: FlightEstimate[];
@@ -70,10 +71,6 @@ export default function FlightHub({
   const [fromCode, setFromCode] = useState<string>("LAX");
   const [toCode, setToCode] = useState<string>("TYO");
   const [dateStr, setDateStr] = useState<string>("2026-10-12");
-  
-  // Suggestions states
-  const [showFromSuggestions, setShowFromSuggestions] = useState(false);
-  const [showToSuggestions, setShowToSuggestions] = useState(false);
 
   const filteredFromSuggestions = Object.keys(airportMap).filter(code => {
     if (!fromCode) return true;
@@ -277,84 +274,52 @@ export default function FlightHub({
 
       {/* Flight Search Panel: support for full city name and codes */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5 bg-slate-900/60 border border-white/8 p-5 md:p-6 rounded-2xl mb-6 text-sm">
-        <div className="md:col-span-3 relative">
+        <div className="md:col-span-3">
           <label className="block text-[12px] font-semibold text-slate-300 mb-2">
             {t.departureCity} {lang === "zh" ? "(全寫或縮寫，例如 LAX / 洛杉磯)" : "(Name / Airport code)"}
           </label>
-          <input
+          <AutocompleteInput
             id="flight-from-input"
-            type="text"
             value={fromCode}
-            onChange={(e) => {
-              setFromCode(e.target.value);
-              setShowFromSuggestions(true);
-            }}
-            onFocus={() => setShowFromSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowFromSuggestions(false), 200)}
+            onChange={setFromCode}
+            onSelect={(code) => setFromCode(code)}
+            suggestions={filteredFromSuggestions}
             placeholder="e.g. LAX / Tokyo"
             className="w-full bg-slate-950 border border-white/10 hover:border-white/25 rounded-xl px-4 py-2.5 font-bold text-white uppercase outline-none focus:border-blue-500"
+            renderSuggestion={(code) => {
+              const item = airportMap[code];
+              return (
+                <div className="w-full text-left px-4 py-2.5 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs">
+                  <span>{lang === "zh" ? item.zh : item.en}</span>
+                  <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-bold uppercase">{code}</span>
+                </div>
+              );
+            }}
           />
-          {showFromSuggestions && filteredFromSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 mt-2 max-h-48 overflow-y-auto bg-slate-955 border border-white/10 rounded-xl shadow-2xl z-[150] divide-y divide-white/5 scrollbar-thin">
-              {filteredFromSuggestions.map(code => {
-                const item = airportMap[code];
-                return (
-                  <button
-                    key={code}
-                    type="button"
-                    onMouseDown={() => {
-                      setFromCode(code);
-                      setShowFromSuggestions(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
-                  >
-                    <span>{lang === "zh" ? item.zh : item.en}</span>
-                    <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-bold uppercase">{code}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
 
-        <div className="md:col-span-3 relative">
+        <div className="md:col-span-3">
           <label className="block text-[12px] font-semibold text-slate-300 mb-2">
             {t.destinationCity} {lang === "zh" ? "(全寫或縮寫，例如 HND / 東京羽田)" : "(Name / Airport code)"}
           </label>
-          <input
+          <AutocompleteInput
             id="flight-to-input"
-            type="text"
             value={toCode}
-            onChange={(e) => {
-              setToCode(e.target.value);
-              setShowToSuggestions(true);
-            }}
-            onFocus={() => setShowToSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowToSuggestions(false), 200)}
+            onChange={setToCode}
+            onSelect={(code) => setToCode(code)}
+            suggestions={filteredToSuggestions}
             placeholder="e.g. HND / Osaka"
             className="w-full bg-slate-955 border border-white/10 hover:border-white/25 rounded-xl px-4 py-2.5 font-bold text-white uppercase outline-none focus:border-blue-500"
+            renderSuggestion={(code) => {
+              const item = airportMap[code];
+              return (
+                <div className="w-full text-left px-4 py-2.5 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs">
+                  <span>{lang === "zh" ? item.zh : item.en}</span>
+                  <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-bold uppercase">{code}</span>
+                </div>
+              );
+            }}
           />
-          {showToSuggestions && filteredToSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 mt-2 max-h-48 overflow-y-auto bg-slate-950 border border-white/10 rounded-xl shadow-2xl z-[150] divide-y divide-white/5 scrollbar-thin">
-              {filteredToSuggestions.map(code => {
-                const item = airportMap[code];
-                return (
-                  <button
-                    key={code}
-                    type="button"
-                    onMouseDown={() => {
-                      setToCode(code);
-                      setShowToSuggestions(false);
-                    }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
-                  >
-                    <span>{lang === "zh" ? item.zh : item.en}</span>
-                    <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-bold uppercase">{code}</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
         </div>
 
         <div className={tripType === "roundtrip" ? "md:col-span-2" : "md:col-span-3"}>

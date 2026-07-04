@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { AutocompleteInput } from "./common/AutocompleteInput";
+import { POPULAR_HOT_PLACES } from "../lib/constants/places";
 
 interface CreateTripModalProps {
   lang: "en" | "zh";
@@ -14,133 +16,7 @@ interface CreateTripModalProps {
   error?: string | null;
 }
 
-export const POPULAR_HOT_PLACES = [
-  // --- 香港 ---
-    { zh: "香港", en: "Hong Kong", countryZh: "香港", countryEn: "Hong Kong" },
-    
-  // --- 日本 ---
-  { zh: "東京", en: "Tokyo", countryZh: "日本", countryEn: "Japan" },
-  { zh: "大阪", en: "Osaka", countryZh: "日本", countryEn: "Japan" },
-  { zh: "京都", en: "Kyoto", countryZh: "日本", countryEn: "Japan" },
-  { zh: "沖繩", en: "Okinawa", countryZh: "日本", countryEn: "Japan" },
-  { zh: "札幌", en: "Sapporo", countryZh: "日本", countryEn: "Japan" },
-  { zh: "福岡", en: "Fukuoka", countryZh: "日本", countryEn: "Japan" },
-  { zh: "名古屋", en: "Nagoya", countryZh: "日本", countryEn: "Japan" },
-  { zh: "奈良", en: "Nara", countryZh: "日本", countryEn: "Japan" },
-  { zh: "箱根", en: "Hakone", countryZh: "日本", countryEn: "Japan" },
-  { zh: "橫濱", en: "Yokohama", countryZh: "日本", countryEn: "Japan" },
-  { zh: "神戶", en: "Kobe", countryZh: "日本", countryEn: "Japan" },
-  { zh: "廣島", en: "Hiroshima", countryZh: "日本", countryEn: "Japan" },
-  { zh: "輕井澤", en: "Karuizawa", countryZh: "日本", countryEn: "Japan" },
-  { zh: "小樽", en: "Otaru", countryZh: "日本", countryEn: "Japan" },
-  { zh: "仙台", en: "Sendai", countryZh: "日本", countryEn: "Japan" },
-  { zh: "靜岡", en: "Shizuoka", countryZh: "日本", countryEn: "Japan" },
-  { zh: "熊本", en: "Kumamoto", countryZh: "日本", countryEn: "Japan" },
-  { zh: "長野", en: "Nagano", countryZh: "日本", countryEn: "Japan" },
 
-  // --- 台灣 ---
-  { zh: "台北", en: "Taipei", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "高雄", en: "Kaohsiung", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "台中", en: "Taichung", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "台南", en: "Tainan", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "花蓮", en: "Hualien", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "墾丁", en: "Kenting", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "台東", en: "Taitung", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "宜蘭", en: "Yilan", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "新竹", en: "Hsinchu", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "阿里山", en: "Alishan", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "澎湖", en: "Penghu", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "金門", en: "Kinmen", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "南投", en: "Nantou", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "苗栗", en: "Miaoli", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "彰化", en: "Changhua", countryZh: "台灣", countryEn: "Taiwan" },
-  { zh: "嘉義", en: "Chiayi", countryZh: "台灣", countryEn: "Taiwan" },
-
-  // --- 韓國 ---
-  { zh: "首爾", en: "Seoul", countryZh: "韓國", countryEn: "South Korea" },
-  { zh: "釜山", en: "Busan", countryZh: "韓國", countryEn: "South Korea" },
-  { zh: "濟州島", en: "Jeju Island", countryZh: "韓國", countryEn: "South Korea" },
-  { zh: "仁川", en: "Incheon", countryZh: "韓國", countryEn: "South Korea" },
-  { zh: "大邱", en: "Daegu", countryZh: "韓國", countryEn: "South Korea" },
-  { zh: "慶州", en: "Gyeongju", countryZh: "韓國", countryEn: "South Korea" },
-  { zh: "江陵", en: "Gangneung", countryZh: "韓國", countryEn: "South Korea" },
-  { zh: "麗水", en: "Yeosu", countryZh: "韓國", countryEn: "South Korea" },
-
-  // --- 泰國 ---
-  { zh: "曼谷", en: "Bangkok", countryZh: "泰國", countryEn: "Thailand" },
-  { zh: "芭達雅", en: "Pattaya", countryZh: "泰國", countryEn: "Thailand" },
-  { zh: "清邁", en: "Chiang Mai", countryZh: "泰國", countryEn: "Thailand" },
-  { zh: "普吉島", en: "Phuket", countryZh: "泰國", countryEn: "Thailand" },
-  { zh: "蘇美島", en: "Koh Samui", countryZh: "泰國", countryEn: "Thailand" },
-  { zh: "華欣", en: "Hua Hin", countryZh: "泰國", countryEn: "Thailand" },
-  { zh: "喀比", en: "Krabi", countryZh: "泰國", countryEn: "Thailand" },
-  { zh: "清萊", en: "Chiang Rai", countryZh: "泰國", countryEn: "Thailand" },
-  { zh: "北碧", en: "Kanchanaburi", countryZh: "泰國", countryEn: "Thailand" },
-
-  // --- 越南 ---
-  { zh: "河內", en: "Hanoi", countryZh: "越南", countryEn: "Vietnam" },
-  { zh: "胡志明市", en: "Ho Chi Minh City", countryZh: "越南", countryEn: "Vietnam" },
-  { zh: "峴港", en: "Da Nang", countryZh: "越南", countryEn: "Vietnam" },
-  { zh: "會安", en: "Hoi An", countryZh: "越南", countryEn: "Vietnam" },
-  { zh: "下龍灣", en: "Ha Long Bay", countryZh: "越南", countryEn: "Vietnam" },
-  { zh: "芽莊", en: "Nha Trang", countryZh: "越南", countryEn: "Vietnam" },
-  { zh: "大叻", en: "Da Lat", countryZh: "越南", countryEn: "Vietnam" },
-  { zh: "富國島", en: "Phu Quoc", countryZh: "越南", countryEn: "Vietnam" },
-
-  // --- 澳洲 ---
-  { zh: "雪梨", en: "Sydney", countryZh: "澳洲", countryEn: "Australia" },
-  { zh: "墨爾本", en: "Melbourne", countryZh: "澳洲", countryEn: "Australia" },
-  { zh: "布里斯本", en: "Brisbane", countryZh: "澳洲", countryEn: "Australia" },
-  { zh: "黃金海岸", en: "Gold Coast", countryZh: "澳洲", countryEn: "Australia" },
-  { zh: "坎培拉", en: "Canberra", countryZh: "澳洲", countryEn: "Australia" },
-  { zh: "珀斯", en: "Perth", countryZh: "澳洲", countryEn: "Australia" },
-  { zh: "凱恩斯", en: "Cairns", countryZh: "澳洲", countryEn: "Australia" },
-  { zh: "阿德萊德", en: "Adelaide", countryZh: "澳洲", countryEn: "Australia" },
-  { zh: "荷巴特", en: "Hobart", countryZh: "澳洲", countryEn: "Australia" },
-
-  // --- 中國 ---
-  { zh: "澳門", en: "Macau", countryZh: "中國澳門", countryEn: "Macau" },
-  { zh: "北京", en: "Beijing", countryZh: "中國", countryEn: "China" },
-  { zh: "上海", en: "Shanghai", countryZh: "中國", countryEn: "China" },
-
-  // --- 歐美 ---
-  { zh: "倫敦", en: "London", countryZh: "英國", countryEn: "United Kingdom" },
-  { zh: "巴黎", en: "Paris", countryZh: "法國", countryEn: "France" },
-  { zh: "羅馬", en: "Rome", countryZh: "義大利", countryEn: "Italy" },
-  { zh: "巴塞隆納", en: "Barcelona", countryZh: "西班牙", countryEn: "Spain" },
-  { zh: "阿姆斯特丹", en: "Amsterdam", countryZh: "荷蘭", countryEn: "Netherlands" },
-  { zh: "維也納", en: "Vienna", countryZh: "奧地利", countryEn: "Austria" },
-  { zh: "布拉格", en: "Prague", countryZh: "捷克", countryEn: "Czech Republic" },
-  { zh: "蘇黎世", en: "Zurich", countryZh: "瑞士", countryEn: "Switzerland" },
-  { zh: "柏林", en: "Berlin", countryZh: "德國", countryEn: "Germany" },
-  { zh: "米蘭", en: "Milan", countryZh: "義大利", countryEn: "Italy" },
-  { zh: "威尼斯", en: "Venice", countryZh: "義大利", countryEn: "Italy" },
-  { zh: "佛羅倫斯", en: "Florence", countryZh: "義大利", countryEn: "Italy" },
-  { zh: "里斯本", en: "Lisbon", countryZh: "葡萄牙", countryEn: "Portugal" },
-  { zh: "慕尼黑", en: "Munich", countryZh: "德國", countryEn: "Germany" },
-  { zh: "紐約", en: "New York", countryZh: "美國", countryEn: "United States" },
-  { zh: "洛杉磯", en: "Los Angeles", countryZh: "美國", countryEn: "United States" },
-  { zh: "舊金山", en: "San Francisco", countryZh: "美國", countryEn: "United States" },
-  { zh: "芝加哥", en: "Chicago", countryZh: "美國", countryEn: "United States" },
-  { zh: "波士頓", en: "Boston", countryZh: "美國", countryEn: "United States" },
-  { zh: "西雅圖", en: "Seattle", countryZh: "美國", countryEn: "United States" },
-  { zh: "邁阿密", en: "Miami", countryZh: "美國", countryEn: "United States" },
-  { zh: "夏威夷", en: "Hawaii", countryZh: "美國", countryEn: "United States" },
-  { zh: "溫哥華", en: "Vancouver", countryZh: "加拿大", countryEn: "Canada" },
-  { zh: "多倫多", en: "Toronto", countryZh: "加拿大", countryEn: "Canada" },
-
-  // --- 北歐 ---
-  { zh: "哥本哈根", en: "Copenhagen", countryZh: "丹麥", countryEn: "Denmark" },
-  { zh: "奧斯陸", en: "Oslo", countryZh: "挪威", countryEn: "Norway" },
-  { zh: "斯德哥爾摩", en: "Stockholm", countryZh: "瑞典", countryEn: "Sweden" },
-  { zh: "赫爾辛基", en: "Helsinki", countryZh: "芬蘭", countryEn: "Finland" },
-  { zh: "雷克雅維克", en: "Reykjavik", countryZh: "冰島", countryEn: "Iceland" },
-
-  // --- 東南亞其他 ---
-  { zh: "新加坡", en: "Singapore", countryZh: "新加坡", countryEn: "Singapore" },
-  { zh: "吉隆坡", en: "Kuala Lumpur", countryZh: "馬來西亞", countryEn: "Malaysia" },
-  { zh: "峇里島", en: "Bali", countryZh: "印尼", countryEn: "Indonesia" },
-];
 
 export default function CreateTripModal({
   lang,
@@ -155,8 +31,6 @@ export default function CreateTripModal({
   isCreating = false,
   error = null,
 }: CreateTripModalProps) {
-  const [showSuggestions, setShowSuggestions] = useState(false);
-
   const filteredSuggestions = POPULAR_HOT_PLACES.filter(place => {
     if (!newTripDestination) return true; // Show all when focused on empty input
     const search = newTripDestination.toLowerCase();
@@ -207,44 +81,28 @@ export default function CreateTripModal({
             />
           </div>
 
-          <div className="relative">
+          <div>
             <label className="block text-slate-350 font-bold mb-1 font-sans">
               {lang === "zh" ? "出發目的地站點 *" : "Destination Station / City *"}
             </label>
-            <input
-              type="text"
-              required
-              disabled={isCreating}
-              placeholder="e.g. Kyoto / Osaka / HND Tokyo"
+            <AutocompleteInput
               value={newTripDestination}
-              onChange={(e) => {
-                setNewTripDestination(e.target.value);
-                setShowSuggestions(true);
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+              onChange={setNewTripDestination}
+              onSelect={(place) => setNewTripDestination(lang === "zh" ? place.zh : place.en)}
+              suggestions={filteredSuggestions}
+              disabled={isCreating}
+              required
+              placeholder="e.g. Kyoto / Osaka / HND Tokyo"
               className="w-full glass-input px-3 py-2 rounded-xl text-white font-sans text-xs disabled:opacity-50"
+              renderSuggestion={(place) => (
+                <div className="w-full text-left px-3.5 py-2 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs">
+                  <span>{lang === "zh" ? `${place.zh} (${place.countryZh})` : `${place.en} (${place.countryEn})`}</span>
+                  <span className="text-[10px] text-slate-400 font-mono italic">
+                    {lang === "zh" ? place.en : place.zh}
+                  </span>
+                </div>
+              )}
             />
-            {showSuggestions && filteredSuggestions.length > 0 && (
-              <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-white/10 rounded-xl shadow-2xl z-[200] divide-y divide-white/5 scrollbar-thin">
-                {filteredSuggestions.map((place, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onMouseDown={() => {
-                      setNewTripDestination(lang === "zh" ? place.zh : place.en);
-                      setShowSuggestions(false);
-                    }}
-                    className="w-full text-left px-3.5 py-2 hover:bg-white/10 text-white font-semibold flex justify-between items-center transition-colors text-xs"
-                  >
-                    <span>{lang === "zh" ? `${place.zh} (${place.countryZh})` : `${place.en} (${place.countryEn})`}</span>
-                    <span className="text-[10px] text-slate-400 font-mono italic">
-                      {lang === "zh" ? place.en : place.zh}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           <div>

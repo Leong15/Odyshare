@@ -128,6 +128,7 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
         }
 
         const user = data.user || (data.data && data.data.user);
+        const token = data.token || (data.data && data.data.token);
         if (!user) {
           throw new Error("User data missing from response");
         }
@@ -136,6 +137,9 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
         localStorage.setItem("loggedInUserColor", user.avatarColor || "#3b82f6");
         localStorage.setItem("loggedInUserUsername", user.username || "");
         localStorage.setItem("loginTimestamp", String(Date.now()));
+        if (token) {
+          localStorage.setItem("sessionToken", token);
+        }
 
         setLoggedInUserId(user.id);
         setCurrentUser(user);
@@ -157,7 +161,7 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
 
   const handleLogout = useCallback(() => {
     ["loggedInUserId", "loggedInUserName", "loggedInUserColor",
-      "loggedInUserUsername", "loginTimestamp"].forEach((k) =>
+      "loggedInUserUsername", "loginTimestamp", "sessionToken"].forEach((k) =>
       localStorage.removeItem(k)
     );
     setLoggedInUserId(null);

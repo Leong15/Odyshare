@@ -20,9 +20,9 @@ const DocumentVault = lazy(() => import("./components/DocumentVault"));
 const EncryptedWorkspaceChat = lazy(() => import("./components/EncryptedWorkspaceChat"));
 
 // Custom Hooks for Modular Architecture
-import { useAuth } from "./hook/useAuth";
-import { useTripSync } from "./hook/useTripSync";
-import { useTripActions } from "./hook/useTripActions";
+import { useAuth } from "./hooks/useAuth";
+import { useTripSync } from "./hooks/useTripSync";
+import { useTripActions } from "./hooks/useTripActions";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "map" | "itinerary" | "flights" | "budget" | "vault" | "chat" | "ai">("dashboard");
@@ -43,6 +43,7 @@ export default function App() {
   const sync = useTripSync({
     loggedInUserId: auth.loggedInUserId,
     onUserResolved: auth.setCurrentUser,
+    onSessionExpired: auth.handleLogout,
   });
 
   // 3. Initialize Trip Actions Engine (Shared trip level CRUD operations)
@@ -141,18 +142,8 @@ export default function App() {
   };
 
   const handlePostAISystemMessage = (text: string) => {
-    const systemMsg: ChatMessage = {
-      id: "msg-ai-ref-" + Date.now(),
-      senderId: "system",
-      senderName: "WanderSmart AI",
-      avatarColor: "#8b5cf6",
-      messageEncrypted: "",
-      messageDecrypted: text,
-      timestamp: new Date().toISOString(),
-      isTripUpdate: true
-    };
     if (sync.trip) {
-      sync.postTripUpdate({ chats: [...sync.trip.chats, systemMsg] });
+      actions.handlePostAISystemMessage(text, sync.trip.chats);
     }
   };
 
@@ -554,7 +545,9 @@ export default function App() {
                     onCommentItinerary={actions.handleAddComment}
                     onAddItineraryItem={actions.handleAddItineraryItem}
                     lang={lang}
-                    onApplyAIOptimization={actions.handleApplyAIOptimization}
+                    onApplyAIOptimization={(items) =>
+                      actions.handleApplyAIOptimization(items, trip.itineraries)
+                    }
                     onPostAISystemMessage={handlePostAISystemMessage}
                     backupItineraries={trip.backupItineraries || []}
                     onRestoreItineraries={handleRestoreItineraries}

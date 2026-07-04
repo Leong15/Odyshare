@@ -10,6 +10,7 @@ import { initFirebase } from "./db/index.js";
 import authRouter from "./routes/auth";
 import tripRouter from "./routes/trip";
 import aiRouter from "./routes/ai";
+import { requireAuth } from "./middleware/requireAuth.js";
 
 dotenv.config();
 
@@ -37,8 +38,8 @@ app.get("/world_map_plate_carree.png", (req, res) => {
 
 // Mount Modular API routers
 app.use("/api/auth", authRouter);
-app.use("/api/trip", tripRouter);
-app.use("/api/ai", aiRouter);
+app.use("/api/trip", requireAuth, tripRouter);
+app.use("/api/ai", requireAuth, aiRouter);
 
 // Start server hosting & Vite integrations
 async function start() {

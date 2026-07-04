@@ -1,5 +1,4 @@
 import { Request } from "express";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebase.js";
 import { getDB, writeDB } from "./cache.js";
 import { DEFAULT_TRIP } from "./seed.js";
@@ -24,7 +23,7 @@ function enrichParticipants(participants: Participant[], users: any[]): Particip
 
 // Standard Request-scoped helpers
 export function getTripForRequest(req: Request) {
-  const userId = req.headers["x-user-id"] as string;
+  const userId = (req as any).userId as string;
   const tripId = req.headers["x-trip-id"] as string;
   const dbState = getDB();
 
@@ -216,14 +215,14 @@ export async function createFirestoreUser(userId: string, userData: Partial<DBUs
   logger.info(`[Firebase db.ts] Creating user document in Firestore: ${userId}`);
   const payload = { ...userData };
   delete payload.id;
-  await setDoc(doc(db, "users", userId), payload);
+  await db.collection("users").doc(userId).set(payload);
 }
 
 export async function updateFirestoreUser(userId: string, userData: Partial<DBUser>) {
   logger.info(`[Firebase db.ts] Updating user document in Firestore: ${userId}`);
   const payload = { ...userData };
   delete payload.id;
-  await setDoc(doc(db, "users", userId), payload);
+  await db.collection("users").doc(userId).set(payload);
 }
 
 export async function createFirestoreTrip(tripId: string, tripData: Partial<Trip>) {
@@ -231,7 +230,7 @@ export async function createFirestoreTrip(tripId: string, tripData: Partial<Trip
   const payload = { ...tripData };
   delete payload.id;
   delete payload.tripsList;
-  await setDoc(doc(db, "trips", tripId), payload);
+  await db.collection("trips").doc(tripId).set(payload);
 }
 
 export async function updateFirestoreTrip(tripId: string, tripData: Partial<Trip>) {
@@ -239,29 +238,29 @@ export async function updateFirestoreTrip(tripId: string, tripData: Partial<Trip
   const payload = { ...tripData };
   delete payload.id;
   delete payload.tripsList;
-  await setDoc(doc(db, "trips", tripId), payload);
+  await db.collection("trips").doc(tripId).set(payload);
 }
 
 export async function deleteFirestoreTrip(tripId: string) {
   logger.info(`[Firebase db.ts] Deleting trip document from Firestore: ${tripId}`);
-  await deleteDoc(doc(db, "trips", tripId));
+  await db.collection("trips").doc(tripId).delete();
 }
 
 export async function createFirestoreInvitation(invitationId: string, invitationData: Partial<DBInvitation>) {
   logger.info(`[Firebase db.ts] Creating invitation document in Firestore: ${invitationId}`);
   const payload = { ...invitationData };
   delete payload.id;
-  await setDoc(doc(db, "invitations", invitationId), payload);
+  await db.collection("invitations").doc(invitationId).set(payload);
 }
 
 export async function updateFirestoreInvitation(invitationId: string, invitationData: Partial<DBInvitation>) {
   logger.info(`[Firebase db.ts] Updating invitation document in Firestore: ${invitationId}`);
   const payload = { ...invitationData };
   delete payload.id;
-  await setDoc(doc(db, "invitations", invitationId), payload);
+  await db.collection("invitations").doc(invitationId).set(payload);
 }
 
 export async function deleteFirestoreInvitation(invitationId: string) {
   logger.info(`[Firebase db.ts] Deleting invitation document from Firestore: ${invitationId}`);
-  await deleteDoc(doc(db, "invitations", invitationId));
+  await db.collection("invitations").doc(invitationId).delete();
 }

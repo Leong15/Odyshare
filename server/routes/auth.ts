@@ -6,6 +6,8 @@ import crypto from "crypto";
 import { ok, fail } from "../utils/apiResponse.js";
 import { sanitizeString } from "../utils/sanitize.js";
 import { LOGIN_RATE_LIMIT_WINDOW_MS, LOGIN_RATE_LIMIT_MAX_ATTEMPTS } from "../utils/constants.js";
+import { signSession } from "../utils/session.js";
+import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
 
@@ -140,6 +142,7 @@ router.post("/register", async (req: Request, res: Response) => {
     const randomColor = colors[Math.floor(Math.random() * colors.length)];
     const verifyToken = crypto.randomBytes(32).toString("hex");
 
+    const hasSmtp = !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASS);
     const newUser = {
       id: "user-" + Date.now(),
       username: cleanUsername,
@@ -147,12 +150,19 @@ router.post("/register", async (req: Request, res: Response) => {
       name: cleanName,
       email: cleanEmail,
       avatarColor: randomColor,
-      emailVerified: false,
+      emailVerified: !hasSmtp, // auto-verify if no SMTP is set up
       verificationToken: verifyToken
     };
 
     db.users.push(newUser);
     writeDB(db);
+
+    if (!hasSmtp) {
+      return res.json(ok({
+        pendingVerification: false,
+        message: "Registration successful! Account is activated immediately (註冊成功！帳號已立即啟用，您可以直接登入)。"
+      }));
+    }
 
     // Send verification link via real email
     const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
@@ -228,17 +238,25 @@ router.post("/login", async (req: Request, res: Response) => {
     return res.status(401).json(fail("UNAUTHORIZED", "Invalid username or password (帳號或密碼錯誤)。"));
   }
 
-  // Block login if email is not verified yet (except for initial Admin account which is pre-verified)
-  if (user.id !== "u1" && user.emailVerified === false) {
-    return res.status(401).json(fail("UNAUTHORIZED", "Please verify your email address to activate your account (您的帳號尚未啟用，請先至信箱點擊驗證連結進行啟用)。"));
-  }
-
   try {
     const isValid = await safeVerify(user.password, password);
 
     if (!isValid) {
       return res.status(401).json(fail("UNAUTHORIZED", "Invalid username or password (帳號或密碼錯誤)。"));
     }
+
+    // Auto-verify if GMAIL SMTP is not configured
+    if (user.emailVerified === false && (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASS)) {
+      user.emailVerified = true;
+      writeDB(db);
+    }
+
+    // Block login if email is not verified yet (except for initial Admin account which is pre-verified)
+    if (user.id !== "u1" && user.emailVerified === false) {
+      return res.status(401).json(fail("UNAUTHORIZED", "Please verify your email address to activate your account (您的帳號尚未啟用，請先至信箱點擊驗證連結進行啟用)。"));
+    }
+
+    const token = signSession(user.id);
 
     res.json(ok({
       user: {
@@ -247,7 +265,8 @@ router.post("/login", async (req: Request, res: Response) => {
         name: user.name,
         email: user.email,
         avatarColor: user.avatarColor
-      }
+      },
+      token
     }));
   } catch (err) {
     console.error("Password verification crash:", err);
@@ -256,10 +275,10 @@ router.post("/login", async (req: Request, res: Response) => {
 });
 
 // 3. User Change Password (When already logged in)
-router.post("/change-password", async (req: Request, res: Response) => {
+router.post("/change-password", requireAuth, async (req: Request, res: Response) => {
   await initAdminPromise;
   const { username, currentPassword, newPassword } = req.body;
-  const headerUserId = req.headers["x-user-id"];
+  const verifiedUserId = (req as any).userId;
 
   if (!currentPassword || !newPassword) {
     return res.status(400).json(fail("BAD_REQUEST", "Current password and new password are required."));
@@ -282,9 +301,8 @@ router.post("/change-password", async (req: Request, res: Response) => {
     user = db.users.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
   }
   
-  if (!user && headerUserId) {
-    const cleanHeaderUserId = sanitizeString(headerUserId);
-    user = db.users.find(u => u.id === cleanHeaderUserId);
+  if (!user && verifiedUserId) {
+    user = db.users.find(u => u.id === verifiedUserId);
   }
 
   if (!user) {

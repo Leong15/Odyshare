@@ -5,6 +5,7 @@
  * and only keeps the core trip CRUD + shared utilities here.
  */
 import { Router, Request, Response } from "express";
+import crypto from "crypto";
 import type { Trip, Participant } from "../../src/types";
 import type { MemoryDB } from "../types/db";
 import {
@@ -75,9 +76,9 @@ router.post("/google-route", async (req: Request, res: Response) => {
 // ── Live location telemetry ──────────────────────────────────────────────────
 router.post("/update-location", (req: Request, res: Response) => {
   const { lat, lng } = req.body;
-  const userId = req.headers["x-user-id"] as string;
+  const userId = (req as any).userId as string;
 
-  if (!userId) return res.status(401).json(fail("UNAUTHORIZED", "x-user-id header required."));
+  if (!userId) return res.status(401).json(fail("UNAUTHORIZED", "User identity required."));
   if (lat === undefined || lng === undefined) {
     return res.status(400).json(fail("BAD_REQUEST", "Missing lat or lng."));
   }
@@ -153,7 +154,7 @@ router.post("/select", (req: Request, res: Response) => {
 // ── POST /api/trip/create ────────────────────────────────────────────────────
 router.post("/create", async (req: Request, res: Response) => {
   const { name, destination, startDate, endDate, totalBudget } = req.body;
-  const userId = req.headers["x-user-id"] as string;
+  const userId = (req as any).userId as string;
   const db = getDB();
 
   const creator = db.users.find((u: any) => u.id === userId);
@@ -189,7 +190,7 @@ router.post("/create", async (req: Request, res: Response) => {
     chats: [{
       id: "msg-start-" + Date.now(),
       senderId: "system",
-      senderName: "System",
+      senderName: "OdyShareSmart AI",
       avatarColor: "#64748b",
       messageEncrypted: "",
       messageDecrypted: `🚀 Welcome to ${name || "New Trip"}! Add itineraries, vote on flights, and track budgets.`,
@@ -276,10 +277,13 @@ router.post("/document/upload", async (req: Request, res: Response) => {
 
   let downloadUrl = "#";
   let calculatedSize = size || "1.2 MB";
+  let accessKey = crypto.createHash("sha256").update((name || "doc") + Date.now()).digest("hex").slice(0, 32);
 
   if (fileData) {
     try {
       const buffer = Buffer.from(fileData, "base64");
+      accessKey = crypto.createHash("sha256").update(buffer).digest("hex").slice(0, 32);
+
       // Calculate human-readable size
       if (buffer.length < 1024 * 1024) {
         calculatedSize = (buffer.length / 1024).toFixed(1) + " KB";
@@ -312,7 +316,7 @@ router.post("/document/upload", async (req: Request, res: Response) => {
     type: type || "application/pdf",
     uploadedAt: new Date().toISOString(),
     url: downloadUrl,
-    accessKey: "doc_hash_sha250_" + Math.random().toString(36).slice(2, 12),
+    accessKey,
     uploadedBy: uploadedBy || "Unknown",
   };
   current.documents.push(newDoc);
@@ -320,7 +324,7 @@ router.post("/document/upload", async (req: Request, res: Response) => {
   current.chats.push({
     id: "msg-doc-" + Date.now(),
     senderId: "system",
-    senderName: "System",
+    senderName: "OdyShareSmart AI",
     avatarColor: "#64748b",
     messageEncrypted: "",
     messageDecrypted: `📂 ${newDoc.uploadedBy} uploaded '${newDoc.name}'`,

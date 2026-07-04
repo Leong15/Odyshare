@@ -23,7 +23,7 @@ router.post("/add", async (req: Request, res: Response) => {
     current.chats.push({
       id: "msg-exp-" + Date.now(),
       senderId: "system",
-      senderName: "System Alert",
+      senderName: "OdyShareSmart AI",
       avatarColor: "#64748b",
       messageEncrypted: "",
       messageDecrypted: `📌 ${expense.paidByName || "Someone"} added expense '${expense.description}' ($${newExpense.amount})`,

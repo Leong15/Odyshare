@@ -113,8 +113,8 @@ export const translations = {
     decryptPdf: "Decrypt PDF",
 
     // Encrypted Chat
-    securityHub: "Security Hub: Workspace End-to-End Encryption",
-    doubleRatchet: "Double-ratchet session key",
+    securityHub: "Security Hub: Simulated End-to-End Encryption",
+    doubleRatchet: "Base64 Simple Encoding Transmission",
     activeRoomUsers: "Active Room Users",
     sendSecuredUpdate: "Send secured encrypted update to group...",
     broadcast: "Broadcast",
@@ -278,8 +278,8 @@ export const translations = {
     decryptPdf: "解密 PDF 副本",
 
     // Encrypted Chat
-    securityHub: "安全管理中心：工作區端到端加密通道保護中",
-    doubleRatchet: "雙棘輪會話動態金鑰算法",
+    securityHub: "安全管理中心：模擬端到端加密通道",
+    doubleRatchet: "Base64 簡易編碼傳輸方案",
     activeRoomUsers: "當前協作房間在線用戶",
     sendSecuredUpdate: "發送端到端加密消息給組員...",
     broadcast: "廣播密文",

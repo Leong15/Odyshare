@@ -340,6 +340,7 @@ export function useTripActions({
 
   const handleSendChatMessage = useCallback(
     async (msg: string) => {
+      // TODO: Currently just base64 encoding, not true encryption...
       const encryptedMsg = "U2FsdGVkX19" + safeBtoa(msg);
       try {
         const res = await fetchWithAuth("/api/trip/chat/send", {
@@ -368,7 +369,7 @@ export function useTripActions({
   );
 
   const handlePostAISystemMessage = useCallback(
-    (text: string) => {
+    async (text: string, currentChats: ChatMessage[]) => {
       const systemMsg: ChatMessage = {
         id: ITEM_ID_PREFIXES.MESSAGE + "ai-ref-" + Date.now(),
         senderId: SYSTEM_SENDER_ID,
@@ -379,10 +380,7 @@ export function useTripActions({
         timestamp: new Date().toISOString(),
         isTripUpdate: true,
       };
-      postTripUpdate({ chats: undefined } as any);
-      // We can't easily append without current trip state here,
-      // so we expose this for App.tsx to call with trip in scope
-      return systemMsg;
+      await postTripUpdate({ chats: [...currentChats, systemMsg] });
     },
     [postTripUpdate]
   );
@@ -536,9 +534,9 @@ export function useTripActions({
   // ---------------------------------------------------------------------------
 
   const handleApplyAIOptimization = useCallback(
-    (items: ItineraryItem[]) => {
+    (items: ItineraryItem[], currentItineraries: ItineraryItem[]) => {
       postTripUpdate({
-        backupItineraries: undefined, // caller must pass current trip.itineraries
+        backupItineraries: currentItineraries,
         itineraries: items,
       });
     },

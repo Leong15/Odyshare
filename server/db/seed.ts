@@ -1,4 +1,3 @@
-import { setDoc, doc } from "firebase/firestore";
 import { db } from "./firebase.js";
 import fs from "fs";
 import { safeHash } from "../utils/crypto.js";
@@ -30,15 +29,15 @@ export async function seedDefaults() {
   ];
   for (const u of defaultUsers) {
     const { id, ...uData } = u;
-    await setDoc(doc(db, "users", id), uData);
+    await db.collection("users").doc(id).set(uData);
   }
   
   const tripPayload = {
     ...DEFAULT_TRIP,
     participantIds: ((DEFAULT_TRIP.participants as any[]) || []).map((p: any) => p.id).filter(Boolean)
   };
-  await setDoc(doc(db, "trips", DEFAULT_TRIP.id), tripPayload);
-  await setDoc(doc(db, "config", "active"), { activeTripId: DEFAULT_ACTIVE_TRIP_ID });
+  await db.collection("trips").doc(DEFAULT_TRIP.id).set(tripPayload);
+  await db.collection("config").doc("active").set({ activeTripId: DEFAULT_ACTIVE_TRIP_ID });
 
   const seeded = {
     activeTripId: DEFAULT_ACTIVE_TRIP_ID,
