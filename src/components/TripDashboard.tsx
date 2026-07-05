@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from "react";
 import { ArrowRightLeft, Trash2, Edit, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Trip } from "../types";
+import { Trip, TripSummary } from "../types";
 import { MAP_BOUNDS } from "../lib/constants";
 import { AggregateStatsRow } from "./dashboard/AggregateStatsRow";
 import { TripMetaEditForm } from "./dashboard/TripMetaEditForm";
@@ -9,20 +9,8 @@ import { ProjectListPanel } from "./dashboard/ProjectListPanel";
 import { WorldMapPanel } from "./dashboard/WorldMapPanel";
 import { ConfirmModal } from "./common/ConfirmModal";
 
-export interface DashboardTrip {
-  id: string;
-  name: string;
-  destination: string;
-  startDate: string;
-  endDate: string;
-  totalBudget: number;
-  status?: "active" | "inactive";
-  participants?: any[];
-  expenses?: any[];
-  itineraries?: any[];
-  lat?: number;
-  lng?: number;
-}
+export type DashboardTrip = TripSummary;
+
 
 interface TripDashboardProps {
   trip: Trip;

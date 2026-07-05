@@ -39,7 +39,7 @@ export function useMapGeolocation({
   });
   const [geoError, setGeoError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(false);
-  const [isSimulatedMoving, setIsSimulatedMoving] = useState<boolean>(true); // Walking loop simulation starts active by default
+  const [isSimulatedMoving, setIsSimulatedMoving] = useState<boolean>(false); // Walking loop simulation is closed by default
 
   // Automated simulated walking movement loop updates
   useEffect(() => {

@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { readTripsDB, writeTripsDB } from "../db/index.js";
 import { resolveCoordinates } from "../utils/geocoding.js";
 import { ok, fail } from "../utils/apiResponse.js";
+import { latLngToCanvasXY } from "../../src/lib/mapUtils.js";
 
 const router = Router();
 
@@ -26,10 +27,7 @@ router.post("/add", async (req: Request, res: Response) => {
       votes: [],
       comments: [],
       coordinates: coords
-        ? {
-            x: Math.round(50 + (coords.lng - (current.lng || 139.6503)) / 0.0018),
-            y: Math.round(50 - (coords.lat - (current.lat || 35.6762)) / 0.0015),
-          }
+        ? latLngToCanvasXY(coords.lat, coords.lng, current.lat || 35.6762, current.lng || 139.6503)
         : { x: 50, y: 50 },
       lat: coords?.lat,
       lng: coords?.lng,
@@ -63,10 +61,7 @@ router.post("/edit", async (req: Request, res: Response) => {
         if (coords) {
           lat = coords.lat;
           lng = coords.lng;
-          coordinates = {
-            x: Math.round(50 + (coords.lng - (current.lng || 139.6503)) / 0.0018),
-            y: Math.round(50 - (coords.lat - (current.lat || 35.6762)) / 0.0015),
-          };
+          coordinates = latLngToCanvasXY(coords.lat, coords.lng, current.lat || 35.6762, current.lng || 139.6503);
         }
       }
 

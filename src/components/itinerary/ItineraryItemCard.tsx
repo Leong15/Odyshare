@@ -280,12 +280,13 @@ export default function ItineraryItemCard({
                 type="button"
                 disabled={isFirst}
                 onClick={onMoveUp}
-                className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all border ${
+                className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                   isFirst
                     ? "text-slate-600 border-transparent cursor-not-allowed opacity-30"
                     : "text-blue-400 border-white/5 hover:bg-white/5 hover:border-white/10 cursor-pointer"
                 }`}
                 title={lang === "zh" ? "往上移動" : "Move Up"}
+                aria-label={lang === "zh" ? "往上移動" : "Move Up"}
               >
                 <ChevronLeft size={16} className="rotate-90 shrink-0" />
               </button>
@@ -295,12 +296,13 @@ export default function ItineraryItemCard({
                 type="button"
                 disabled={isLast}
                 onClick={onMoveDown}
-                className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all border ${
+                className={`h-9 w-9 flex items-center justify-center rounded-xl transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                   isLast
                     ? "text-slate-600 border-transparent cursor-not-allowed opacity-30"
                     : "text-blue-400 border-white/5 hover:bg-white/5 hover:border-white/10 cursor-pointer"
                 }`}
                 title={lang === "zh" ? "往下移動" : "Move Down"}
+                aria-label={lang === "zh" ? "往下移動" : "Move Down"}
               >
                 <ChevronLeft size={16} className="-rotate-90 shrink-0" />
               </button>
@@ -349,12 +351,13 @@ export default function ItineraryItemCard({
             <button
               id={`vote-activity-${item.id}`}
               onClick={() => onVote()}
-              className={`px-3 h-9 rounded-xl transition-all border cursor-pointer flex items-center justify-center gap-1.5 text-[11px] font-semibold ${
+              className={`px-3 h-9 rounded-xl transition-all border cursor-pointer flex items-center justify-center gap-1.5 text-[11px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                 userVoted
                   ? "bg-blue-600 text-white border-blue-500 shadow-sm shadow-blue-500/20"
                   : "bg-white/5 hover:bg-white/10 text-slate-300 border-white/10"
               }`}
               title={lang === "zh" ? "投下一票" : "Vote this activity"}
+              aria-label={lang === "zh" ? "投下一票" : "Vote this activity"}
             >
               <ThumbsUp size={11} className="shrink-0" />
               <span>{item.votes.length}</span>
@@ -380,8 +383,9 @@ export default function ItineraryItemCard({
                 setEditCategory(item.category);
                 setEditCost(item.cost.toString());
               }}
-              className="p-2 h-9 w-9 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/10 hover:border-blue-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+              className="p-2 h-9 w-9 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 border border-blue-500/10 hover:border-blue-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               title={lang === "zh" ? "編輯行程" : "Edit activity"}
+              aria-label={lang === "zh" ? "編輯行程" : "Edit activity"}
             >
               <Pencil size={11} className="shrink-0" />
             </button>
@@ -390,8 +394,9 @@ export default function ItineraryItemCard({
             <button
               id={`delete-activity-${item.id}`}
               onClick={() => onDelete()}
-              className="p-2 h-9 w-9 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+              className="p-2 h-9 w-9 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 border border-rose-500/10 hover:border-rose-500/20 rounded-xl transition-all cursor-pointer flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
               title={lang === "zh" ? "刪除行程" : "Delete activity"}
+              aria-label={lang === "zh" ? "刪除行程" : "Delete activity"}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"

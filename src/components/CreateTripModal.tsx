@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { AutocompleteInput } from "./common/AutocompleteInput";
-import { POPULAR_HOT_PLACES } from "../lib/constants/places";
+import { POPULAR_HOT_PLACES } from "../lib/constants";
 
 interface CreateTripModalProps {
   lang: "en" | "zh";

@@ -32,6 +32,19 @@ export function getGenAI(): GoogleGenAI | null {
   return aiClient;
 }
 
+export function isRetryableGeminiError(err: any): boolean {
+  if (!err) return false;
+  const errorString = String(err?.message || err || "").toLowerCase();
+  return errorString.includes("503") || 
+         errorString.includes("429") || 
+         errorString.includes("unavailable") || 
+         errorString.includes("high demand") || 
+         err?.status === 503 ||
+         err?.status === 429 ||
+         err?.statusCode === 503 ||
+         err?.statusCode === 429;
+}
+
 // Helper to perform Gemini generateContent calls with robust automatic retry and model fallback (e.g. to gemini-1.5-flash-8b on 503/429/high-demand)
 export async function generateContentWithRetry(
   ai: GoogleGenAI, 
@@ -45,16 +58,8 @@ export async function generateContentWithRetry(
     } catch (err: any) {
       attempt++;
       const errorString = String(err?.message || err || "").toLowerCase();
-      const isRetryable = errorString.includes("503") || 
-                          errorString.includes("429") || 
-                          errorString.includes("unavailable") || 
-                          errorString.includes("high demand") || 
-                          err?.status === 503 ||
-                          err?.status === 429 ||
-                          err?.statusCode === 503 ||
-                          err?.statusCode === 429;
       
-      if (isRetryable && attempt < maxRetries) {
+      if (isRetryableGeminiError(err) && attempt < maxRetries) {
         console.warn(`Gemini API call failed (attempt ${attempt}/${maxRetries}): ${errorString}. Retrying with gemini-1.5-flash-8b...`);
         params.model = "gemini-1.5-flash-8b";
         // Wait a bit (exponential backoff)

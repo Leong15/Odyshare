@@ -62,8 +62,8 @@ export function getExpenseShareForUser(exp: ExpenseItem, uid: string): number {
   return individualRawAmt * (actualTotal / rawTotal);
 }
 
-/** Internal helper — calculates refund/discount amount from expense metadata. */
-function getRefundAmount(rawTotal: number, exp: ExpenseItem): number {
+/** Helper — calculates refund/discount amount from expense metadata. */
+export function getRefundAmount(rawTotal: number, exp: Partial<ExpenseItem>): number {
   if (exp.taxRefundTotalAmount !== undefined && Number(exp.taxRefundTotalAmount) > 0) {
     return Number(exp.taxRefundTotalAmount);
   }

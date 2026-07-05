@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { readTripsDB, writeTripsDB } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
+import { createSystemMessage } from "../utils/message.js";
 import type { Trip } from "../../src/types";
 
 const router = Router();
@@ -57,16 +58,12 @@ router.post("/:tripId/flight-subscription", (req: Request, res: Response) => {
 
   // Append a chat alert to notify the team
   if (!trip.chats) trip.chats = [];
-  trip.chats.push({
-    id: `msg-sub-${Date.now()}-${Math.random()}`,
-    senderId: "system",
-    senderName: "OdyShareSmart AI",
-    avatarColor: "#8b5cf6",
-    messageEncrypted: "",
-    messageDecrypted: `🔔 航班監控已啟動：正在監控從 ${from} 飛往 ${to} (${date}) 的航班票價，目標基準價格為 ${currencyCode} $${baselinePrice}。`,
-    timestamp: new Date().toISOString(),
-    isTripUpdate: true
-  });
+  trip.chats.push(
+    createSystemMessage(`🔔 航班監控已啟動：正在監控從 ${from} 飛往 ${to} (${date}) 的航班票價，目標基準價格為 ${currencyCode} $${baselinePrice}。`, {
+      idPrefix: "sub",
+      avatarColor: "#8b5cf6"
+    })
+  );
 
   writeTripsDB(trip, req);
 
@@ -100,16 +97,12 @@ router.delete("/:tripId/flight-subscription", (req: Request, res: Response) => {
     });
 
     if (!trip.chats) trip.chats = [];
-    trip.chats.push({
-      id: `msg-unsub-${Date.now()}-${Math.random()}`,
-      senderId: "system",
-      senderName: "OdyShareSmart AI",
-      avatarColor: "#8b5cf6",
-      messageEncrypted: "",
-      messageDecrypted: `🔕 航班價格監控已停止（${trip.flightSubscription.from} ➔ ${trip.flightSubscription.to}）。`,
-      timestamp: new Date().toISOString(),
-      isTripUpdate: true
-    });
+    trip.chats.push(
+      createSystemMessage(`🔕 航班價格監控已停止（${trip.flightSubscription.from} ➔ ${trip.flightSubscription.to}）。`, {
+        idPrefix: "unsub",
+        avatarColor: "#8b5cf6"
+      })
+    );
   }
 
   writeTripsDB(trip, req);
@@ -191,16 +184,12 @@ router.post("/:tripId/simulate-price-check", (req: Request, res: Response) => {
 
   // Append a chat alert to notify the team
   if (!trip.chats) trip.chats = [];
-  trip.chats.push({
-    id: `msg-sim-${Date.now()}-${Math.random()}`,
-    senderId: "system",
-    senderName: "OdyShareSmart AI",
-    avatarColor: "#8b5cf6",
-    messageEncrypted: "",
-    messageDecrypted: `📢 [手動模擬機票更新] ${pushMsg}`,
-    timestamp: new Date().toISOString(),
-    isTripUpdate: true
-  });
+  trip.chats.push(
+    createSystemMessage(`📢 [手動模擬機票更新] ${pushMsg}`, {
+      idPrefix: "sim",
+      avatarColor: "#8b5cf6"
+    })
+  );
 
   writeTripsDB(trip, req);
   res.json(ok({ trip }));

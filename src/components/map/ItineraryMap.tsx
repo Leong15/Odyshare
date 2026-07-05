@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
-import { ItineraryItem } from "../types";
+import { ItineraryItem } from "../../types";
 import { MapPin, Navigation, Globe } from "lucide-react";
-import { resolveLatLng } from "../utils/mapHelpers";
+import { resolveLatLng } from "../../utils/mapHelpers";
 
 interface ItineraryMapProps {
   destination?: string;

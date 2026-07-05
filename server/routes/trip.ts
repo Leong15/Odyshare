@@ -15,6 +15,7 @@ import { resolveCoordinates } from "../utils/geocoding.js";
 import { ok, fail } from "../utils/apiResponse.js";
 import { createLogger } from "../utils/logger.js";
 import { SSE_KEEPALIVE_INTERVAL_MS } from "../utils/constants.js";
+import { createSystemMessage } from "../utils/message.js";
 
 const logger = createLogger("TripRoute");
 
@@ -187,15 +188,13 @@ router.post("/create", async (req: Request, res: Response) => {
     itineraries: [],
     expenses: [],
     documents: [],
-    chats: [{
-      id: "msg-start-" + Date.now(),
-      senderId: "system",
-      senderName: "OdyShareSmart AI",
-      avatarColor: "#64748b",
-      messageEncrypted: "",
-      messageDecrypted: `🚀 Welcome to ${name || "New Trip"}! Add itineraries, vote on flights, and track budgets.`,
-      timestamp: new Date().toISOString(),
-    }],
+    chats: [
+      createSystemMessage(`🚀 Welcome to ${name || "New Trip"}! Add itineraries, vote on flights, and track budgets.`, {
+        idPrefix: "start",
+        avatarColor: "#64748b",
+        isTripUpdate: false
+      })
+    ],
   };
 
   (db as MemoryDB).trips.push(newTrip);
@@ -321,16 +320,12 @@ router.post("/document/upload", async (req: Request, res: Response) => {
   };
   current.documents.push(newDoc);
 
-  current.chats.push({
-    id: "msg-doc-" + Date.now(),
-    senderId: "system",
-    senderName: "OdyShareSmart AI",
-    avatarColor: "#64748b",
-    messageEncrypted: "",
-    messageDecrypted: `📂 ${newDoc.uploadedBy} uploaded '${newDoc.name}'`,
-    timestamp: new Date().toISOString(),
-    isTripUpdate: true,
-  });
+  current.chats.push(
+    createSystemMessage(`📂 ${newDoc.uploadedBy} uploaded '${newDoc.name}'`, {
+      idPrefix: "doc",
+      avatarColor: "#64748b"
+    })
+  );
 
   writeTripsDB(current, req);
   res.json(ok({ document: newDoc, trip: current }));

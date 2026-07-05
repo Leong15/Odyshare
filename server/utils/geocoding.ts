@@ -4,49 +4,10 @@
  * fallback tables in db.ts, routes/trip.ts, and OfflineMapSimulator.tsx
  */
 
-import { CITY_COORDS } from "../../src/lib/constants/cityCoords.js";
+import { lookupCityCoords } from "../../src/lib/mapUtils.js";
 import { createLogger } from "./logger.js";
 
 const logger = createLogger("Geocoding");
-
-
-/**
- * Look up coordinates from the static table using fuzzy matching.
- * Returns null if no match found.
- */
-export function lookupCityCoords(destination: string): { lat: number; lng: number } | null {
-  if (!destination) return null;
-  const searchKey = destination.toLowerCase().trim();
-
-  // 1. Exact key match first
-  if (CITY_COORDS[searchKey]) {
-    return { lat: CITY_COORDS[searchKey].lat, lng: CITY_COORDS[searchKey].lng };
-  }
-
-  // 2. Exact alias match
-  for (const [key, city] of Object.entries(CITY_COORDS)) {
-    if (city.aliases && city.aliases.some(alias => alias.toLowerCase() === searchKey)) {
-      return { lat: city.lat, lng: city.lng };
-    }
-  }
-
-  // 3. Partial key match or partial alias match (destination contains key/alias, or key/alias contains destination)
-  for (const [key, city] of Object.entries(CITY_COORDS)) {
-    if (searchKey.includes(key) || key.includes(searchKey)) {
-      return { lat: city.lat, lng: city.lng };
-    }
-    if (city.aliases) {
-      for (const alias of city.aliases) {
-        const lowerAlias = alias.toLowerCase();
-        if (searchKey.includes(lowerAlias) || lowerAlias.includes(searchKey)) {
-          return { lat: city.lat, lng: city.lng };
-        }
-      }
-    }
-  }
-
-  return null;
-}
 
 /**
  * Fetch coordinates from OpenStreetMap Nominatim (free, no API key needed).

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { POPULAR_HOT_PLACES } from "../../lib/constants/places";
+import { POPULAR_HOT_PLACES } from "../../lib/constants";
 import { Trip } from "../../types";
 import { AutocompleteInput } from "../common/AutocompleteInput";
 

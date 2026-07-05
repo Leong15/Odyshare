@@ -5,7 +5,7 @@ import {
   calculateSettleMatrix,
   calculatePersonalMetrics,
   getParticipantAdjustedSpent,
-} from "./expensecalculator";
+} from "./expenseCalculator";
 import type { ExpenseItem, Participant } from "../types";
 
 describe("Expense Calculator Utilities", () => {

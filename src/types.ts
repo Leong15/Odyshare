@@ -149,3 +149,19 @@ export interface Trip {
   updatedAt?: string;
 }
 
+export interface TripSummary {
+  id: string;
+  name: string;
+  destination: string;
+  startDate: string;
+  endDate: string;
+  totalBudget: number;
+  status?: "active" | "inactive";
+  participants?: Participant[];
+  expenses?: ExpenseItem[];
+  itineraries?: ItineraryItem[];
+  lat?: number;
+  lng?: number;
+}
+
+

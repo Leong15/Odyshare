@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { readTripsDB, writeTripsDB } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
+import { createSystemMessage } from "../utils/message.js";
 
 const router = Router();
 
@@ -20,16 +21,12 @@ router.post("/add", async (req: Request, res: Response) => {
 
     // Send a system message indicating expense was added
     if (!current.chats) current.chats = [];
-    current.chats.push({
-      id: "msg-exp-" + Date.now(),
-      senderId: "system",
-      senderName: "OdyShareSmart AI",
-      avatarColor: "#64748b",
-      messageEncrypted: "",
-      messageDecrypted: `📌 ${expense.paidByName || "Someone"} added expense '${expense.description}' ($${newExpense.amount})`,
-      timestamp: new Date().toISOString(),
-      isTripUpdate: true,
-    });
+    current.chats.push(
+      createSystemMessage(`📌 ${expense.paidByName || "Someone"} added expense '${expense.description}' ($${newExpense.amount})`, {
+        idPrefix: "exp",
+        avatarColor: "#64748b"
+      })
+    );
 
     writeTripsDB(current, req);
     res.json(ok({ trip: current }));

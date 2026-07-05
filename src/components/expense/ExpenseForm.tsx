@@ -3,6 +3,7 @@ import { FileText, Upload, Camera, Image, X, Sparkles, Zap, Users, Percent, Shop
 import { ExpenseItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
 import { getCategoryLabel, EXPENSE_CATEGORIES } from "../../utils/categoryUtils";
+import { getRefundAmount } from "../../utils/expenseCalculator";
 
 interface ExpenseFormProps {
   participants: Participant[];
@@ -29,6 +30,7 @@ export default function ExpenseForm({
   const [category, setCategory] = useState<ExpenseItem["category"]>("food");
   const [ocrInput, setOcrInput] = useState<string>("");
   const [ocrParsing, setOcrParsing] = useState<boolean>(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
   const [receiptImage, setReceiptImage] = useState<string>("");
   const [splitType, setSplitType] = useState<"equal" | "individual">("equal");
   const [individualAmounts, setIndividualAmounts] = useState<Record<string, string>>({});
@@ -63,6 +65,7 @@ export default function ExpenseForm({
   const handleReceiptOcrSubmit = async () => {
     if (!ocrInput.trim() && !receiptImage) return;
     setOcrParsing(true);
+    setOcrError(null);
     try {
       const res = await fetch("/api/ai/ocr-receipt", {
         method: "POST",
@@ -73,7 +76,7 @@ export default function ExpenseForm({
         }),
       });
       const json = await res.json();
-      if (json && json.success && json.data) {
+      if (res.ok && json && json.success && json.data) {
         const ocrData = json.data;
         if (ocrData.amount != null) {
           setDescription(ocrData.description || "OCR Receipt Expense");
@@ -81,10 +84,30 @@ export default function ExpenseForm({
           setCategory(ocrData.category || "food");
           setOcrInput("");
           setReceiptImage("");
+          setOcrError(null);
+        } else {
+          setOcrError(
+            lang === "zh"
+              ? "無法從此收據中擷取有效金額項目，請手動輸入。"
+              : "Could not extract a valid amount from receipt. Please input manually."
+          );
         }
+      } else {
+        setOcrError(
+          json.error?.message || json.error || (
+            lang === "zh"
+              ? "辨識失敗。可能因收據解析格式不符，請重試或手動輸入。"
+              : "Receipt OCR failed. Format might be unsupported. Please retry or input manually."
+          )
+        );
       }
     } catch (err) {
       console.error("Receipt OCR failed:", err);
+      setOcrError(
+        lang === "zh"
+          ? "系統連線失敗或伺服器錯誤，請稍後重試。"
+          : "System connection failure or server error, please try again later."
+      );
     } finally {
       setOcrParsing(false);
     }
@@ -140,22 +163,12 @@ export default function ExpenseForm({
       ? parseFloat(amount) || 0
       : splitAmong.reduce((acc, id) => acc + (parseFloat(individualAmounts[id]) || 0), 0);
 
-  let refundVal = 0;
-  if (taxRefundTotalAmount) {
-    refundVal = parseFloat(taxRefundTotalAmount) || 0;
-  } else if (taxRefundPercent) {
-    // VAT-exclusive Tax-Free Refund: use the total after tax-refund (pre-tax amount B) as the base:
-    // B = rawTotalVal / (1 + percent / 100)
-    // Refund = rawTotalVal - B
-    const pct = parseFloat(taxRefundPercent) || 0;
-    const postRefundTotal = rawTotalVal / (1 + pct / 100);
-    let tempRefund = rawTotalVal - postRefundTotal;
-    if (taxRefundDeductFee) {
-      const feePct = parseFloat(taxRefundFeePercent) || 1.5;
-      tempRefund = tempRefund * (1 - feePct / 100);
-    }
-    refundVal = tempRefund;
-  }
+  const refundVal = getRefundAmount(rawTotalVal, {
+    taxRefundTotalAmount: taxRefundTotalAmount ? parseFloat(taxRefundTotalAmount) : undefined,
+    taxRefundPercent: taxRefundPercent ? parseFloat(taxRefundPercent) : undefined,
+    taxRefundDeductFee,
+    taxRefundFeePercent: taxRefundFeePercent ? parseFloat(taxRefundFeePercent) : undefined,
+  });
 
   const finalPriceVal = Math.max(0, rawTotalVal - refundVal);
   const ratioVal = rawTotalVal > 0 ? finalPriceVal / rawTotalVal : 0;
@@ -328,6 +341,12 @@ export default function ExpenseForm({
             </select>
           </div>
         </div>
+
+        {ocrError && (
+          <div className="text-[11.5px] text-rose-300 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-xl flex items-center gap-1.5 animate-fadeIn">
+            <span>⚠️ {ocrError}</span>
+          </div>
+        )}
       </div>
 
       {/* Inputs */}

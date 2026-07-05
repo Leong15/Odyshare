@@ -3,6 +3,7 @@ import cron from "node-cron";
 import { getDB, writeDB } from "./db/index.js";
 import { searchSerpApiFlights } from "./serpapi.js";
 import { createLogger } from "./utils/logger.js";
+import { createSystemMessage } from "./utils/message.js";
 import type { MemoryDB } from "./types/db";
 
 const logger = createLogger("Scheduler");
@@ -96,16 +97,12 @@ export function startScheduler() {
           trip.pushNotifications.push(notificationItem);
 
           // Pushes to chat logs
-          trip.chats.push({
-            id: `msg-sched-${Date.now()}-${Math.random()}`,
-            senderId: "system",
-            senderName: "OdyShareSmart AI",
-            avatarColor: "#8b5cf6",
-            messageEncrypted: "",
-            messageDecrypted: `📢 [週一/四 12:00 正式排程] ${pushMsg}`,
-            timestamp: new Date().toISOString(),
-            isTripUpdate: true
-          });
+          trip.chats.push(
+            createSystemMessage(`📢 [週一/四 12:00 正式排程] ${pushMsg}`, {
+              idPrefix: "sched",
+              avatarColor: "#8b5cf6"
+            })
+          );
 
           activeChecksCount++;
         } catch (err) {

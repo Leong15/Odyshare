@@ -7,16 +7,16 @@ import { translations } from "./lib/translations";
 
 // Modular Subcomponents
 import LoginTerminal from "./components/LoginTerminal";
-import HeaderWorkspace from "./components/HeaderWorkspace";
+import HeaderWorkspace from "./components/common/HeaderWorkspace";
 import CreateTripModal from "./components/CreateTripModal";
-import TripDashboard from "./components/TripDashboard";
-
+import InviteMemberModal from "./components/common/InviteMemberModal";
 // Tab Subcomponents (Lazy Loaded)
+const TripDashboard = lazy(() => import("./components/TripDashboard"));
 const ItineraryPlanner = lazy(() => import("./components/ItineraryPlanner"));
 const ExpenseTracker = lazy(() => import("./components/ExpenseTracker"));
-const OfflineMapSimulator = lazy(() => import("./components/OfflineMapSimulator"));
+const OfflineMapSimulator = lazy(() => import("./components/map/OfflineMapSimulator"));
 const DocumentVault = lazy(() => import("./components/DocumentVault"));
-const EncryptedWorkspaceChat = lazy(() => import("./components/EncryptedWorkspaceChat"));
+const EncryptedWorkspaceChat = lazy(() => import("./components/chat/EncryptedWorkspaceChat"));
 
 // Custom Hooks for Modular Architecture
 import { useAuth } from "./hooks/useAuth";
@@ -65,10 +65,6 @@ export default function App() {
   const [createTripError, setCreateTripError] = useState<string | null>(null);
 
   const [showInviteModal, setShowInviteModal] = useState<boolean>(false);
-  const [inviteUsername, setInviteUsername] = useState<string>("");
-  const [inviteError, setInviteError] = useState<string | null>(null);
-  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
-  const [isInviting, setIsInviting] = useState<boolean>(false);
 
   // Sync dark/light class on body
   useEffect(() => {
@@ -98,36 +94,7 @@ export default function App() {
     }
   };
 
-  const handleInviteSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inviteUsername.trim()) return;
-    setInviteError(null);
-    setInviteSuccess(null);
-    setIsInviting(true);
-    const res = await actions.handleInviteUser(inviteUsername.trim());
-    setIsInviting(false);
-    if (res.success) {
-      setInviteSuccess(lang === "zh" ? "🎉 邀請成功送出！受邀人需接受邀請才能進入此專案。" : "🎉 Invite sent! Invitee must accept to access project.");
-      setInviteUsername("");
-      setTimeout(() => {
-        setShowInviteModal(false);
-        setInviteSuccess(null);
-      }, 3000);
-    } else {
-      setInviteError(res.error || (lang === "zh" ? "找不到此成員帳號" : "User not found"));
-    }
-  };
-
-  const handleKickParticipant = async (userIdToKick: string) => {
-    const res = await actions.handleKickParticipant(userIdToKick);
-    if (res.success) {
-      setInviteSuccess(lang === "zh" ? "✔️ 成員已成功踢除/移除。" : "✔️ Member kicked successfully.");
-      setTimeout(() => setInviteSuccess(null), 2500);
-    } else {
-      setInviteError(res.error || "Failed to kick participant");
-      setTimeout(() => setInviteError(null), 3500);
-    }
-  };
+  // Invite and kick functions are passed directly to InviteMemberModal
 
   const handleRestoreItineraries = () => {
     if (sync.trip?.backupItineraries && sync.trip.backupItineraries.length > 0) {
@@ -212,12 +179,7 @@ export default function App() {
             onShowCreateTripModal={() => setShowCreateTripModal(true)}
             onDeleteTrip={actions.handleDeleteTrip}
             onLogout={auth.handleLogout}
-            onOpenInviteModal={() => {
-              setInviteError(null);
-              setInviteSuccess(null);
-              setInviteUsername("");
-              setShowInviteModal(true);
-            }}
+            onOpenInviteModal={() => setShowInviteModal(true)}
           />
         )}
 
@@ -243,149 +205,15 @@ export default function App() {
 
         {/* 2.5. Root-level Invitation Modal Dialog for perfect screen-centering */}
         {showInviteModal && trip && (
-          <div 
-            onClick={(e) => {
-              if (e.target === e.currentTarget) {
-                setShowInviteModal(false);
-              }
-            }}
-            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn"
-          >
-            <div className="w-full max-w-md bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl relative animate-scaleIn">
-              
-              {/* Close button */}
-              <button
-                onClick={() => setShowInviteModal(false)}
-                className="absolute top-4 right-4 p-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition cursor-pointer"
-              >
-                <X size={15} />
-              </button>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 shrink-0">
-                  <UserPlus size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-extrabold text-white">
-                    {lang === "zh" ? "拉入旅伴加入當前專案" : "Pull Traveler into Project"}
-                  </h3>
-                  <p className="text-[10.5px] text-slate-400 mt-0.5 leading-none">
-                    {lang === "zh" ? "立刻實現多瀏覽器/多帳號即時協同規劃" : "Enable multi-device real-time sync planning"}
-                  </p>
-                </div>
-              </div>
-
-              <form onSubmit={handleInviteSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5">
-                    {lang === "zh" ? "旅群組員的帳號名稱 (Username)" : "Team Member's Username"}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      required
-                      value={inviteUsername}
-                      onChange={(e) => setInviteUsername(e.target.value)}
-                      placeholder={lang === "zh" ? "輸入組員帳號，例如：chloe" : "e.g. chloe, david"}
-                      className="w-full bg-slate-950 border border-white/10 focus:border-emerald-500/50 rounded-xl py-2 px-3 text-xs text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-emerald-500/35 transition"
-                      disabled={isInviting}
-                      autoFocus
-                    />
-                  </div>
-                </div>
-
-                {/* Suggestions Box to optimize user testing experience */}
-                <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 text-[11px] text-emerald-350 space-y-1.5">
-                  <p className="font-extrabold flex items-center gap-1">
-                    💡 {lang === "zh" ? "可以用於協同測試的內建帳號：" : "Built-in accounts for easy sync testing:"}
-                  </p>
-                  <div className="grid grid-cols-3 gap-2 mt-1">
-                    {["chloe", "david", "sophy"].map((testName) => (
-                      <button
-                        key={testName}
-                        type="button"
-                        onClick={() => setInviteUsername(testName)}
-                        className="p-1 px-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/15 rounded-lg font-mono text-center text-[10px] text-emerald-300 transition cursor-pointer"
-                      >
-                        {testName}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[9.5px] text-slate-450 mt-1 leading-normal italic">
-                    {lang === "zh" ? "* 點擊上方帳號快速填寫！你也可以在登出後註冊新帳號來邀請對帳。" : "* Click to select! You can also log out, register new users, and invite them."}
-                  </p>
-                </div>
-
-                {/* 👥 Current Team / Kick Members Section */}
-                <div className="border-t border-white/5 pt-4 mt-2">
-                  <label className="block text-[11px] font-extrabold text-slate-450 uppercase tracking-wider mb-2">
-                    {lang === "zh" ? "📋 管理組員 / 踢除組員" : "📋 Current Team Members (Kick / Remove)"}
-                  </label>
-                  <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 select-none">
-                    {(trip.participants || []).map((p) => {
-                      const isSelf = auth.currentUser && p.id === auth.currentUser.id;
-                      return (
-                        <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/3 border border-white/5 text-xs">
-                          <div className="flex items-center gap-2">
-                            <div style={{ backgroundColor: p.avatarColor }} className="w-5 h-5 rounded-full text-[9px] font-black text-white flex items-center justify-center uppercase">
-                              {p.name ? p.name[0] : "?"}
-                            </div>
-                            <span className="font-bold text-white">
-                              {p.name} {isSelf && <span className="text-[9px] text-slate-400 font-mono">(You)</span>}
-                            </span>
-                          </div>
-                          {!isSelf && (
-                            <button
-                              type="button"
-                              onClick={() => handleKickParticipant(p.id)}
-                              className="text-[10.5px] text-rose-400 hover:text-rose-200 font-bold underline cursor-pointer"
-                            >
-                              {lang === "zh" ? "踢除" : "Kick"}
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {inviteError && (
-                  <div className="p-2.5 bg-rose-500/10 border border-rose-500/15 rounded-xl text-rose-300 text-[11px] font-bold flex items-center gap-2">
-                    <span className="shrink-0 text-xs">⚠️</span>
-                    <span>{inviteError}</span>
-                  </div>
-                )}
-
-                {inviteSuccess && (
-                  <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/15 rounded-xl text-emerald-300 text-[11px] font-bold flex items-center gap-2 animate-pulse">
-                    <span className="shrink-0 text-xs">✔️</span>
-                    <span>{inviteSuccess}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowInviteModal(false)}
-                    className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 rounded-xl text-[11px] font-bold text-slate-350 cursor-pointer transition border border-white/5"
-                  >
-                    {lang === "zh" ? "取消" : "Cancel"}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isInviting || !inviteUsername.trim()}
-                    className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-555 border border-emerald-500/30 text-[11px] font-bold text-white rounded-xl cursor-pointer transition shadow-lg shadow-emerald-600/15 flex items-center gap-1 disabled:opacity-50"
-                  >
-                    {isInviting ? (
-                      <span>{lang === "zh" ? "邀請中..." : "Inviting..."}</span>
-                    ) : (
-                      <span>{lang === "zh" ? "確認加入" : "Add Member"}</span>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+          <InviteMemberModal
+            isOpen={showInviteModal}
+            onClose={() => setShowInviteModal(false)}
+            participants={trip.participants || []}
+            currentUser={auth.currentUser}
+            onInviteUser={actions.handleInviteUser}
+            onKickParticipant={actions.handleKickParticipant}
+            lang={lang}
+          />
         )}
 
         {/* 3. Error warnings */}
@@ -504,24 +332,24 @@ export default function App() {
         <main className="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6 text-sm">
           {trip && auth.currentUser && (
             <div className="space-y-6 animate-fadeIn">
-              {activeTab === "dashboard" && (
-                <TripDashboard
-                  trip={trip}
-                  trips={trip.tripsList || []}
-                  lang={lang}
-                  onSwitchTrip={sync.handleSelectTrip}
-                  onCreateTrip={() => setShowCreateTripModal(true)}
-                  onEditTripMeta={actions.handleEditTripMeta}
-                  onDeleteTrip={actions.handleDeleteTrip}
-                />
-              )}
-
               <Suspense fallback={
                 <div className="p-12 text-center text-slate-400 font-mono text-xs flex flex-col items-center justify-center gap-3 bg-slate-900/50 border border-white/5 rounded-2xl backdrop-blur-sm animate-pulse">
                   <RefreshCw className="w-5 h-5 animate-spin text-indigo-400" />
                   <span>Loading Secure Workspace Module...</span>
                 </div>
               }>
+                {activeTab === "dashboard" && (
+                  <TripDashboard
+                    trip={trip}
+                    trips={trip.tripsList || []}
+                    lang={lang}
+                    onSwitchTrip={sync.handleSelectTrip}
+                    onCreateTrip={() => setShowCreateTripModal(true)}
+                    onEditTripMeta={actions.handleEditTripMeta}
+                    onDeleteTrip={actions.handleDeleteTrip}
+                  />
+                )}
+
                 {activeTab === "itinerary" && (
                   <ItineraryPlanner
                     itineraries={trip.itineraries}

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { FolderLock, FolderPlus, Trash, MapPin, LogOut, Moon, Sun, Languages, Users, UserPlus, X, Check } from "lucide-react";
-import { Trip, Participant } from "../types";
-import { translations } from "../lib/translations";
+import { Trip, Participant } from "../../types";
+import { translations } from "../../lib/translations";
 
 interface HeaderWorkspaceProps {
   lang: "en" | "zh";
@@ -158,8 +158,9 @@ export default function HeaderWorkspace({
                   <button
                     id="delete-trip-btn"
                     onClick={() => onDeleteTrip(trip.id)}
-                    className="p-1 px-2.5 hover:bg-rose-500/20 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition text-xs text-rose-300 min-w-0 shrink-0"
+                    className="p-1 px-2.5 hover:bg-rose-500/20 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition text-xs text-rose-300 min-w-0 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
                     title={lang === "zh" ? "刪除此專案" : "Delete folder"}
+                    aria-label={lang === "zh" ? "刪除此專案" : "Delete folder"}
                   >
                     <Trash size={12} />
                   </button>
@@ -260,8 +261,9 @@ export default function HeaderWorkspace({
                 id="theme-switch-btn"
                 type="button"
                 onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
-                className="p-1 px-3 hover:bg-white/5 rounded-lg cursor-pointer transition-all flex items-center justify-center text-amber-300 text-[13px]"
+                className="p-1 px-3 hover:bg-white/5 rounded-lg cursor-pointer transition-all flex items-center justify-center text-amber-300 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                 title={lang === "zh" ? "日間/夜間主題切換" : "Toggle theme mode"}
+                aria-label={lang === "zh" ? "日間/夜間主題切換" : "Toggle theme mode"}
               >
                 {theme === "light" ? (
                   <Moon size={14} className="text-indigo-400" />
@@ -303,7 +305,9 @@ export default function HeaderWorkspace({
             
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 bg-white/5 border border-white/10 rounded-xl text-slate-300 hover:text-white cursor-pointer active:scale-95 transition-all"
+              className="p-2 bg-white/5 border border-white/10 rounded-xl text-slate-300 hover:text-white cursor-pointer active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              aria-label={lang === "zh" ? "切換手機版導航選單" : "Toggle mobile navigation menu"}
+              title={lang === "zh" ? "切換手機版導航選單" : "Toggle mobile menu"}
             >
               {mobileMenuOpen ? <X size={20} /> : <span className="block w-5 h-4.5 relative">
                 <span className="block w-5 h-0.5 bg-current rounded absolute top-0"></span>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { MessageSquare, Sparkles, Send, Eye } from "lucide-react";
 import { ItineraryItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
-import ItineraryMap from "../ItineraryMap";
+import ItineraryMap from "../map/ItineraryMap";
 import AIOptimizerPanel from "./sidebar/AIOptimizerPanel";
 import VoiceSchedulePanel from "./sidebar/VoiceSchedulePanel";
 import EmailImportPanel from "./sidebar/EmailImportPanel";

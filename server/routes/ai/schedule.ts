@@ -1,9 +1,14 @@
 import { Router, Request, Response } from "express";
 import { Type } from "@google/genai";
-import { getGenAI, callGemini, generateTTSAudio } from "./shared";
+import { getGenAI, callGemini, generateTTSAudio } from "./shared.js";
 import { ok, fail } from "../../utils/apiResponse.js";
 
 const router = Router();
+
+function hasChinese(text?: string): boolean {
+  if (!text) return false;
+  return /[\u4e00-\u9fa5]/.test(text);
+}
 
 // ── POST /api/ai/parse-voice-schedule ────────────────────────────────────────
 router.post("/parse-voice-schedule", async (req: Request, res: Response) => {
@@ -115,7 +120,7 @@ router.post("/parse-voice-schedule", async (req: Request, res: Response) => {
     let audio: string | null = null;
     let voiceSummary = "";
     if (parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
-      const isChinese = userQuery && /[\u4e00-\u9fa5]/.test(userQuery);
+      const isChinese = hasChinese(userQuery);
       if (isChinese) {
         const summary = parsed.items.map((it: any) => `第 ${it.dayIndex + 1} 天 ${it.time} 的 ${it.title}`).join("；");
         voiceSummary = `好的，已為您成功排程：${summary}。已同步更新到日程表囉！`;
@@ -244,7 +249,7 @@ router.post("/parse-email-confirmation", async (req: Request, res: Response) => 
     let audio: string | null = null;
     let voiceSummary = "";
     if (parsed.items && Array.isArray(parsed.items) && parsed.items.length > 0) {
-      const isChinese = emailText && /[\u4e00-\u9fa5]/.test(emailText);
+      const isChinese = hasChinese(emailText);
       if (isChinese) {
         const summary = parsed.items.map((it: any) => `第 ${it.dayIndex + 1} 天 ${it.time} 的 ${it.title}`).join("，以及 ");
         voiceSummary = `預訂確認信已導入成功！已自動排入行程：${summary}。`;

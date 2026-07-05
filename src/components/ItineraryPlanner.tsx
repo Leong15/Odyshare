@@ -182,12 +182,13 @@ export default function ItineraryPlanner({
                         setIsSidebarOpen(true);
                       }
                     }}
-                    className={`flex items-center gap-1.5 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-sm shrink-0 h-10 ${
+                    className={`flex items-center gap-1.5 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-sm shrink-0 h-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                       showMap
                         ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25"
                         : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
                     }`}
                     title={lang === "zh" ? "切換地圖檢視模式" : "Toggle Split Map View"}
+                    aria-label={lang === "zh" ? "切換地圖檢視模式" : "Toggle Split Map View"}
                   >
                     <Map size={13} className="shrink-0" />
                     <span>{lang === "zh" ? "地圖" : "Map"}</span>
@@ -196,12 +197,13 @@ export default function ItineraryPlanner({
                   <button
                     type="button"
                     onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-                    className={`flex items-center gap-1.5 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-sm shrink-0 h-10 ${
+                    className={`flex items-center gap-1.5 font-semibold py-2 px-3 rounded-xl cursor-pointer transition-all text-xs border shadow-sm shrink-0 h-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                       isSidebarOpen
                         ? "bg-blue-500/15 text-blue-300 border-blue-500/30 hover:bg-blue-500/25"
                         : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
                     }`}
                     title={lang === "zh" ? "顯示或隱藏 AI 與討論板側邊欄" : "Toggle AI & Chat sidebar"}
+                    aria-label={lang === "zh" ? "顯示或隱藏 AI 與討論板側邊欄" : "Toggle AI & Chat sidebar"}
                   >
                     {isSidebarOpen ? (
                       <ChevronRight size={13} className="shrink-0" />
@@ -214,7 +216,9 @@ export default function ItineraryPlanner({
                   <button
                     id="add-itinerary-trigger"
                     onClick={() => setShowAddForm(!showAddForm)}
-                    className="flex items-center gap-1.5 glass-button-primary text-white font-semibold py-2 px-3.5 rounded-xl cursor-pointer shrink-0 text-xs shadow-sm h-10"
+                    className="flex items-center gap-1.5 glass-button-primary text-white font-semibold py-2 px-3.5 rounded-xl cursor-pointer shrink-0 text-xs shadow-sm h-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    title={lang === "zh" ? "新增每日行程活動" : "Add daily activity"}
+                    aria-label={lang === "zh" ? "新增每日行程活動" : "Add daily activity"}
                   >
                     <Plus size={14} /> {t.addDailyActivity}
                   </button>

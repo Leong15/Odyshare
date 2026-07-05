@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import type L_TYPE from "leaflet";
 import { resolveLatLng, getDayColor } from "../../utils/mapHelpers";
+import { latLngToCanvasXY } from "../../lib/mapUtils";
 import { MapTarget } from "./types";
 import { Participant } from "../../types";
 
@@ -72,12 +73,11 @@ export function useLeafletMap({
       center = { lat: Number(tripLat), lng: Number(tripLng) };
     }
 
-    const y = 50 - (lat - center.lat) / 0.0015;
-    const x = 50 + (lng - center.lng) / 0.0018;
+    const coords = latLngToCanvasXY(lat, lng, center.lat, center.lng);
 
     return {
-      x: Math.round(Math.min(Math.max(5, x), 95)),
-      y: Math.round(Math.min(Math.max(5, y), 95)),
+      x: Math.round(Math.min(Math.max(5, coords.x), 95)),
+      y: Math.round(Math.min(Math.max(5, coords.y), 95)),
     };
   };
 

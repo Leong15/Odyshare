@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { X, Download, QrCode, CreditCard, Check, AlertCircle } from "lucide-react";
-import { ExpenseItem, Participant } from "../types";
-import { getCategoryLabel, getCategoryDotColor } from "../utils/categoryUtils";
+import { ExpenseItem, Participant } from "../../types";
+import { getCategoryLabel, getCategoryDotColor } from "../../utils/categoryUtils";
 
 interface SettlementModalProps {
   isOpen: boolean;

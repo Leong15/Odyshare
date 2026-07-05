@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Lock, Eye, EyeOff, Send, Info, Users, Bell } from "lucide-react";
-import { ChatMessage, Participant } from "../types";
-import { translations } from "../lib/translations";
-import { isSystemMessage } from "../lib/constants";
+import { ChatMessage, Participant } from "../../types";
+import { translations } from "../../lib/translations";
+import { isSystemMessage } from "../../lib/constants";
 
 interface EncryptedWorkspaceChatProps {
   chats: ChatMessage[];
@@ -229,12 +229,12 @@ export default function EncryptedWorkspaceChat({
             </div>
           </div>
 
-          <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/15 rounded-xl flex items-start gap-1.5">
-            <Info size={12} className="text-blue-400 shrink-0 mt-0.5" />
+          <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/15 rounded-xl flex items-start gap-1.5">
+            <Info size={12} className="text-amber-400 shrink-0 mt-0.5" />
             <p className="text-[10px] text-slate-400 leading-normal font-sans">
               {lang === "zh" 
-                ? "迪菲-赫爾曼 (Diffie-Hellman) 金鑰對是在房間連線建立時動態協商。所有文字傳輸在接觸伺服器前即由本地熵源加載加密。"
-                : "Diffie-Hellman key pairs are negotiated instantly inside client session. All outputs undergo client entropy shielding vectors."}
+                ? "【模擬安全演示】迪菲-赫爾曼 (Diffie-Hellman) 密鑰對與本地 Base64 簡易編碼僅作為安全協同演示目的，請勿將其用於存儲高度機密或真實敏感個人信息。"
+                : "[Simulated Sandbox] Diffie-Hellman negotiation & Base64 encoding are executed as client-side proof-of-concept visual previews. Avoid posting real highly-sensitive credentials."}
             </p>
           </div>
         </div>

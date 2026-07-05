@@ -3,18 +3,19 @@ import { MapPin, Navigation, Download, CloudOff, RefreshCw, Signal, Search, Chec
 import { motion, AnimatePresence } from "motion/react";
 import type L_TYPE from "leaflet";
 let L: typeof L_TYPE | null = null;
-import { ItineraryItem, Participant } from "../types";
-import { translations } from "../lib/translations";
-import { resolveLatLng, getDayColor } from "../utils/mapHelpers";
-import { MAP_CONFIG, isItineraryItem } from "../lib/constants";
-import { MapTarget } from "../hooks/map/types";
-import { useMapGeolocation } from "../hooks/map/useMapGeolocation";
-import { useLeafletMap } from "../hooks/map/useLeafletMap";
-import { useMapRouting } from "../hooks/map/useMapRouting";
-import { useMapPins } from "../hooks/map/useMapPins";
-import { mapEditCategoryToItemCategory } from "../utils/categoryUtils";
-import { MapNodeEditor } from "./map/MapNodeEditor";
-import { MapLegend } from "./map/MapLegend";
+import { ItineraryItem, Participant } from "../../types";
+import { translations } from "../../lib/translations";
+import { resolveLatLng, getDayColor } from "../../utils/mapHelpers";
+import { latLngToCanvasXY } from "../../lib/mapUtils";
+import { MAP_CONFIG, isItineraryItem } from "../../lib/constants";
+import { MapTarget } from "../../hooks/map/types";
+import { useMapGeolocation } from "../../hooks/map/useMapGeolocation";
+import { useLeafletMap } from "../../hooks/map/useLeafletMap";
+import { useMapRouting } from "../../hooks/map/useMapRouting";
+import { useMapPins } from "../../hooks/map/useMapPins";
+import { mapEditCategoryToItemCategory } from "../../utils/categoryUtils";
+import { MapNodeEditor } from "./MapNodeEditor";
+import { MapLegend } from "./MapLegend";
 
 // Polyline decoder was removed as it was migrated to useMapRouting.ts
 
@@ -264,10 +265,7 @@ export default function OfflineMapSimulator({
         cost: Number(editCost) || 0,
         lat: localCoords.lat,
         lng: localCoords.lng,
-        coordinates: {
-          x: Math.round(50 + (localCoords.lng - (tripLng || 139.6503)) / 0.0018),
-          y: Math.round(50 - (localCoords.lat - (tripLat || 35.6762)) / 0.0015)
-        }
+        coordinates: latLngToCanvasXY(localCoords.lat, localCoords.lng, tripLat || 35.6762, tripLng || 139.6503)
       };
       await onUpdateItineraryItem(updated);
       setActiveItem(updated);
@@ -386,6 +384,25 @@ export default function OfflineMapSimulator({
             )}
           </div>
         )}
+
+        <div className="mb-4 shrink-0 flex items-center justify-between p-2.5 bg-slate-900/40 border border-white/5 rounded-xl text-xs">
+          <span className="text-slate-300 font-medium">
+            {lang === "zh" ? "🚶 模擬 GPS 步行移動" : "🚶 Simulate GPS Walking"}
+          </span>
+          <button
+            id="toggle-sim-move-btn"
+            type="button"
+            onClick={() => setIsSimulatedMoving(!isSimulatedMoving)}
+            aria-label={lang === "zh" ? "切換模擬 GPS 步行移動" : "Toggle simulate GPS walking"}
+            className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+              isSimulatedMoving
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                : "bg-white/5 hover:bg-white/10 text-slate-400 border border-white/5"
+            }`}
+          >
+            {isSimulatedMoving ? (lang === "zh" ? "已開啟" : "ON") : (lang === "zh" ? "已關閉" : "OFF")}
+          </button>
+        </div>
 
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">

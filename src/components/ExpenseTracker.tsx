@@ -2,14 +2,14 @@ import React, { useState, useEffect } from "react";
 import { Plus, Trash2, Users, ChevronRight, CheckSquare, Square, DollarSign } from "lucide-react";
 import { ExpenseItem, Participant } from "../types";
 import { translations } from "../lib/translations";
-import SettlementModal from "./SettlementModal";
+import SettlementModal from "./expense/SettlementModal";
 import { getCategoryLabel, getCategoryBadgeClasses } from "../utils/categoryUtils";
 import {
   getExpenseActualTotal,
   calculateSettleMatrix,
   calculatePersonalMetrics,
   getParticipantAdjustedSpent,
-} from "../utils/expensecalculator";
+} from "../utils/expenseCalculator";
 
 import ExpenseForm from "./expense/ExpenseForm";
 import BudgetSummaryWidget from "./expense/BudgetSummaryWidget";

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { ChevronRight, Users, Pencil, Sparkles } from "lucide-react";
 import { ExpenseItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
-import { getParticipantAdjustedSpent } from "../../utils/expensecalculator";
+import { getParticipantAdjustedSpent } from "../../utils/expenseCalculator";
 
 interface MemberLimitsWidgetProps {
   participants: Participant[];

@@ -249,9 +249,8 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
       if (fallbackInterval) clearInterval(fallbackInterval);
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
-    // Re-run whenever user login status or active trip ID changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loggedInUserId, trip?.id]);
+  }, [loggedInUserId, trip?.id, fetchTripData]);
+
 
   // ---------------------------------------------------------------------------
   // Helpers exposed to consumers

@@ -8,7 +8,35 @@ import { safeHash } from "../utils/crypto.js";
 import { createLogger } from "../utils/logger.js";
 import { DEFAULT_ACTIVE_TRIP_ID } from "../utils/constants.js";
 
+/**
+ * ============================================================================
+ * CONCURRENCY, TRANSACTION AND SCALING LIMITATIONS WARNING (已知規模限制說明)
+ * ============================================================================
+ * 
+ * Please be aware of the following architectural trade-offs in this file:
+ * 
+ * 1. Single-Instance / Non-Distributed State:
+ *    `memoryDB` is stored as a mutable global object (memory singleton). This is optimal 
+ *    for near-zero-latency local updates and works perfectly for single-container 
+ *    deployments. However, if deployed on horizontally-scaled container nodes (e.g. multi-node 
+ *    Cloud Run instances), each node will maintain its own independent in-memory state, 
+ *    resulting in data inconsistency.
+ * 
+ * 2. Race Conditions & No Transaction/Locking:
+ *    Since `writeDB` executes delta updates asynchronously in the background via non-blocking 
+ *    promises without row-level locking or atomic database-level transactions, concurrent writes 
+ *    to different keys inside a nested structure could potentially lead to race conditions 
+ *    or write conflicts.
+ * 
+ * 3. Mitigation & Recommendations for Production Scale:
+ *    For large production environments, replace this in-memory singleton cache with direct 
+ *    cloud-native queries to Firestore/Spanner using transaction isolation levels, or integrate 
+ *    a distributed lock service (such as Redis) to arbitrate access.
+ * ============================================================================
+ */
+
 const logger = createLogger("Cache");
+
 
 export const DB_PATH = path.join(process.cwd(), "trips-db.json");
 

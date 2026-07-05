@@ -1,7 +1,7 @@
 import { Router } from "express";
 import chatRouter from "./ai/chat";
 import flightsRouter from "./ai/flights";
-import itineraryRouter from "./ai/itinerary";
+import itineraryRouter from "./ai/itineraryAi";
 import scheduleRouter from "./ai/schedule";
 import ocrRouter from "./ai/ocr";
 

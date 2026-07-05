@@ -7,6 +7,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import type { Participant } from "../types";
 import { SESSION_TTL_MS } from "../lib/constants";
+import { apiClient } from "../lib/apiClient";
+
 
 
 function readStorage(key: string): string {
@@ -48,7 +50,16 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
   const [authEmail, setAuthEmail] = useState("");
   const [authError, setAuthError] = useState<string | null>(null);
 
-  // 12-hour session timeout
+  const handleLogout = useCallback(() => {
+    ["loggedInUserId", "loggedInUserName", "loggedInUserColor",
+      "loggedInUserUsername", "loginTimestamp", "sessionToken"].forEach((k) =>
+      localStorage.removeItem(k)
+    );
+    setLoggedInUserId(null);
+    setCurrentUser(null);
+  }, []);
+
+  // 12-hour session timeout check with a stable interval callback
   useEffect(() => {
     if (!loggedInUserId) return;
 
@@ -69,8 +80,9 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
     check();
     const id = setInterval(check, 30_000);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loggedInUserId, lang]);
+  }, [loggedInUserId, lang, handleLogout]);
+
+
 
   const handleAuthSubmit = useCallback(
     async (e: React.FormEvent) => {
@@ -102,23 +114,16 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
       }
 
       try {
-        const res = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        const data = await res.json();
+        const data = await apiClient.post(endpoint, body);
 
-        if (!res.ok) {
-          const errMsg = typeof data.error === "object" && data.error !== null
-            ? (data.error.message || data.error.code || "Authentication failed")
-            : (data.error || "Authentication failed");
+        if (!data.success) {
+          const errMsg = (data as any).error?.message || "Authentication failed";
           setAuthError(errMsg);
           return;
         }
 
-        if (data.pendingVerification || (data.data && data.data.pendingVerification)) {
-          const payload = data.data || data;
+        const payload = data.data;
+        if (payload.pendingVerification) {
           setAuthError(`✅ ${payload.message}`);
           setAuthMode("login");
           setAuthPassword("");
@@ -127,8 +132,8 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
           return;
         }
 
-        const user = data.user || (data.data && data.data.user);
-        const token = data.token || (data.data && data.data.token);
+        const user = payload.user;
+        const token = payload.token;
         if (!user) {
           throw new Error("User data missing from response");
         }
@@ -156,17 +161,8 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
         );
       }
     },
-    [authMode, authUsername, authPassword, authName, authEmail, lang]
+    [authMode, authUsername, authPassword, authName, authEmail, lang, handleLogout]
   );
-
-  const handleLogout = useCallback(() => {
-    ["loggedInUserId", "loggedInUserName", "loggedInUserColor",
-      "loggedInUserUsername", "loginTimestamp", "sessionToken"].forEach((k) =>
-      localStorage.removeItem(k)
-    );
-    setLoggedInUserId(null);
-    setCurrentUser(null);
-  }, []);
 
   return {
     loggedInUserId,

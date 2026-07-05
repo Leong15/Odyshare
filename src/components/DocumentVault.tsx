@@ -117,7 +117,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     });
     setTimeout(() => {
       setActiveToast(null);
-    }, 4500);
+    }, 1500);
   };
 
   const showDownloadSim = (titleName: string) => {
@@ -127,21 +127,19 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     });
     setTimeout(() => {
       setActiveToast(null);
-    }, 4000);
+    }, 1500);
   };
 
   const handleDownloadFile = (docUrl: string, docName: string) => {
     showDownloadSim(docName);
     if (docUrl && docUrl !== "#") {
-      setTimeout(() => {
-        const link = document.createElement("a");
-        link.href = docUrl;
-        link.target = "_blank";
-        link.download = docName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }, 1000);
+      const link = document.createElement("a");
+      link.href = docUrl;
+      link.target = "_blank";
+      link.download = docName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -175,8 +173,16 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
           <h3 className="font-extrabold text-white text-sm flex items-center gap-2">
             <FolderLock size={16} className="text-blue-400" />
             <span>{t.vaultTitle}</span>
+            <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-[9.5px] font-extrabold text-amber-300 rounded font-sans uppercase">
+              {lang === "zh" ? "沙盒安全模擬" : "Sandbox Simulation"}
+            </span>
           </h3>
           <p className="text-xs text-slate-400 mt-1">{t.vaultDesc}</p>
+          <p className="text-[10px] text-amber-400/80 mt-1.5 leading-normal">
+            ⚠️ {lang === "zh" 
+              ? "本地沙盒密鑰校驗與存儲僅供前端效果演示。請勿上傳包含真實個人身份、護照號碼、或任何敏感私密的文件。" 
+              : "Local crypto signatures are for front-end demonstration only. Please do not upload real passports, official credentials, or sensitive documents."}
+          </p>
         </div>
         <button
           id="upload-doc-trigger"

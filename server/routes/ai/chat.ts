@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getGenAI } from "./shared";
+import { getGenAI, isRetryableGeminiError } from "./shared.js";
 import { ok, fail } from "../../utils/apiResponse.js";
 
 const router = Router();
@@ -37,16 +37,7 @@ router.post("/chat-assistant", async (req: Request, res: Response) => {
     try {
       response = await chat.sendMessage({ message });
     } catch (err: any) {
-      const errorString = String(err?.message || err || "").toLowerCase();
-      const isRetryable = errorString.includes("503") || 
-                          errorString.includes("429") || 
-                          errorString.includes("unavailable") || 
-                          errorString.includes("high demand") || 
-                          err?.status === 503 ||
-                          err?.status === 429 ||
-                          err?.statusCode === 503 ||
-                          err?.statusCode === 429;
-      if (isRetryable) {
+      if (isRetryableGeminiError(err)) {
         console.warn(`Chat sendMessage failed, retrying once with gemini-1.5-flash-8b...`);
         const fallbackChat = ai.chats.create({
           model: "gemini-1.5-flash-8b",

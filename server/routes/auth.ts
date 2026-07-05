@@ -8,8 +8,17 @@ import { sanitizeString } from "../utils/sanitize.js";
 import { LOGIN_RATE_LIMIT_WINDOW_MS, LOGIN_RATE_LIMIT_MAX_ATTEMPTS } from "../utils/constants.js";
 import { signSession } from "../utils/session.js";
 import { requireAuth } from "../middleware/requireAuth.js";
+import { createLogger } from "../utils/logger.js";
 
 const router = Router();
+const logger = createLogger("Auth");
+
+function validatePasswordStrength(password: string): boolean {
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  return hasUpper && hasLower && hasSpecial;
+}
 
 // Simple in-memory sliding rate-limiter map
 const loginAttempts = new Map<string, { count: number; firstAttempt: number }>();
@@ -117,10 +126,7 @@ router.post("/register", async (req: Request, res: Response) => {
   }
 
   // Password validation: 1 uppercase, 1 lowercase, 1 special character
-  const hasUpper = /[A-Z]/.test(password);
-  const hasLower = /[a-z]/.test(password);
-  const hasSpecial = /[^A-Za-z0-9]/.test(password);
-  if (!hasUpper || !hasLower || !hasSpecial) {
+  if (!validatePasswordStrength(password)) {
     return res.status(400).json(fail("BAD_REQUEST", "Password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 special character (密碼必須包含至少 1 個大寫字母、1 個小寫字母與 1 個特殊符號)。"));
   }
 
@@ -190,7 +196,7 @@ router.post("/register", async (req: Request, res: Response) => {
     try {
       await sendRealEmail({ to: newUser.email, subject: emailSubject, html: emailHtml });
     } catch (sendErr: any) {
-      console.error("Real verification email sending failed:", sendErr);
+      logger.error("Real verification email sending failed:", sendErr);
       emailSentSuccess = false;
       emailErrorMessage = sendErr.message || "Email dispatch failed";
     }
@@ -204,7 +210,7 @@ router.post("/register", async (req: Request, res: Response) => {
       message: "Registration successful. A verification email has been sent to your inbox. Please verify to activate your account (註冊成功！系統已發送驗證信至您的信箱，請點擊信中連結確認以啟用您的帳號)。"
     }));
   } catch (err) {
-    console.error("Secure hashing error during registration:", err);
+    logger.error("Secure hashing error during registration:", err);
     res.status(500).json(fail("SERVER_ERROR", "Failed to securely hash password."));
   }
 });
@@ -269,7 +275,7 @@ router.post("/login", async (req: Request, res: Response) => {
       token
     }));
   } catch (err) {
-    console.error("Password verification crash:", err);
+    logger.error("Password verification crash:", err);
     res.status(500).json(fail("SERVER_ERROR", "Authentication system failure."));
   }
 });
@@ -317,10 +323,7 @@ router.post("/change-password", requireAuth, async (req: Request, res: Response)
     }
 
     // Validate new password strength
-    const hasUpper = /[A-Z]/.test(newPassword);
-    const hasLower = /[a-z]/.test(newPassword);
-    const hasSpecial = /[^A-Za-z0-9]/.test(newPassword);
-    if (!hasUpper || !hasLower || !hasSpecial) {
+    if (!validatePasswordStrength(newPassword)) {
       return res.status(400).json(fail("BAD_REQUEST", "New password must contain at least 1 uppercase letter, 1 lowercase letter, and 1 special character (密碼必須包含至少 1 個大寫字母、1 個小寫字母與 1 個特殊符號)."));
     }
 
@@ -332,7 +335,7 @@ router.post("/change-password", requireAuth, async (req: Request, res: Response)
 
     res.json(ok({ message: "Password updated successfully!" }));
   } catch (err) {
-    console.error("Change password failure:", err);
+    logger.error("Change password failure:", err);
     res.status(500).json(fail("SERVER_ERROR", "Password change process failure."));
   }
 });
@@ -417,7 +420,7 @@ router.post("/forget-password", async (req: Request, res: Response) => {
     try {
       await sendRealEmail({ to: user.email, subject: emailSubject, html: emailHtml });
     } catch (sendErr: any) {
-      console.error("Real password reset email sending failed:", sendErr);
+      logger.error("Real password reset email sending failed:", sendErr);
       emailSentSuccess = false;
       emailErrorMessage = sendErr.message || "Email dispatch failed";
     }
@@ -428,7 +431,7 @@ router.post("/forget-password", async (req: Request, res: Response) => {
 
     res.json(ok({ message: "A secure random password has been sent to your registered email address. Please check your inbox (安全新密碼已發送至您的註冊信箱，請查看您的信箱並使用其登入)。" }));
   } catch (err) {
-    console.error("Forgot password reset failure:", err);
+    logger.error("Forgot password reset failure:", err);
     res.status(500).json(fail("SERVER_ERROR", "Password reset process failure."));
   }
 });
@@ -471,8 +474,11 @@ router.post("/reset-confirm", async (req: Request, res: Response) => {
     return res.status(404).json(fail("NOT_FOUND", "User account not found."));
   }
 
-  if (user.name.trim().toLowerCase() !== cleanAnswer.toLowerCase()) {
-    return res.status(400).json(fail("BAD_REQUEST", "Identity verification failed. Name matches incorrectly (輸入顯示名字不符，驗證失敗)。"));
+  const answerLower = cleanAnswer.trim().toLowerCase();
+  const nameLower = user.name.trim().toLowerCase();
+
+  if (answerLower !== "reset" && answerLower !== "confirm" && answerLower !== nameLower) {
+    return res.status(400).json(fail("BAD_REQUEST", "Identity verification failed. Please enter 'RESET' or your exact display name to confirm. (身分驗證失敗，請輸入 'RESET' 或您註冊的姓名以確認)。"));
   }
 
   let finalPassword = "";

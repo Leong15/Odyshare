@@ -3,6 +3,7 @@ import type { Participant } from "../../src/types";
 import { getDB, readTripsDB, writeTripsDB } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
 import { DEFAULT_PARTICIPANT_BUDGET_LIMIT } from "../utils/constants.js";
+import { createSystemMessage } from "../utils/message.js";
 
 const router = Router();
 
@@ -39,16 +40,12 @@ router.post("/invite", async (req: Request, res: Response) => {
 
     // Post a welcome system chat alert
     if (!current.chats) current.chats = [];
-    current.chats.push({
-      id: "msg-invite-" + Date.now(),
-      senderId: "system",
-      senderName: "OdyShareSmart AI",
-      avatarColor: "#64748b",
-      messageEncrypted: "",
-      messageDecrypted: `🎉 ${user.name} has joined the travel workspace!`,
-      timestamp: new Date().toISOString(),
-      isTripUpdate: true,
-    });
+    current.chats.push(
+      createSystemMessage(`🎉 ${user.name} has joined the travel workspace!`, {
+        idPrefix: "invite",
+        avatarColor: "#64748b"
+      })
+    );
 
     writeTripsDB(current, req);
     res.json(ok({ trip: current }));
@@ -91,16 +88,12 @@ router.post("/invite-external", async (req: Request, res: Response) => {
 
     // Post system message
     if (!current.chats) current.chats = [];
-    current.chats.push({
-      id: "msg-invite-ext-" + Date.now(),
-      senderId: "system",
-      senderName: "OdyShareSmart AI",
-      avatarColor: "#64748b",
-      messageEncrypted: "",
-      messageDecrypted: `➕ 已新增臨時外部旅伴：${name.trim()} (僅用於此旅程的拆帳與預算管理)！`,
-      timestamp: new Date().toISOString(),
-      isTripUpdate: true,
-    });
+    current.chats.push(
+      createSystemMessage(`➕ 已新增臨時外部旅伴：${name.trim()} (僅用於此旅程的拆帳與預算管理)！`, {
+        idPrefix: "invite-ext",
+        avatarColor: "#64748b"
+      })
+    );
 
     writeTripsDB(current, req);
     res.json(ok({ trip: current }));
@@ -180,16 +173,12 @@ router.post("/upgrade-external", async (req: Request, res: Response) => {
 
     // Add trip system update chat message
     if (!current.chats) current.chats = [];
-    current.chats.push({
-      id: "msg-upgrade-ext-" + Date.now(),
-      senderId: "system",
-      senderName: "OdyShareSmart AI",
-      avatarColor: "#10b981",
-      messageEncrypted: "",
-      messageDecrypted: `🎉 臨時旅伴「${extName}」已成功綁定/升級為正式帳號「${user.name}」！歷史代墊與應付帳目已無縫合併。`,
-      timestamp: new Date().toISOString(),
-      isTripUpdate: true,
-    });
+    current.chats.push(
+      createSystemMessage(`🎉 臨時旅伴「${extName}」已成功綁定/升級為正式帳號「${user.name}」！歷史代墊與應付帳目已無縫合併。`, {
+        idPrefix: "upgrade-ext",
+        avatarColor: "#10b981"
+      })
+    );
 
     writeTripsDB(current, req);
     res.json(ok({ trip: current }));

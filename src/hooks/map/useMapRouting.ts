@@ -1,6 +1,20 @@
 import { useState } from "react";
 import { resolveLatLng } from "../../utils/mapHelpers";
 
+function resolveActiveItemLatLng(activeItem: any, destination: string) {
+  if (!activeItem) return null;
+  return activeItem.coordinates
+    ? resolveLatLng(
+        activeItem.locationName || activeItem.title,
+        destination,
+        activeItem.coordinates.x,
+        activeItem.coordinates.y,
+        activeItem.lat,
+        activeItem.lng
+      )
+    : null;
+}
+
 // Polyline decoder to convert Google Maps Encoded Polyline algorithm format to latlng arrays
 const decodePolyline = (encoded: string): [number, number][] => {
   const points: [number, number][] = [];
@@ -79,16 +93,7 @@ export function useMapRouting({
     setRouteMeta(null);
 
     // Resolve lat/lng for activeItem
-    const activeCoords = activeItem.coordinates
-      ? resolveLatLng(
-          activeItem.locationName || activeItem.title,
-          destination,
-          activeItem.coordinates.x,
-          activeItem.coordinates.y,
-          activeItem.lat,
-          activeItem.lng
-        )
-      : null;
+    const activeCoords = resolveActiveItemLatLng(activeItem, destination);
 
     if (!activeCoords) {
       setRouteError(
@@ -163,16 +168,7 @@ export function useMapRouting({
 
   const getPublicTransitUrl = () => {
     if (!currentGeoLocation || !activeItem) return "";
-    const activeCoords = activeItem.coordinates
-      ? resolveLatLng(
-          activeItem.locationName || activeItem.title,
-          destination,
-          activeItem.coordinates.x,
-          activeItem.coordinates.y,
-          activeItem.lat,
-          activeItem.lng
-        )
-      : null;
+    const activeCoords = resolveActiveItemLatLng(activeItem, destination);
     if (!activeCoords) return "";
     return `https://www.google.com/maps/dir/?api=1&origin=${currentGeoLocation.lat},${currentGeoLocation.lng}&destination=${activeCoords.lat},${activeCoords.lng}&travelmode=transit`;
   };

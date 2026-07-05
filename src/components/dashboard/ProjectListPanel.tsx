@@ -1,19 +1,8 @@
 import React, { useState, useMemo } from "react";
 import { Search, X, ChevronRight, Plus } from "lucide-react";
+import { TripSummary } from "../../types";
 
-export interface MappedProject {
-  id: string;
-  name: string;
-  destination: string;
-  startDate: string;
-  endDate: string;
-  totalBudget: number;
-  status?: "active" | "inactive";
-  participants?: any[];
-  expenses?: any[];
-  itineraries?: any[];
-  lat?: number;
-  lng?: number;
+export interface MappedProject extends TripSummary {
   left: number;
   top: number;
   spent: number;
@@ -21,6 +10,7 @@ export interface MappedProject {
   membersCount: number;
   itinerariesCount: number;
 }
+
 
 interface ProjectListPanelProps {
   trips: MappedProject[];
@@ -134,7 +124,7 @@ export function ProjectListPanel({
                 key={t.id}
                 id={`project-list-item-${t.id}`}
                 onClick={() => onSwitch(t.id)}
-                className={`w-full text-left p-3.5 rounded-xl border transition flex items-center justify-between cursor-pointer ${
+                className={`w-full text-left p-3.5 rounded-xl border transition flex items-center justify-between cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
                   isActive 
                     ? "bg-blue-600/10 border-blue-500/80 text-white shadow-lg" 
                     : "bg-slate-950/40 border-white/5 text-slate-400 hover:border-white/15 hover:bg-slate-950/60"
@@ -179,7 +169,7 @@ export function ProjectListPanel({
       <button
         id="btn-create-new-trip"
         onClick={onCreateTrip}
-        className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer text-xs uppercase tracking-wide"
+        className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl transition duration-150 flex items-center justify-center gap-1.5 cursor-pointer text-xs uppercase tracking-wide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       >
         <Plus size={14} />
         <span>{lang === "zh" ? "開拓新漫遊專案" : "Create New Trip"}</span>
