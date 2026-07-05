@@ -15,7 +15,6 @@ import TripDashboard from "./components/TripDashboard";
 const ItineraryPlanner = lazy(() => import("./components/ItineraryPlanner"));
 const ExpenseTracker = lazy(() => import("./components/ExpenseTracker"));
 const OfflineMapSimulator = lazy(() => import("./components/OfflineMapSimulator"));
-const FlightHub = lazy(() => import("./components/FlightHub"));
 const DocumentVault = lazy(() => import("./components/DocumentVault"));
 const EncryptedWorkspaceChat = lazy(() => import("./components/EncryptedWorkspaceChat"));
 
@@ -25,7 +24,7 @@ import { useTripSync } from "./hooks/useTripSync";
 import { useTripActions } from "./hooks/useTripActions";
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"dashboard" | "map" | "itinerary" | "flights" | "budget" | "vault" | "chat" | "ai">("dashboard");
+  const [activeTab, setActiveTab] = useState<"dashboard" | "map" | "itinerary" | "budget" | "vault" | "chat" | "ai">("dashboard");
   const [lang, setLang] = useState<"en" | "zh">("zh"); // Defaulting to zh (Traditional Chinese)
   
   // Theme Switching
@@ -145,10 +144,6 @@ export default function App() {
     if (sync.trip) {
       actions.handlePostAISystemMessage(text, sync.trip.chats);
     }
-  };
-
-  const handleAIRecFlights = async (from: string, to: string, date: string, type?: string, returnDate?: string) => {
-    await actions.handleAIRecFlights(from, to, date, type, returnDate, sync.trip?.flightEstimates || []);
   };
 
   // If not authenticated, render Login/Register Terminal
@@ -476,15 +471,6 @@ export default function App() {
               </button>
 
               <button
-                id="tab-btn-flights"
-                onClick={() => setActiveTab("flights")}
-                className={`nav-tab ${activeTab === "flights" ? "nav-tab-active" : "nav-tab-inactive"}`}
-              >
-                <Plane size={14} className="shrink-0" />
-                <span>{translations[lang].tabFlights}</span>
-              </button>
-
-              <button
                 id="tab-btn-budget"
                 onClick={() => setActiveTab("budget")}
                 className={`nav-tab ${activeTab === "budget" ? "nav-tab-active" : "nav-tab-inactive"}`}
@@ -571,18 +557,6 @@ export default function App() {
                     lang={lang}
                     tripLat={trip.lat}
                     tripLng={trip.lng}
-                  />
-                )}
-
-                {activeTab === "flights" && (
-                  <FlightHub
-                    tripId={trip.id}
-                    flightEstimates={trip.flightEstimates}
-                    participants={trip.participants}
-                    currentUser={auth.currentUser.id}
-                    onVoteFlight={(flightId) => actions.handleVote("flight", flightId)}
-                    onFetchAIRec={handleAIRecFlights}
-                    lang={lang}
                   />
                 )}
 
