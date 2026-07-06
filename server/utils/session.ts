@@ -1,7 +1,15 @@
 import crypto from "crypto";
 
 const getSecret = (): string => {
-  return process.env.SESSION_SECRET || "default_local_dev_session_secret_xyz123";
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("CRITICAL SECURITY ERROR: SESSION_SECRET is not configured in production environment!");
+    }
+    console.warn("WARNING: SESSION_SECRET is missing. Falling back to default local development secret. (DO NOT use this in production)");
+    return "default_local_dev_session_secret_xyz123";
+  }
+  return secret;
 };
 
 /**

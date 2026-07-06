@@ -6,7 +6,7 @@ let L: typeof L_TYPE | null = null;
 import { ItineraryItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
 import { resolveLatLng, getDayColor } from "../../utils/mapHelpers";
-import { latLngToCanvasXY } from "../../lib/mapUtils";
+import { latLngToCanvasXY, isSameCoordinate } from "../../lib/mapUtils";
 import { MAP_CONFIG, isItineraryItem } from "../../lib/constants";
 import { MapTarget } from "../../hooks/map/types";
 import { useMapGeolocation } from "../../hooks/map/useMapGeolocation";
@@ -239,7 +239,7 @@ export default function OfflineMapSimulator({
       if (activeItem) {
         setCustomHotspots(prev => prev.filter(c => {
           const nameMatches = c.name !== activeItem.title && c.name !== activeItem.locationName;
-          const coordMatches = !(c.lat && activeItem.lat && Math.abs(c.lat - activeItem.lat) < 0.0001 && Math.abs(c.lng - activeItem.lng) < 0.0001);
+          const coordMatches = !isSameCoordinate(c, activeItem);
           return nameMatches && coordMatches;
         }));
       }
@@ -309,7 +309,7 @@ export default function OfflineMapSimulator({
     } else {
       setCustomHotspots(prev => prev.filter(c => {
         const nameMatches = c.name !== activeItem.title && c.name !== activeItem.locationName;
-        const coordMatches = !(c.lat && activeItem.lat && Math.abs(c.lat - activeItem.lat) < 0.0001 && Math.abs(c.lng - activeItem.lng) < 0.0001);
+        const coordMatches = !isSameCoordinate(c, activeItem);
         return nameMatches && coordMatches;
       }));
     }
