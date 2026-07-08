@@ -3,6 +3,9 @@ import { Sparkles, RefreshCw } from "lucide-react";
 import { ItineraryItem } from "../../../types";
 import { translations } from "../../../lib/translations";
 import { Toast } from "../../common/Toast";
+import { CollapsibleSection } from "../../common/CollapsibleSection";
+import { useToast } from "../../../hooks/useToast";
+import { apiClient } from "../../../lib/apiClient";
 
 interface AIOptimizerPanelProps {
   lang: "en" | "zh";
@@ -24,29 +27,20 @@ export default function AIOptimizerPanel({
   const [prefInput, setPrefInput] = useState<string>("");
   const [optimizing, setOptimizing] = useState<boolean>(false);
   const [tspOptimizing, setTspOptimizing] = useState<boolean>(false);
-  const [isOptimizerCollapsed, setIsOptimizerCollapsed] = useState<boolean>(false);
-  const [toast, setToast] = useState<{
-    type: "success" | "error" | "info" | "warning";
-    title: string;
-    message: string;
-  } | null>(null);
+  const { toast, showToast, closeToast } = useToast();
 
   const handleOptimize = async () => {
     if (optimizing) return;
     setOptimizing(true);
     try {
-      const res = await fetch("/api/ai/optimize-itinerary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itineraries,
-          preferences: prefInput,
-          lang,
-        }),
+      const response = await apiClient.post("/api/ai/optimize-itinerary", {
+        itineraries,
+        preferences: prefInput,
+        lang,
       });
-      const json = await res.json();
-      if (json.success && json.data) {
-        const { optimizedItems, voiceSummary, audioBase64 } = json.data;
+
+      if (response.success && response.data) {
+        const { optimizedItems, voiceSummary, audioBase64 } = response.data;
 
         // format items
         const formatted = optimizedItems.map((item: any, idx: number) => ({
@@ -75,14 +69,20 @@ export default function AIOptimizerPanel({
               : "🔮 Intelligent schedule overhaul complete! Restructured using Gemini model based on your vibes."
           );
         }
+      } else {
+        showToast(
+          "error",
+          lang === "zh" ? "優化失敗" : "Optimization Failed",
+          lang === "zh" ? "升級行程時發生伺服器錯誤" : "A server error occurred during itinerary upgrade"
+        );
       }
     } catch (err) {
       console.error(err);
-      setToast({
-        type: "error",
-        title: lang === "zh" ? "優化失敗" : "Optimization Failed",
-        message: lang === "zh" ? "升級行程時發生伺服器錯誤" : "A server error occurred during itinerary upgrade",
-      });
+      showToast(
+        "error",
+        lang === "zh" ? "優化失敗" : "Optimization Failed",
+        lang === "zh" ? "升級行程時發生伺服器錯誤" : "A server error occurred during itinerary upgrade"
+      );
     } finally {
       setOptimizing(false);
     }
@@ -94,28 +94,23 @@ export default function AIOptimizerPanel({
     try {
       const currentDayItems = itineraries.filter((i) => i.dayIndex === activeDay);
       if (currentDayItems.length < 2) {
-        setToast({
-          type: "warning",
-          title: lang === "zh" ? "路徑優化提示" : "Route Notice",
-          message:
-            lang === "zh"
-              ? "當天項目少於 2 個，無須進行 TSP 最短路徑排列！"
-              : "Requires at least 2 items on the active day to calculate TSP route!",
-        });
+        showToast(
+          "warning",
+          lang === "zh" ? "路徑優化提示" : "Route Notice",
+          lang === "zh"
+            ? "當天項目少於 2 個，無須進行 TSP 最短路徑排列！"
+            : "Requires at least 2 items on the active day to calculate TSP route!"
+        );
         return;
       }
 
-      const res = await fetch("/api/ai/optimize-tsp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: currentDayItems,
-          lang,
-        }),
+      const response = await apiClient.post("/api/ai/optimize-tsp", {
+        items: currentDayItems,
+        lang,
       });
-      const json = await res.json();
-      if (json.success && json.data) {
-        const { optimizedItems } = json.data;
+
+      if (response.success && response.data) {
+        const { optimizedItems } = response.data;
 
         // Replace day items while retaining other days
         const otherDaysItems = itineraries.filter((i) => i.dayIndex !== activeDay);
@@ -140,86 +135,79 @@ export default function AIOptimizerPanel({
     }
   };
 
+  const panelTitle = (
+    <div className="flex items-center gap-1.5">
+      <span className="p-0.5 px-1.5 bg-blue-500/15 text-blue-300 rounded border border-blue-500/25 text-[9px] font-mono font-bold leading-none flex items-center">
+        {t.geminiEngine}
+      </span>
+      <h4 className="font-extrabold text-white text-xs leading-none">{t.optimizerTitle}</h4>
+    </div>
+  );
+
   return (
-    <div className="bg-white/3 border border-white/5 p-3 rounded-xl space-y-2 shrink-0 text-left">
-      <div
-        className="flex items-center justify-between cursor-pointer select-none"
-        onClick={() => setIsOptimizerCollapsed(!isOptimizerCollapsed)}
-      >
-        <div className="flex items-center gap-1.5">
-          <span className="p-0.5 px-1.5 bg-blue-500/15 text-blue-300 rounded border border-blue-500/25 text-[9px] font-mono font-bold leading-none flex items-center">
-            {t.geminiEngine}
-          </span>
-          <h4 className="font-extrabold text-white text-xs">{t.optimizerTitle}</h4>
-        </div>
-        <span className="text-slate-400 text-[10px] font-bold">
-          {isOptimizerCollapsed ? "＋" : "－"}
-        </span>
-      </div>
+    <>
+      <CollapsibleSection title={panelTitle} ariaLabel={lang === "zh" ? "Gemini 智慧行程優化器" : "Gemini Intelligent Schedule Optimizer"}>
+        <p className="text-[10.5px] text-slate-400 leading-relaxed">
+          {t.optimizerDesc}
+        </p>
+        <div className="space-y-1.5 text-xs">
+          <label className="block text-[9px] font-bold text-slate-300 uppercase tracking-widest">
+            {t.groupVibe}
+          </label>
+          <input
+            id="ai-preferences-input"
+            type="text"
+            value={prefInput}
+            onChange={(e) => setPrefInput(e.target.value)}
+            placeholder="e.g. Sushi crawl, cultural shrines..."
+            className="w-full text-xs px-2.5 py-1.5 glass-input rounded-lg text-white font-medium"
+          />
+          <div className="flex gap-1">
+            <button
+              id="ai-optimize-btn"
+              onClick={handleOptimize}
+              disabled={optimizing}
+              className="flex-1 py-1.5 glass-button-primary text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 animate-pulse-subtle"
+            >
+              {optimizing ? (
+                <>
+                  <RefreshCw size={12} className="animate-spin text-white" />
+                  <span>{t.generatingPath}</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles size={12} className="text-blue-200" />
+                  <span>{t.rebuildItinerary}</span>
+                </>
+              )}
+            </button>
 
-      {!isOptimizerCollapsed && (
-        <div className="space-y-2 pt-1 animate-fadeIn">
-          <p className="text-[10.5px] text-slate-400 leading-relaxed">
-            {t.optimizerDesc}
-          </p>
-          <div className="space-y-1.5 text-xs">
-            <label className="block text-[9px] font-bold text-slate-300 uppercase tracking-widest">
-              {t.groupVibe}
-            </label>
-            <input
-              id="ai-preferences-input"
-              type="text"
-              value={prefInput}
-              onChange={(e) => setPrefInput(e.target.value)}
-              placeholder="e.g. Sushi crawl, cultural shrines..."
-              className="w-full text-xs px-2.5 py-1.5 glass-input rounded-lg text-white font-medium"
-            />
-            <div className="flex gap-1">
-              <button
-                id="ai-optimize-btn"
-                onClick={handleOptimize}
-                disabled={optimizing}
-                className="flex-1 py-1.5 glass-button-primary text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {optimizing ? (
-                  <>
-                    <RefreshCw size={12} className="animate-spin text-white" />
-                    <span>{t.generatingPath}</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={12} className="text-blue-200" />
-                    <span>{t.rebuildItinerary}</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                id="ai-tsp-btn"
-                type="button"
-                onClick={handleTSPOptimization}
-                disabled={tspOptimizing}
-                className="py-1.5 px-3 bg-indigo-600/90 hover:bg-indigo-650 border border-indigo-500/10 text-white font-bold rounded-lg text-xs cursor-pointer transition-all shrink-0"
-                title={
-                  lang === "zh"
-                    ? "TSP 經緯度最短路徑排序"
-                    : "Optimize geographical shortest paths"
-                }
-              >
-                {tspOptimizing ? "..." : lang === "zh" ? "最短路徑" : "Shortest Route"}
-              </button>
-            </div>
+            <button
+              id="ai-tsp-btn"
+              type="button"
+              onClick={handleTSPOptimization}
+              disabled={tspOptimizing}
+              className="py-1.5 px-3 bg-indigo-600/90 hover:bg-indigo-650 border border-indigo-500/10 text-white font-bold rounded-lg text-xs cursor-pointer transition-all shrink-0"
+              title={
+                lang === "zh"
+                  ? "TSP 經緯度最短路徑排序"
+                  : "Optimize geographical shortest paths"
+              }
+            >
+              {tspOptimizing ? "..." : lang === "zh" ? "最短路徑" : "Shortest Route"}
+            </button>
           </div>
         </div>
-      )}
+      </CollapsibleSection>
+
       {toast && (
         <Toast
           type={toast.type}
           title={toast.title}
           message={toast.message}
-          onClose={() => setToast(null)}
+          onClose={closeToast}
         />
       )}
-    </div>
+    </>
   );
 }

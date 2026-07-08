@@ -4,6 +4,8 @@ import { ExpenseItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
 import { getCategoryLabel, EXPENSE_CATEGORIES } from "../../utils/categoryUtils";
 import { getRefundAmount } from "../../utils/expenseCalculator";
+import { apiClient } from "../../lib/apiClient";
+import { EXCHANGE_RATES } from "../../lib/constants/exchangeRates";
 
 interface ExpenseFormProps {
   participants: Participant[];
@@ -67,20 +69,25 @@ export default function ExpenseForm({
     setOcrParsing(true);
     setOcrError(null);
     try {
-      const res = await fetch("/api/ai/ocr-receipt", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          receiptText: ocrInput,
-          receiptImage: receiptImage || undefined,
-        }),
+      const response = await apiClient.post("/api/ai/ocr-receipt", {
+        receiptText: ocrInput,
+        receiptImage: receiptImage || undefined,
       });
-      const json = await res.json();
-      if (res.ok && json && json.success && json.data) {
-        const ocrData = json.data;
+
+      if (response.success && response.data) {
+        const ocrData = response.data;
         if (ocrData.amount != null) {
-          setDescription(ocrData.description || "OCR Receipt Expense");
-          setAmount(ocrData.amount.toString());
+          let finalAmount = ocrData.amount;
+          const currency = (ocrData.currency || "USD").toUpperCase();
+          let rateNote = "";
+          if (currency !== "USD") {
+            const rate = EXCHANGE_RATES[currency] || 1.0;
+            finalAmount = Number((ocrData.amount / rate).toFixed(2));
+            rateNote = ` (${ocrData.amount} ${currency} ➡️ $${finalAmount} USD)`;
+          }
+
+          setDescription((ocrData.description || "OCR Receipt Expense") + rateNote);
+          setAmount(finalAmount.toString());
           setCategory(ocrData.category || "food");
           setOcrInput("");
           setReceiptImage("");
@@ -93,13 +100,12 @@ export default function ExpenseForm({
           );
         }
       } else {
-        setOcrError(
-          json.error?.message || json.error || (
-            lang === "zh"
+        const errMsg = !response.success && "error" in response
+          ? (response as any).error?.message
+          : (lang === "zh"
               ? "辨識失敗。可能因收據解析格式不符，請重試或手動輸入。"
-              : "Receipt OCR failed. Format might be unsupported. Please retry or input manually."
-          )
-        );
+              : "Receipt OCR failed. Format might be unsupported. Please retry or input manually.");
+        setOcrError(errMsg);
       }
     } catch (err) {
       console.error("Receipt OCR failed:", err);
@@ -719,6 +725,16 @@ export default function ExpenseForm({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Mock Exchange Rate Disclaimer Banner */}
+      <div className="p-3 bg-slate-900/60 border border-white/5 rounded-xl text-[10.5px] text-slate-400 font-medium leading-relaxed font-sans flex items-start gap-2 mt-2">
+        <span className="text-amber-400 shrink-0">ℹ️</span>
+        <div>
+          {lang === "zh"
+            ? "系統提示：跨幣別記帳時，系統採用固定模擬匯率 (USD/JPY: 155, USD/TWD: 32) 進行換算與統計，非實時市場匯率。"
+            : "System Tip: For multi-currency entries, conversions use fixed simulated rates (USD/JPY: 155, USD/TWD: 32) for travel expense consolidation."}
+        </div>
       </div>
 
       <button

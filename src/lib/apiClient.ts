@@ -4,20 +4,9 @@
  * and guarantees a strong, typed ApiResponse<T> interface.
  */
 
-export interface ApiSuccess<T = any> {
-  success: true;
-  data: T;
-}
+import { ApiSuccess, ApiError, ApiResponse } from "../shared/apiTypes";
 
-export interface ApiError {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-  };
-}
-
-export type ApiResponse<T = any> = ApiSuccess<T> | ApiError;
+export type { ApiSuccess, ApiError, ApiResponse };
 
 interface RequestOptions extends Omit<RequestInit, 'body'> {
   body?: any;

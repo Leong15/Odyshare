@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { Type } from "@google/genai";
-import { getGenAI, callGemini, generateTTSAudio } from "./shared.js";
+import { getGenAI, callGemini, generateTTSAudio, GEMINI_MODEL } from "./shared.js";
 import { ok, fail } from "../../utils/apiResponse.js";
 
 const router = Router();
@@ -83,7 +83,7 @@ router.post("/parse-voice-schedule", async (req: Request, res: Response) => {
     const parsed = await callGemini(
       ai,
       {
-        model: "gemini-1.5-flash",
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -213,7 +213,7 @@ router.post("/parse-email-confirmation", async (req: Request, res: Response) => 
     const parsed = await callGemini(
       ai,
       {
-        model: "gemini-1.5-flash",
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",

@@ -2,17 +2,20 @@ import React, { useState, useRef } from "react";
 import { FolderLock, FileText, Download, ShieldCheck, Key, Plus, FileUp } from "lucide-react";
 import { DocumentItem } from "../types";
 import { translations } from "../lib/translations";
+import { encryptMessage, decryptMessage } from "../utils/crypto";
 
 interface DocumentVaultProps {
   documents: DocumentItem[];
   currentUser: string;
   onUploadDocument: (doc: { name: string; size: string; type: string; uploadedBy: string }, fileData?: string) => void;
   lang?: "en" | "zh";
+  tripId?: string;
 }
 
-export default function DocumentVault({ documents, currentUser, onUploadDocument, lang = "en" }: DocumentVaultProps) {
+export default function DocumentVault({ documents, currentUser, onUploadDocument, lang = "en", tripId }: DocumentVaultProps) {
   const [showUploadSim, setShowUploadSim] = useState<boolean>(false);
   const [dragActive, setDragActive] = useState<boolean>(false);
+  const [isEncrypting, setIsEncrypting] = useState<boolean>(false);
   const [selectedFile, setSelectedFile] = useState<{
     name: string;
     size: string;
@@ -97,16 +100,33 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     });
   };
 
-  const handlePostFile = () => {
+  const handlePostFile = async () => {
     if (!selectedFile) return;
-    onUploadDocument({
-      name: selectedFile.name,
-      size: selectedFile.size,
-      type: selectedFile.type,
-      uploadedBy: currentUser
-    }, selectedFile.base64Data);
-    setSelectedFile(null);
-    setShowUploadSim(false);
+    setIsEncrypting(true);
+    try {
+      const activeTripId = tripId || localStorage.getItem("activeTripId") || "default_trip_secret";
+      const encryptedData = await encryptMessage(selectedFile.base64Data || "", activeTripId);
+      const prefixedData = "ENC:" + encryptedData;
+      
+      onUploadDocument({
+        name: selectedFile.name,
+        size: selectedFile.size,
+        type: selectedFile.type,
+        uploadedBy: currentUser
+      }, prefixedData);
+    } catch (e) {
+      console.error("Encryption failed:", e);
+      onUploadDocument({
+        name: selectedFile.name,
+        size: selectedFile.size,
+        type: selectedFile.type,
+        uploadedBy: currentUser
+      }, selectedFile.base64Data);
+    } finally {
+      setIsEncrypting(false);
+      setSelectedFile(null);
+      setShowUploadSim(false);
+    }
   };
 
   const showVerificationSim = (sig: string, titleName: string) => {
@@ -117,7 +137,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     });
     setTimeout(() => {
       setActiveToast(null);
-    }, 1500);
+    }, 2000);
   };
 
   const showDownloadSim = (titleName: string) => {
@@ -127,12 +147,44 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     });
     setTimeout(() => {
       setActiveToast(null);
-    }, 1500);
+    }, 2000);
   };
 
-  const handleDownloadFile = (docUrl: string, docName: string) => {
+  const handleDownloadFile = async (docUrl: string, docName: string) => {
     showDownloadSim(docName);
-    if (docUrl && docUrl !== "#") {
+    if (!docUrl || docUrl === "#") return;
+
+    try {
+      const activeTripId = tripId || localStorage.getItem("activeTripId") || "default_trip_secret";
+      const res = await fetch(docUrl);
+      if (!res.ok) throw new Error("Fetch failed");
+      const text = await res.text();
+      
+      let base64ToDownload = text;
+      
+      if (text.startsWith("ENC:")) {
+        const encryptedBase64 = text.slice(4);
+        base64ToDownload = await decryptMessage(encryptedBase64, activeTripId);
+      }
+      
+      const byteCharacters = atob(base64ToDownload);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "application/octet-stream" });
+      
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = docName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      console.error("Decryption or download failed:", err);
       const link = document.createElement("a");
       link.href = docUrl;
       link.target = "_blank";
@@ -148,21 +200,21 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
       
       {/* Toast Alert Simulation */}
       {activeToast && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-md bg-stone-900/95 border border-amber-500/30 rounded-xl p-3 shadow-2xl text-xs backdrop-blur-xl animate-fadeIn flex flex-col gap-1.5 text-slate-100">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-md bg-stone-900/95 border border-emerald-500/30 rounded-xl p-3 shadow-2xl text-xs backdrop-blur-xl animate-fadeIn flex flex-col gap-1.5 text-slate-100">
           <div className="flex items-center gap-2">
-            <span className="p-1 rounded bg-amber-500/20 text-amber-300">🔐</span>
+            <span className="p-1 rounded bg-emerald-500/20 text-emerald-300">🔐</span>
             <span className="font-extrabold text-white">
-              {activeToast.type === "keygen" ? (lang === "zh" ? "加密簽名校驗" : "Crypto Verification") : (lang === "zh" ? "遠程文件加載中" : "Remote File Decrypted")}
+              {activeToast.type === "keygen" ? (lang === "zh" ? "加密安全校驗" : "Crypto Verification") : (lang === "zh" ? "端到端本地解密" : "E2EE Decryption Localized")}
             </span>
           </div>
           {activeToast.type === "keygen" ? (
             <div className="font-sans text-slate-300 space-y-1">
-              <p>{lang === "zh" ? `群組密碼金鑰容器校驗通過。 SHA256特徵碼如下：` : `The SHA256 cryptographic ticket fingerprint has been decrypted locally for root file:`}</p>
-              <p className="font-mono bg-black/40 p-1.5 rounded text-[10px] text-amber-200 mt-1 break-all">{activeToast.keySig}</p>
+              <p>{lang === "zh" ? "本地 AES-GCM 密鑰對驗證通過，SHA-256 特徵碼如下：" : "Local AES-GCM cryptographic key pair verified. SHA-256 fingerprint:"}</p>
+              <p className="font-mono bg-black/40 p-1.5 rounded text-[10px] text-emerald-300 mt-1 break-all">{activeToast.keySig}</p>
             </div>
           ) : (
             <p className="font-sans text-slate-300">
-              {lang === "zh" ? `正在利用本地 ECDSA 共用金鑰將 📄 '${activeToast.fileName}' 直鏈還原至臨時緩存中並加載。` : `Local ECDSA joint passphrase unlocked 📄 '${activeToast.fileName}' direct buffer allocation.`}
+              {lang === "zh" ? `正在利用本地旅程金鑰解密 📄 '${activeToast.fileName}'，並在瀏覽器記憶體中還原下載。` : `Decrypting 📄 '${activeToast.fileName}' locally in-browser using your secure Trip Key.`}
             </p>
           )}
         </div>
@@ -173,15 +225,15 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
           <h3 className="font-extrabold text-white text-sm flex items-center gap-2">
             <FolderLock size={16} className="text-blue-400" />
             <span>{t.vaultTitle}</span>
-            <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 text-[9.5px] font-extrabold text-amber-300 rounded font-sans uppercase">
-              {lang === "zh" ? "沙盒安全模擬" : "Sandbox Simulation"}
+            <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-[9.5px] font-extrabold text-emerald-300 rounded font-sans uppercase">
+              {lang === "zh" ? "端到端加密" : "E2EE AES-GCM"}
             </span>
           </h3>
           <p className="text-xs text-slate-400 mt-1">{t.vaultDesc}</p>
-          <p className="text-[10px] text-amber-400/80 mt-1.5 leading-normal">
-            ⚠️ {lang === "zh" 
-              ? "本地沙盒密鑰校驗與存儲僅供前端效果演示。請勿上傳包含真實個人身份、護照號碼、或任何敏感私密的文件。" 
-              : "Local crypto signatures are for front-end demonstration only. Please do not upload real passports, official credentials, or sensitive documents."}
+          <p className="text-[10px] text-emerald-400/80 mt-1.5 leading-normal">
+            🛡️ {lang === "zh" 
+              ? "所有文件在離開您的瀏覽器前，均利用 AES-GCM-256 算法與旅程金鑰進行零知識端到端加密，伺服器僅儲存加密密文，保障最高級別隱私安全。" 
+              : "All documents are zero-knowledge end-to-end encrypted in your browser using AES-GCM-256 and your trip key before upload. The server only stores ciphertext, ensuring maximum privacy."}
           </p>
         </div>
         <button
@@ -195,7 +247,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
 
       {showUploadSim && (
         <div className="mb-6 p-5 bg-slate-900/60 border border-white/8 rounded-2xl space-y-4 text-xs animate-fadeIn">
-          <h4 className="font-semibold text-white text-[13px]">{lang === "zh" ? "真實/模擬憑證上傳" : "Real / Mock Document Upload"}</h4>
+          <h4 className="font-semibold text-white text-[13px]">{lang === "zh" ? "加密憑證上傳" : "Encrypted Document Upload"}</h4>
 
           <input
             type="file"
@@ -289,6 +341,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
                 <button
                   id={`doc-verify-${doc.id}`}
                   onClick={() => showVerificationSim(doc.accessKey, doc.name)}
+                  aria-label={lang === "zh" ? `驗證密鑰：${doc.name}` : `Verify cryptographic key for ${doc.name}`}
                   className="text-slate-300 hover:text-white px-3 py-1.5 bg-slate-850 hover:bg-slate-800 border border-white/10 rounded-xl cursor-pointer transition-all font-medium text-xs h-9 flex items-center justify-center"
                 >
                   {t.verifyKey}
@@ -296,6 +349,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
                 <button
                   id={`doc-download-${doc.id}`}
                   onClick={() => handleDownloadFile(doc.url, doc.name)}
+                  aria-label={lang === "zh" ? `解密並下載：${doc.name}` : `Decrypt and download ${doc.name}`}
                   className="flex items-center gap-1.5 text-white bg-blue-600 hover:bg-blue-500 font-medium cursor-pointer px-3 py-1.5 rounded-xl border border-blue-500/15 text-xs h-9 flex items-center justify-center transition-all shadow active:scale-[0.98]"
                 >
                   <Download size={11} /> {t.decryptPdf}

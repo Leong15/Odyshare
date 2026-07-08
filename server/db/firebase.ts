@@ -23,9 +23,10 @@ const logger = createLogger("Firebase");
 
 // Load Firebase configuration safely from root
 const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+const rawConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
 const firebaseConfig = {
-  ...JSON.parse(fs.readFileSync(configPath, "utf-8")),
-  apiKey: process.env.FIREBASE_API_KEY || JSON.parse(fs.readFileSync(configPath, "utf-8")).apiKey
+  ...rawConfig,
+  apiKey: process.env.FIREBASE_API_KEY || rawConfig.apiKey
 };
 
 const firebaseApp = initializeApp(firebaseConfig);

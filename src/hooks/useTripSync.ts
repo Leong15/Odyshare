@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Trip } from "../types";
+import { decryptMessage } from "../utils/crypto";
 
 const POLL_INTERVAL_MS = 4_000;
 
@@ -136,7 +137,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
         if (showSpinner) setSyncing(false);
       }
     },
-    [loggedInUserId, fetchInvitations, onUserResolved, buildHeaders, onSessionExpired]
+    [loggedInUserId, onUserResolved, buildHeaders, onSessionExpired]
   );
 
   // ---------------------------------------------------------------------------
@@ -191,6 +192,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
           if (data.type === "update") {
             console.log("[SSE] Live modification detected on server, triggering dynamic refresh...");
             fetchTripData(false);
+            fetchInvitations();
           }
         } catch (err) {
           console.error("[SSE] Failed to parse SSE message payload:", err);
@@ -250,6 +252,59 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
   }, [loggedInUserId, trip?.id, fetchTripData]);
+
+
+  // ---------------------------------------------------------------------------
+  // Automatic Decryption of Secured Group Chat Messages
+  // ---------------------------------------------------------------------------
+  const chatsSerialized = trip?.chats?.map(c => c.id + ":" + c.messageEncrypted).join(",") || "";
+  
+  useEffect(() => {
+    if (!trip) return;
+    
+    // Check if there are any chats that are NOT decrypted yet
+    const hasUndecrypted = trip.chats?.some(msg => 
+      msg.senderId !== "system" && 
+      !msg.isTripUpdate && 
+      (!msg.messageDecrypted || msg.messageDecrypted === "[Decrypted payload secure - key verified]")
+    );
+    
+    if (!hasUndecrypted) return;
+
+    let active = true;
+    const runDecryption = async () => {
+      const decryptedChats = await Promise.all(
+        (trip.chats || []).map(async (msg) => {
+          if (msg.senderId === "system" || msg.isTripUpdate) {
+            return { ...msg, messageDecrypted: msg.messageDecrypted || msg.messageEncrypted };
+          }
+          if (msg.messageDecrypted && !msg.messageDecrypted.startsWith("[Decrypted payload")) {
+            return msg;
+          }
+          try {
+            const decrypted = await decryptMessage(msg.messageEncrypted, trip.id);
+            return { ...msg, messageDecrypted: decrypted };
+          } catch (e) {
+            return { ...msg, messageDecrypted: "[Decryption failed]" };
+          }
+        })
+      );
+      
+      if (active) {
+        setTrip(prev => {
+          if (!prev || prev.id !== trip.id) return prev;
+          const changed = prev.chats?.some((c, idx) => c.messageDecrypted !== decryptedChats[idx]?.messageDecrypted);
+          if (!changed) return prev;
+          return { ...prev, chats: decryptedChats };
+        });
+      }
+    };
+
+    runDecryption();
+    return () => {
+      active = false;
+    };
+  }, [chatsSerialized, trip?.id]);
 
 
   // ---------------------------------------------------------------------------
@@ -324,19 +379,12 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
     };
   }, [flushOfflineQueue]);
 
-  // Low-frequency checking of invitations (every 45 seconds) to avoid high HTTP request density
+  // Fetch invitations once on login or mount, then rely on SSE pushes to trigger refreshes
   useEffect(() => {
     const uid = localStorage.getItem("loggedInUserId") || loggedInUserId;
-    if (!uid) return;
-
-    // Run once immediately
-    fetchInvitations();
-
-    const interval = setInterval(() => {
+    if (uid) {
       fetchInvitations();
-    }, 45000); // 45 seconds interval
-
-    return () => clearInterval(interval);
+    }
   }, [loggedInUserId, fetchInvitations]);
 
   /** Post a partial trip update and refresh local state from server response. */

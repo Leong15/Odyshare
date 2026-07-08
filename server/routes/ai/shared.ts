@@ -1,5 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 
+export const GEMINI_MODEL = "gemini-1.5-flash" as const;
+export const GEMINI_FALLBACK_MODEL = "gemini-1.5-flash-8b" as const;
+export const GEMINI_TTS_MODEL = "gemini-2.5-flash-preview-tts" as const;
+
 // Lazy initialization pattern for Gemini API
 let aiClient: GoogleGenAI | null = null;
 
@@ -60,8 +64,8 @@ export async function generateContentWithRetry(
       const errorString = String(err?.message || err || "").toLowerCase();
       
       if (isRetryableGeminiError(err) && attempt < maxRetries) {
-        console.warn(`Gemini API call failed (attempt ${attempt}/${maxRetries}): ${errorString}. Retrying with gemini-1.5-flash-8b...`);
-        params.model = "gemini-1.5-flash-8b";
+        console.warn(`Gemini API call failed (attempt ${attempt}/${maxRetries}): ${errorString}. Retrying with ${GEMINI_FALLBACK_MODEL}...`);
+        params.model = GEMINI_FALLBACK_MODEL;
         // Wait a bit (exponential backoff)
         await new Promise(resolve => setTimeout(resolve, 300 * attempt));
         continue;
@@ -75,7 +79,7 @@ export async function generateContentWithRetry(
 export async function generateTTSAudio(ai: GoogleGenAI, text: string): Promise<string | null> {
   try {
     const ttsResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: GEMINI_TTS_MODEL,
       contents: [{ parts: [{ text: `Say naturally, warmly and professionally: ${text}` }] }],
       config: {
         responseModalities: ['AUDIO'],

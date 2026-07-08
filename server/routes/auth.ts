@@ -25,6 +25,14 @@ const loginAttempts = new Map<string, { count: number; firstAttempt: number }>()
 
 function rateLimitLogin(ip: string): boolean {
   const now = Date.now();
+
+  // Proactive cleanup of expired entries to prevent memory leak
+  for (const [key, val] of loginAttempts.entries()) {
+    if (now - val.firstAttempt > LOGIN_RATE_LIMIT_WINDOW_MS) {
+      loginAttempts.delete(key);
+    }
+  }
+
   const attempt = loginAttempts.get(ip);
   if (!attempt) {
     loginAttempts.set(ip, { count: 1, firstAttempt: now });
@@ -434,65 +442,6 @@ router.post("/forget-password", async (req: Request, res: Response) => {
     logger.error("Forgot password reset failure:", err);
     res.status(500).json(fail("SERVER_ERROR", "Password reset process failure."));
   }
-});
-
-// 5. Reset security question API for check dialog
-router.get("/reset-question", (req: Request, res: Response) => {
-  const { username } = req.query;
-  if (!username) {
-    return res.status(400).json(fail("BAD_REQUEST", "Username is required."));
-  }
-  if ((username as string).length > 50) {
-    return res.status(400).json(fail("BAD_REQUEST", "Username too long."));
-  }
-  const cleanUsername = sanitizeString(username);
-  const db = getDB();
-  const user = db.users.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
-  if (!user) {
-    return res.status(404).json(fail("NOT_FOUND", "User account not found (該帳號不存在)."));
-  }
-  res.json(ok({ message: "Challenge loaded successfully." }));
-});
-
-// 6. Reset security check confirmation and backup trigger
-router.post("/reset-confirm", async (req: Request, res: Response) => {
-  await initAdminPromise;
-  const { username, answer } = req.body;
-  if (!username || !answer) {
-    return res.status(400).json(fail("BAD_REQUEST", "Username and verification answer are required."));
-  }
-  if (username.length > 50 || answer.length > 100) {
-    return res.status(400).json(fail("BAD_REQUEST", "Input length limits exceeded."));
-  }
-
-  const cleanUsername = sanitizeString(username);
-  const cleanAnswer = sanitizeString(answer);
-
-  const db = getDB();
-  const user = db.users.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
-  if (!user) {
-    return res.status(404).json(fail("NOT_FOUND", "User account not found."));
-  }
-
-  const answerLower = cleanAnswer.trim().toLowerCase();
-  const nameLower = user.name.trim().toLowerCase();
-
-  if (answerLower !== "reset" && answerLower !== "confirm" && answerLower !== nameLower) {
-    return res.status(400).json(fail("BAD_REQUEST", "Identity verification failed. Please enter 'RESET' or your exact display name to confirm. (身分驗證失敗，請輸入 'RESET' 或您註冊的姓名以確認)。"));
-  }
-
-  let finalPassword = "";
-  if (!user.password.startsWith("$argon2") && !user.password.startsWith("$scrypt$")) {
-    finalPassword = user.password;
-  } else {
-    // If securely hashed, reset to default compliant passcode to let user lock back in securely
-    finalPassword = "Pass123!";
-    const hashedPassword = await safeHash(finalPassword);
-    user.password = hashedPassword;
-    writeDB(db);
-  }
-
-  res.json(ok({ password: finalPassword }));
 });
 
 export default router;

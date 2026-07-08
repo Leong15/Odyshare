@@ -16,6 +16,7 @@ import { ok, fail } from "../utils/apiResponse.js";
 import { createLogger } from "../utils/logger.js";
 import { SSE_KEEPALIVE_INTERVAL_MS } from "../utils/constants.js";
 import { createSystemMessage } from "../utils/message.js";
+import { ITEM_ID_PREFIXES } from "../../src/shared/ids.js";
 
 const logger = createLogger("TripRoute");
 
@@ -309,7 +310,7 @@ router.post("/document/upload", async (req: Request, res: Response) => {
   }
 
   const newDoc = {
-    id: "doc-" + Date.now(),
+    id: ITEM_ID_PREFIXES.DOCUMENT + Date.now(),
     name,
     size: calculatedSize,
     type: type || "application/pdf",

@@ -22,6 +22,7 @@ const EncryptedWorkspaceChat = lazy(() => import("./components/chat/EncryptedWor
 import { useAuth } from "./hooks/useAuth";
 import { useTripSync } from "./hooks/useTripSync";
 import { useTripActions } from "./hooks/useTripActions";
+import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<"dashboard" | "map" | "itinerary" | "budget" | "vault" | "chat" | "ai">("dashboard");
@@ -339,89 +340,102 @@ export default function App() {
                 </div>
               }>
                 {activeTab === "dashboard" && (
-                  <TripDashboard
-                    trip={trip}
-                    trips={trip.tripsList || []}
-                    lang={lang}
-                    onSwitchTrip={sync.handleSelectTrip}
-                    onCreateTrip={() => setShowCreateTripModal(true)}
-                    onEditTripMeta={actions.handleEditTripMeta}
-                    onDeleteTrip={actions.handleDeleteTrip}
-                  />
+                  <ErrorBoundary lang={lang}>
+                    <TripDashboard
+                      trip={trip}
+                      trips={trip.tripsList || []}
+                      lang={lang}
+                      onSwitchTrip={sync.handleSelectTrip}
+                      onCreateTrip={() => setShowCreateTripModal(true)}
+                      onEditTripMeta={actions.handleEditTripMeta}
+                      onDeleteTrip={actions.handleDeleteTrip}
+                    />
+                  </ErrorBoundary>
                 )}
 
                 {activeTab === "itinerary" && (
-                  <ItineraryPlanner
-                    itineraries={trip.itineraries}
-                    participants={trip.participants}
-                    currentUser={auth.currentUser.id}
-                    onVoteItinerary={(itemId) => actions.handleVote("itinerary", itemId)}
-                    onCommentItinerary={actions.handleAddComment}
-                    onAddItineraryItem={actions.handleAddItineraryItem}
-                    lang={lang}
-                    onApplyAIOptimization={(items) =>
-                      actions.handleApplyAIOptimization(items, trip.itineraries)
-                    }
-                    onPostAISystemMessage={handlePostAISystemMessage}
-                    backupItineraries={trip.backupItineraries || []}
-                    onRestoreItineraries={handleRestoreItineraries}
-                    onDeleteItineraryItem={actions.handleDeleteItineraryItem}
-                    onUpdateItineraryItem={actions.handleUpdateItineraryItem}
-                  />
+                  <ErrorBoundary lang={lang}>
+                    <ItineraryPlanner
+                      itineraries={trip.itineraries}
+                      participants={trip.participants}
+                      currentUser={auth.currentUser.id}
+                      onVoteItinerary={(itemId) => actions.handleVote("itinerary", itemId)}
+                      onCommentItinerary={actions.handleAddComment}
+                      onAddItineraryItem={actions.handleAddItineraryItem}
+                      lang={lang}
+                      onApplyAIOptimization={(items) =>
+                        actions.handleApplyAIOptimization(items, trip.itineraries)
+                      }
+                      onPostAISystemMessage={handlePostAISystemMessage}
+                      backupItineraries={trip.backupItineraries || []}
+                      onRestoreItineraries={handleRestoreItineraries}
+                      onDeleteItineraryItem={actions.handleDeleteItineraryItem}
+                      onUpdateItineraryItem={actions.handleUpdateItineraryItem}
+                    />
+                  </ErrorBoundary>
                 )}
 
                 {activeTab === "map" && (
-                  <OfflineMapSimulator
-                    destination={trip.destination}
-                    itineraries={trip.itineraries}
-                    participants={trip.participants}
-                    currentUserId={auth.currentUser.id}
-                    onSelectLocation={(item) => {
-                      console.log("Selected map checkpoint:", item);
-                    }}
-                    onAddItineraryItem={actions.handleAddItineraryItem}
-                    onUpdateItineraryItem={actions.handleUpdateItineraryItem}
-                    onDeleteItineraryItem={actions.handleDeleteItineraryItem}
-                    lang={lang}
-                    tripLat={trip.lat}
-                    tripLng={trip.lng}
-                  />
+                  <ErrorBoundary lang={lang}>
+                    <OfflineMapSimulator
+                      destination={trip.destination}
+                      itineraries={trip.itineraries}
+                      participants={trip.participants}
+                      currentUserId={auth.currentUser.id}
+                      onSelectLocation={(item) => {
+                        console.log("Selected map checkpoint:", item);
+                      }}
+                      onAddItineraryItem={actions.handleAddItineraryItem}
+                      onUpdateItineraryItem={actions.handleUpdateItineraryItem}
+                      onDeleteItineraryItem={actions.handleDeleteItineraryItem}
+                      lang={lang}
+                      tripLat={trip.lat}
+                      tripLng={trip.lng}
+                    />
+                  </ErrorBoundary>
                 )}
 
                 {activeTab === "budget" && (
-                  <ExpenseTracker
-                    expenses={trip.expenses}
-                    participants={trip.participants}
-                    totalBudget={trip.totalBudget}
-                    onAddExpense={actions.handleAddExpense}
-                    onDeleteExpense={actions.handleDeleteExpense}
-                    onUpdateBudget={(num) => sync.postTripUpdate({ totalBudget: num })}
-                    onUpdateParticipants={(updatedParts) => sync.postTripUpdate({ participants: updatedParts })}
-                    activeUserId={auth.currentUser.id}
-                    lang={lang}
-                    onInviteUser={actions.handleInviteUser}
-                    onInviteExternalUser={actions.handleInviteExternalUser}
-                    onUpgradeExternalUser={actions.handleUpgradeExternalUser}
-                  />
+                  <ErrorBoundary lang={lang}>
+                    <ExpenseTracker
+                      expenses={trip.expenses}
+                      participants={trip.participants}
+                      totalBudget={trip.totalBudget}
+                      onAddExpense={actions.handleAddExpense}
+                      onDeleteExpense={actions.handleDeleteExpense}
+                      onUpdateBudget={(num) => sync.postTripUpdate({ totalBudget: num })}
+                      onUpdateParticipants={(updatedParts) => sync.postTripUpdate({ participants: updatedParts })}
+                      activeUserId={auth.currentUser.id}
+                      lang={lang}
+                      onInviteUser={actions.handleInviteUser}
+                      onInviteExternalUser={actions.handleInviteExternalUser}
+                      onUpgradeExternalUser={actions.handleUpgradeExternalUser}
+                    />
+                  </ErrorBoundary>
                 )}
 
                 {activeTab === "vault" && (
-                  <DocumentVault
-                    documents={trip.documents}
-                    currentUser={auth.currentUser.name}
-                    onUploadDocument={actions.handleUploadDocument}
-                    lang={lang}
-                  />
+                  <ErrorBoundary lang={lang}>
+                    <DocumentVault
+                      documents={trip.documents}
+                      currentUser={auth.currentUser.name}
+                      onUploadDocument={actions.handleUploadDocument}
+                      lang={lang}
+                      tripId={trip.id}
+                    />
+                  </ErrorBoundary>
                 )}
 
                 {activeTab === "chat" && (
-                  <EncryptedWorkspaceChat
-                    chats={trip.chats}
-                    participants={trip.participants}
-                    currentUser={auth.currentUser.id}
-                    onSendMessage={actions.handleSendChatMessage}
-                    lang={lang}
-                  />
+                  <ErrorBoundary lang={lang}>
+                    <EncryptedWorkspaceChat
+                      chats={trip.chats}
+                      participants={trip.participants}
+                      currentUser={auth.currentUser.id}
+                      onSendMessage={actions.handleSendChatMessage}
+                      lang={lang}
+                    />
+                  </ErrorBoundary>
                 )}
               </Suspense>
             </div>

@@ -1,17 +1,6 @@
-export interface ApiSuccess<T = any> {
-  success: true;
-  data: T;
-}
+import { ApiSuccess, ApiError, ApiResponse } from "../../src/shared/apiTypes.js";
 
-export interface ApiError {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-  };
-}
-
-export type ApiResponse<T = any> = ApiSuccess<T> | ApiError;
+export type { ApiSuccess, ApiError, ApiResponse };
 
 export function ok<T>(data: T): ApiSuccess<T> {
   return { success: true, data };

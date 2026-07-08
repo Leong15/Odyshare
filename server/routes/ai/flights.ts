@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { Type } from "@google/genai";
-import { getGenAI, callGemini } from "./shared";
+import { getGenAI, callGemini, GEMINI_MODEL } from "./shared";
 import { searchSerpApiFlights } from "../../serpapi.js";
 import { ok, fail } from "../../utils/apiResponse.js";
 import { buildGoogleFlightsUrl } from "../../utils/flightUrlBuilder.js";
@@ -129,7 +129,7 @@ router.post("/recommend-flights", async (req: Request, res: Response) => {
   const result = await callGemini(
     ai,
     {
-      model: "gemini-1.5-flash",
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",

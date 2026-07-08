@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import type { Participant } from "../../src/types";
-import { getDB, readTripsDB, writeTripsDB } from "../db/index.js";
+import { getDB, writeDB, readTripsDB, writeTripsDB, broadcastTripChange } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
 import { DEFAULT_PARTICIPANT_BUDGET_LIMIT } from "../utils/constants.js";
 import { createSystemMessage } from "../utils/message.js";
@@ -201,6 +201,96 @@ router.post("/kick", async (req: Request, res: Response) => {
     res.json(ok({ trip: current }));
   } catch (err: any) {
     res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to kick participant"));
+  }
+});
+
+// Get invitations for the current logged-in user
+router.get("/invitations", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
+      return res.status(401).json(fail("UNAUTHORIZED", "User not logged in"));
+    }
+    const db = getDB();
+    if (!db.invitations) db.invitations = [];
+    const pending = db.invitations.filter(
+      (inv: any) => inv.inviteeId === userId && inv.status === "pending"
+    );
+    res.json(pending);
+  } catch (err: any) {
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to fetch invitations"));
+  }
+});
+
+// Respond to an invitation (accept or decline)
+router.post("/invitations/respond", async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+    if (!userId) {
+      return res.status(401).json(fail("UNAUTHORIZED", "User not logged in"));
+    }
+    const { invitationId, action } = req.body;
+    if (!invitationId || !action) {
+      return res.status(400).json(fail("BAD_REQUEST", "Missing invitationId or action"));
+    }
+
+    const db = getDB();
+    if (!db.invitations) db.invitations = [];
+    const invitationIndex = db.invitations.findIndex((inv: any) => inv.id === invitationId);
+    if (invitationIndex === -1) {
+      return res.status(404).json(fail("NOT_FOUND", "Invitation not found"));
+    }
+
+    const invitation = db.invitations[invitationIndex];
+    if (invitation.inviteeId !== userId) {
+      return res.status(403).json(fail("FORBIDDEN", "Unauthorized to respond to this invitation"));
+    }
+
+    invitation.status = action === "accept" ? "accepted" : "declined";
+
+    if (action === "accept") {
+      // Find the trip
+      const trip = db.trips.find((t: any) => t.id === invitation.tripId);
+      if (trip) {
+        // Find the user
+        const user = db.users.find((u: any) => u.id === userId);
+        if (user) {
+          // If the user is not already a participant in this trip, add them
+          if (!trip.participants) trip.participants = [];
+          if (!trip.participants.some((p: any) => p.id === userId)) {
+            trip.participants.push({
+              id: user.id,
+              name: user.name,
+              email: user.email || `${user.username}@example.com`,
+              avatarColor: user.avatarColor || "#3b82f6",
+              publicKey: "pub_key_" + Math.random().toString(36).substring(7),
+              budgetLimit: DEFAULT_PARTICIPANT_BUDGET_LIMIT,
+            });
+
+            // Post a system welcome message
+            if (!trip.chats) trip.chats = [];
+            trip.chats.push(
+              createSystemMessage(`🎉 ${user.name} has accepted the invitation and joined the travel workspace!`, {
+                idPrefix: "invite-accept",
+                avatarColor: "#64748b"
+              })
+            );
+          }
+        }
+      }
+    }
+
+    // Persist the changes
+    writeDB(db);
+
+    if (action === "accept") {
+      // Broadcast update to other users on the same trip
+      broadcastTripChange(invitation.tripId);
+    }
+
+    res.json(ok({ success: true }));
+  } catch (err: any) {
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to respond to invitation"));
   }
 });
 

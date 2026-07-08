@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { Type } from "@google/genai";
-import { getGenAI, callGemini } from "./shared";
+import { getGenAI, callGemini, GEMINI_MODEL } from "./shared";
 import { ok, fail } from "../../utils/apiResponse.js";
 
 const router = Router();
@@ -58,7 +58,7 @@ router.post("/optimize-itinerary", async (req: Request, res: Response) => {
   const result = await callGemini(
     ai,
     {
-      model: "gemini-1.5-flash",
+      model: GEMINI_MODEL,
       contents: prompt,
       config: {
         responseMimeType: "application/json",
@@ -173,7 +173,7 @@ Example Output format:
     const parsed = await callGemini(
       ai,
       {
-        model: "gemini-1.5-flash",
+        model: GEMINI_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",

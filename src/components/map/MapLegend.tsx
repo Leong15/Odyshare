@@ -20,11 +20,11 @@ export function MapLegend({ lang }: MapLegendProps) {
       </div>
       <div className="flex items-center gap-1.5">
         <div className="w-1.5 h-1.5 rounded-full bg-[#10b981]" />
-        <span>{lang === "zh" ? "WSmart 畅通航點" : "WS Smooth Traffic"}</span>
+        <span>{lang === "zh" ? "OdyShare 暢通節點" : "OdyShare Smooth Traffic"}</span>
       </div>
       <div className="flex items-center gap-1.5">
         <div className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
-        <span>{lang === "zh" ? "WSmart 壅塞航點" : "WS Congested Area"}</span>
+        <span>{lang === "zh" ? "OdyShare 壅塞節點" : "OdyShare Congested Area"}</span>
       </div>
     </div>
   );

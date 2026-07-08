@@ -20,6 +20,26 @@ function enrichParticipants(participants: Participant[], users: any[]): Particip
   })
 }
 
+export function mapTripSummary(t: any) {
+  return {
+    id: t.id,
+    name: t.name,
+    destination: t.destination,
+    startDate: t.startDate,
+    endDate: t.endDate,
+    totalBudget: t.totalBudget,
+    status: t.status || "active",
+    lat: t.lat,
+    lng: t.lng,
+    participants: t.participants || [],
+    expenses: t.expenses || [],
+    itineraries: t.itineraries || [],
+    flightEstimates: t.flightEstimates || [],
+    documents: t.documents || [],
+    chats: t.chats || []
+  };
+}
+
 
 // Standard Request-scoped helpers
 export function getTripForRequest(req: Request) {
@@ -105,23 +125,7 @@ export function getTripForRequest(req: Request) {
 
   return {
     ...trip,
-    tripsList: visibleTrips.map(t => ({
-      id: t.id,
-      name: t.name,
-      destination: t.destination,
-      startDate: t.startDate,
-      endDate: t.endDate,
-      totalBudget: t.totalBudget,
-      status: t.status || "active",
-      lat: t.lat,
-      lng: t.lng,
-      participants: t.participants || [],
-      expenses: t.expenses || [],
-      itineraries: t.itineraries || [],
-      flightEstimates: t.flightEstimates || [],
-      documents: t.documents || [],
-      chats: t.chats || []
-    }))
+    tripsList: visibleTrips.map(mapTripSummary)
   };
 }
 
@@ -166,23 +170,7 @@ export function readTripsDB(req?: Request) {
   }
   return {
     ...active,
-    tripsList: dbState.trips.map(t => ({
-      id: t.id,
-      name: t.name,
-      destination: t.destination,
-      startDate: t.startDate,
-      endDate: t.endDate,
-      totalBudget: t.totalBudget,
-      status: t.status || "active",
-      lat: t.lat,
-      lng: t.lng,
-      participants: t.participants || [],
-      expenses: t.expenses || [],
-      itineraries: t.itineraries || [],
-      flightEstimates: t.flightEstimates || [],
-      documents: t.documents || [],
-      chats: t.chats || []
-    }))
+    tripsList: dbState.trips.map(mapTripSummary)
   };
 }
 

@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { readTripsDB, writeTripsDB } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
 import { createSystemMessage } from "../utils/message.js";
+import { ITEM_ID_PREFIXES } from "../../src/shared/ids.js";
 
 const router = Router();
 
@@ -11,7 +12,7 @@ router.post("/add", async (req: Request, res: Response) => {
     const expense = req.body;
     const current = readTripsDB(req);
     const newExpense = {
-      id: "exp-" + Date.now(),
+      id: ITEM_ID_PREFIXES.EXPENSE + Date.now(),
       ...expense,
       amount: Number(expense.amount) || 0,
     };

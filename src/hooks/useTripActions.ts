@@ -8,6 +8,7 @@
 import { useCallback } from "react";
 import type { Trip, ItineraryItem, ExpenseItem, DocumentItem, ChatMessage, Participant } from "../types";
 import { ITEM_ID_PREFIXES, SYSTEM_SENDER_ID, SYSTEM_SENDER_NAME } from "../lib/constants";
+import { encryptMessage } from "../utils/crypto";
 
 // Safe Base64 encoder that handles non-Latin1 characters (Chinese, emoji)
 function safeBtoa(str: string): string {
@@ -340,8 +341,8 @@ export function useTripActions({
 
   const handleSendChatMessage = useCallback(
     async (msg: string) => {
-      // TODO: Currently just base64 encoding, not true encryption...
-      const encryptedMsg = "U2FsdGVkX19" + safeBtoa(msg);
+      const activeTripId = localStorage.getItem("activeTripId") || "default_trip_secret";
+      const encryptedMsg = await encryptMessage(msg, activeTripId);
       try {
         const res = await fetchWithAuth("/api/trip/chat/send", {
           method: "POST",

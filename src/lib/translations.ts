@@ -59,26 +59,6 @@ export const translations = {
     cooperativeDrive: "Drive Route",
     gpsActive: "GPS Navigation Active",
 
-    // Flight Hub
-    flightHubTitle: "Cheap Flight Comparison Hub",
-    flightHubDesc: "Search airline databases & vote as a group on preferred itineraries.",
-    departureCity: "Departure City",
-    destinationCity: "Destination City",
-    travelDate: "Travel Date",
-    aiAnalyzing: "AI Analyzing Rates...",
-    estimateAiRates: "Estimate AI Rates",
-    sortBy: "Sort Flights By",
-    price: "Price",
-    rating: "Rating",
-    duration: "Duration",
-    totalVotes: "Total Group Preference Votes Cast",
-    cheapest: "Cheapest",
-    directRoute: "Direct Route",
-    voteBest: "Vote Best",
-    preferred: "Preferred",
-    voted: "voted",
-    cachedNotice: "AI estimations represent cached routing simulations using regional flight catalogs. Standard passenger taxes and dynamic seating structures are evaluated live once booked.",
-
     // Budget Tracker
     tripBudgetTracking: "Trip Budget Tracking",
     totalSpent: "Total Spent",
@@ -224,26 +204,6 @@ export const translations = {
     cooperativeDrive: "模擬駕車導航",
     gpsActive: "GPS 導航系統正在導航中",
 
-    // Flight Hub
-    flightHubTitle: "特惠航班協作對比中心",
-    flightHubDesc: "查詢主流航空公司數據，並由組員共同票選出最適合團隊出發的航班。",
-    departureCity: "出發城市",
-    destinationCity: "目的地城市",
-    travelDate: "出發日期",
-    aiAnalyzing: "AI 正在線上分析庫存票價...",
-    estimateAiRates: "估算 AI 行程票價",
-    sortBy: "航班排序依據",
-    price: "最低價格",
-    rating: "推薦指數",
-    duration: "飛行時長",
-    totalVotes: "團隊全體合計投下喜好票數",
-    cheapest: "性價比最高",
-    directRoute: "直飛航班",
-    voteBest: "投此航班一票",
-    preferred: "團隊心儀推薦",
-    voted: "人投票",
-    cachedNotice: "AI 票價模型預估代表基於以往地區航班目錄所進行的動態模擬，實際座艙與機場稅以加載即時為準。",
-
     // Budget Tracker
     tripBudgetTracking: "旅程預算動態追蹤",
     totalSpent: "合計支出總額",
@@ -278,7 +238,7 @@ export const translations = {
     decryptPdf: "解密 PDF 副本",
 
     // Encrypted Chat
-    securityHub: "安全管理中心：模擬端到端加密通道",
+    securityHub: "安全管理中心：端到端加密通道",
     doubleRatchet: "Base64 簡易編碼傳輸方案",
     activeRoomUsers: "當前協作房間在線用戶",
     sendSecuredUpdate: "發送端到端加密消息給組員...",

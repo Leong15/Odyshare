@@ -94,7 +94,7 @@ export default function HeaderWorkspace({
           {/* Left Block: Logo & Trip Details */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-md border border-blue-500/30 shrink-0">
-              <span className="font-bold text-xs tracking-wider select-none">W/S</span>
+              <span className="font-bold text-xs tracking-wider select-none">OSS</span>
             </div>
             <div>
               <div className="flex items-center gap-2">

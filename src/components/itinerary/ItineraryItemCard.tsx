@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Clock, MapPin, MessageSquare, ThumbsUp, Plus, Pencil, Utensils, ShoppingBag, Landmark, Route, Bed, ChevronLeft } from "lucide-react";
 import { ItineraryItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
-import { getItineraryCategoryLabel } from "../../utils/categoryUtils";
+import { getItineraryCategoryLabel, getItineraryCategoryBadgeColor } from "../../utils/categoryUtils";
 
 interface ItineraryItemCardProps {
   key?: string | number;
@@ -68,23 +68,6 @@ export default function ItineraryItemCard({
         return <Bed size={14} className="text-blue-400" />;
       default:
         return <MapPin size={14} className="text-slate-400" />;
-    }
-  };
-
-  const getCategoryBadgeColor = (cat: string) => {
-    switch (cat) {
-      case "restaurant":
-        return "bg-emerald-500/15 text-emerald-300 border-emerald-500/20";
-      case "shop":
-        return "bg-pink-500/15 text-pink-300 border-pink-500/20";
-      case "sight":
-        return "bg-amber-500/15 text-amber-300 border-amber-500/20";
-      case "transit":
-        return "bg-purple-500/15 text-purple-300 border-purple-500/20";
-      case "hotel":
-        return "bg-blue-500/15 text-blue-300 border-blue-500/20";
-      default:
-        return "bg-slate-500/15 text-slate-300 border-slate-500/20";
     }
   };
 
@@ -239,7 +222,7 @@ export default function ItineraryItemCard({
           {/* Header: Category and Reorder buttons */}
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
             <span
-              className={`text-[10px] font-extrabold border rounded-lg px-2 py-0.5 uppercase tracking-wider flex items-center gap-1.5 ${getCategoryBadgeColor(
+              className={`text-[10px] font-extrabold border rounded-lg px-2 py-0.5 uppercase tracking-wider flex items-center gap-1.5 ${getItineraryCategoryBadgeColor(
                 item.category
               )}`}
             >

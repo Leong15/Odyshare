@@ -108,3 +108,20 @@ export function mapEditCategoryToItemCategory(editCat: "food" | "sight" | "hotel
   }
 }
 
+export function getItineraryCategoryBadgeColor(cat: string): string {
+  switch (cat) {
+    case "restaurant":
+      return "bg-emerald-500/15 text-emerald-300 border-emerald-500/20";
+    case "shop":
+      return "bg-pink-500/15 text-pink-300 border-pink-500/20";
+    case "sight":
+      return "bg-amber-500/15 text-amber-300 border-amber-500/20";
+    case "transit":
+      return "bg-purple-500/15 text-purple-300 border-purple-500/20";
+    case "hotel":
+      return "bg-blue-500/15 text-blue-300 border-blue-500/20";
+    default:
+      return "bg-slate-500/15 text-slate-300 border-slate-500/20";
+  }
+}
+

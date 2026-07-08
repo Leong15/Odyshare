@@ -1,3 +1,5 @@
+import { CITY_COORDS } from "./cityCoords";
+
 // 從 OfflineMapSimulator.tsx 提取
 export const MAP_CONFIG = {
   WALK_STEP_SIZE: 0.00015,
@@ -5,12 +7,12 @@ export const MAP_CONFIG = {
   WALK_INTERVAL_MS: 1500,
   LOCATION_REPORT_DEBOUNCE_MS: 1500,
   DEFAULT_CENTERS: {
-    TOKYO: { lat: 35.6762, lng: 139.6503 },
-    HONG_KONG: { lat: 22.3193, lng: 114.1694 },
-    PARIS: { lat: 48.8566, lng: 2.3522 },
-    LONDON: { lat: 51.5074, lng: -0.1278 },
-    TAIPEI: { lat: 25.0330, lng: 121.5654 },
-    NEW_YORK: { lat: 40.7128, lng: -74.0060 },
+    TOKYO: { lat: CITY_COORDS.tokyo.lat, lng: CITY_COORDS.tokyo.lng },
+    HONG_KONG: { lat: CITY_COORDS.hong_kong.lat, lng: CITY_COORDS.hong_kong.lng },
+    PARIS: { lat: CITY_COORDS.paris.lat, lng: CITY_COORDS.paris.lng },
+    LONDON: { lat: CITY_COORDS.london.lat, lng: CITY_COORDS.london.lng },
+    TAIPEI: { lat: CITY_COORDS.taipei.lat, lng: CITY_COORDS.taipei.lng },
+    NEW_YORK: { lat: CITY_COORDS.new_york.lat, lng: CITY_COORDS.new_york.lng },
   }
 } as const;
 

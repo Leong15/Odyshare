@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, Volume2, Square, Play } from "lucide-react";
 import { ItineraryItem } from "../../../types";
 import { translations } from "../../../lib/translations";
+import { CollapsibleSection } from "../../common/CollapsibleSection";
+import { apiClient } from "../../../lib/apiClient";
 
 interface AIChatPanelProps {
   lang: "en" | "zh";
@@ -27,8 +29,7 @@ export default function AIChatPanel({ lang, itineraries }: AIChatPanelProps) {
   const [isAudioPlaying, setIsAudioPlaying] = useState<boolean>(false);
   const [autoPlayAudio, setAutoPlayAudio] = useState<boolean>(true);
   const [audioSource, setAudioSource] = useState<any>(null);
-  const [audioCtx, setAudioCtx] = useState<any>(null);
-  const [isChatCollapsed, setIsChatCollapsed] = useState<boolean>(false);
+  const [, setAudioCtx] = useState<any>(null);
 
   useEffect(() => {
     setChatLog([
@@ -145,18 +146,14 @@ export default function AIChatPanel({ lang, itineraries }: AIChatPanelProps) {
     setSubmittingChat(true);
 
     try {
-      const res = await fetch("/api/ai/chat-assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: userMessage,
-          itineraries,
-          lang,
-        }),
+      const response = await apiClient.post("/api/ai/chat-assistant", {
+        message: userMessage,
+        itineraries,
+        lang,
       });
-      const json = await res.json();
-      if (json.success && json.data) {
-        setChatLog((prev) => [...prev, { sender: "ai", text: json.data.response }]);
+
+      if (response.success && response.data) {
+        setChatLog((prev) => [...prev, { sender: "ai", text: response.data.response }]);
       } else {
         setChatLog((prev) => [
           ...prev,
@@ -271,77 +268,62 @@ export default function AIChatPanel({ lang, itineraries }: AIChatPanelProps) {
       )}
 
       {/* Conversation Box */}
-      <div className="flex-1 flex flex-col justify-between pb-1 min-h-[160px] bg-white/3 border border-white/5 p-3 rounded-xl text-left">
-        <div
-          className="flex items-center justify-between cursor-pointer select-none mb-2"
-          onClick={() => setIsChatCollapsed(!isChatCollapsed)}
-        >
-          <h5 className="font-extrabold text-white text-[11px] flex items-center gap-1">
-            <MessageSquare size={13} className="text-blue-400" />
-            <span>{t.OdyShareSmartConc}</span>
-          </h5>
-          <span className="text-slate-400 text-[10px] font-bold">
-            {isChatCollapsed ? "＋" : "－"}
-          </span>
+      <CollapsibleSection
+        title={t.OdyShareSmartConc}
+        ariaLabel={lang === "zh" ? "OdyShareSmart 智慧助理對話框" : "OdyShareSmart AI Assistant Chat Box"}
+        headerIcon={<MessageSquare size={13} className="text-blue-400" />}
+        titleClassName="text-blue-300"
+        className="bg-white/3 border border-white/5 p-3 rounded-xl text-left"
+      >
+        <div className="overflow-y-auto mb-2 space-y-2 p-2.5 bg-slate-900/60 border border-white/5 rounded-xl h-[120px] scrollbar-thin text-xs">
+          {chatLog.map((log, idx) => (
+            <div
+              key={idx}
+              className={`flex flex-col max-w-[90%] animate-fadeIn ${
+                log.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"
+              }`}
+            >
+              <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5 font-mono">
+                {log.sender === "user" ? (lang === "zh" ? "您" : "You") : "OdyShareSmart AI"}
+              </span>
+              <div
+                className={`p-2 rounded-xl text-[11px] ${
+                  log.sender === "user"
+                    ? "bg-blue-600/95 border border-blue-500/30 text-white rounded-br-none"
+                    : "bg-white/5 border border-white/5 text-slate-200 rounded-bl-none"
+                }`}
+              >
+                {log.text}
+              </div>
+            </div>
+          ))}
+          {submittingChat && (
+            <span className="text-[9px] text-slate-400 font-mono italic animate-pulse font-medium">
+              {lang === "zh" ? "OdyShareSmart 智慧響應中..." : "Assistant mapping..."}
+            </span>
+          )}
         </div>
 
-        {!isChatCollapsed ? (
-          <>
-            <div className="overflow-y-auto mb-2 space-y-2 p-2.5 bg-slate-900/60 border border-white/5 rounded-xl h-[120px] scrollbar-thin text-xs">
-              {chatLog.map((log, idx) => (
-                <div
-                  key={idx}
-                  className={`flex flex-col max-w-[90%] animate-fadeIn ${
-                    log.sender === "user" ? "ml-auto items-end" : "mr-auto items-start"
-                  }`}
-                >
-                  <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest mb-0.5 font-mono">
-                    {log.sender === "user" ? (lang === "zh" ? "您" : "You") : "OdyShareSmart AI"}
-                  </span>
-                  <div
-                    className={`p-2 rounded-xl text-[11px] ${
-                      log.sender === "user"
-                        ? "bg-blue-600/95 border border-blue-500/30 text-white rounded-br-none"
-                        : "bg-white/5 border border-white/5 text-slate-200 rounded-bl-none"
-                    }`}
-                  >
-                    {log.text}
-                  </div>
-                </div>
-              ))}
-              {submittingChat && (
-                <span className="text-[9px] text-slate-400 font-mono italic animate-pulse font-medium">
-                  {lang === "zh" ? "OdyShareSmart 智慧響應中..." : "Assistant mapping..."}
-                </span>
-              )}
-            </div>
-
-            <form onSubmit={handleChatSubmit} className="flex gap-1.5 text-xs">
-              <input
-                id="ai-chat-input"
-                type="text"
-                placeholder={t.askAiPlaceholder}
-                value={chatMsg}
-                onChange={(e) => setChatMsg(e.target.value)}
-                disabled={submittingChat}
-                className="flex-1 px-2.5 py-1.5 glass-input rounded-lg text-[11px]"
-              />
-              <button
-                id="submit-ai-chat"
-                type="submit"
-                disabled={submittingChat}
-                className="p-1 px-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-lg transition-all cursor-pointer shrink-0 disabled:opacity-50"
-              >
-                <Send size={12} />
-              </button>
-            </form>
-          </>
-        ) : (
-          <p className="text-[10px] text-slate-500 italic text-center py-2">
-            {lang === "zh" ? "對話框已收合" : "Chat log collapsed"}
-          </p>
-        )}
-      </div>
+        <form onSubmit={handleChatSubmit} className="flex gap-1.5 text-xs">
+          <input
+            id="ai-chat-input"
+            type="text"
+            placeholder={t.askAiPlaceholder}
+            value={chatMsg}
+            onChange={(e) => setChatMsg(e.target.value)}
+            disabled={submittingChat}
+            className="flex-1 px-2.5 py-1.5 glass-input rounded-lg text-[11px]"
+          />
+          <button
+            id="submit-ai-chat"
+            type="submit"
+            disabled={submittingChat}
+            className="p-1 px-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white rounded-lg transition-all cursor-pointer shrink-0 disabled:opacity-50"
+          >
+            <Send size={12} />
+          </button>
+        </form>
+      </CollapsibleSection>
     </div>
   );
 }

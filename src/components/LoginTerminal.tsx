@@ -100,7 +100,7 @@ export default function LoginTerminal({
         {/* Brand Heading */}
         <div className="text-center space-y-2">
           <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20 mx-auto border border-white/10">
-            <span className="font-extrabold text-sm tracking-widest">W/S</span>
+            <span className="font-extrabold text-sm tracking-widest">OSS</span>
           </div>
           <h2 className={`text-lg sm:text-xl font-black ${isLight ? "text-slate-900" : "text-white"}`}>
             {lang === "zh" ? "OdyShareSync 旅伴協作平台" : "OdyShareSync Travel System"}

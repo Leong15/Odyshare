@@ -3,6 +3,7 @@ import { readTripsDB, writeTripsDB } from "../db/index.js";
 import { resolveCoordinates } from "../utils/geocoding.js";
 import { ok, fail } from "../utils/apiResponse.js";
 import { latLngToCanvasXY } from "../../src/lib/mapUtils.js";
+import { ITEM_ID_PREFIXES } from "../../src/shared/ids.js";
 
 const router = Router();
 
@@ -16,7 +17,7 @@ router.post("/add", async (req: Request, res: Response) => {
     const coords = await resolveCoordinates(locationName || title);
 
     const newItem = {
-      id: "it-" + Date.now(),
+      id: ITEM_ID_PREFIXES.ITINERARY + Date.now(),
       dayIndex: Number(dayIndex) || 0,
       time: time || "12:00",
       title,

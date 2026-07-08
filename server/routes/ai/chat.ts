@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getGenAI, isRetryableGeminiError } from "./shared.js";
+import { getGenAI, isRetryableGeminiError, GEMINI_MODEL, GEMINI_FALLBACK_MODEL } from "./shared.js";
 import { ok, fail } from "../../utils/apiResponse.js";
 
 const router = Router();
@@ -19,7 +19,7 @@ router.post("/chat-assistant", async (req: Request, res: Response) => {
   }
 
   try {
-    const model = "gemini-1.5-flash";
+    const model = GEMINI_MODEL;
     const historyFormatted = (chatHistory || []).map((h: any) => ({
       role: h.senderId === "u1" ? "user" : "model",
       parts: [{ text: h.messageDecrypted || h.text || "" }]
@@ -38,9 +38,9 @@ router.post("/chat-assistant", async (req: Request, res: Response) => {
       response = await chat.sendMessage({ message });
     } catch (err: any) {
       if (isRetryableGeminiError(err)) {
-        console.warn(`Chat sendMessage failed, retrying once with gemini-1.5-flash-8b...`);
+        console.warn(`Chat sendMessage failed, retrying once with ${GEMINI_FALLBACK_MODEL}...`);
         const fallbackChat = ai.chats.create({
-          model: "gemini-1.5-flash-8b",
+          model: GEMINI_FALLBACK_MODEL,
           config: { systemInstruction },
           history: historyFormatted
         });

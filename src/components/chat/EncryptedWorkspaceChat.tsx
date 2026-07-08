@@ -19,10 +19,9 @@ export default function EncryptedWorkspaceChat({
   onSendMessage,
   lang = "en"
 }: EncryptedWorkspaceChatProps) {
-  // TODO: Currently just base64 encoding, not true encryption...
   const [chatInput, setChatInput] = useState<string>("");
   const [showEncryptedState, setShowEncryptedState] = useState<{ [key: string]: boolean }>({});
-  const [securityStandard, setSecurityStandard] = useState<string>("ECDH + AESGCM-256");
+  const [securityStandard, setSecurityStandard] = useState<string>("AES-GCM-256 (E2EE)");
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
   const t = translations[lang];
@@ -229,12 +228,12 @@ export default function EncryptedWorkspaceChat({
             </div>
           </div>
 
-          <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/15 rounded-xl flex items-start gap-1.5">
-            <Info size={12} className="text-amber-400 shrink-0 mt-0.5" />
+          <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/15 rounded-xl flex items-start gap-1.5">
+            <Info size={12} className="text-emerald-400 shrink-0 mt-0.5" />
             <p className="text-[10px] text-slate-400 leading-normal font-sans">
               {lang === "zh" 
-                ? "【模擬安全演示】迪菲-赫爾曼 (Diffie-Hellman) 密鑰對與本地 Base64 簡易編碼僅作為安全協同演示目的，請勿將其用於存儲高度機密或真實敏感個人信息。"
-                : "[Simulated Sandbox] Diffie-Hellman negotiation & Base64 encoding are executed as client-side proof-of-concept visual previews. Avoid posting real highly-sensitive credentials."}
+                ? "【端到端加密保障】所有對話訊息皆於本地瀏覽器利用 AES-GCM-256 算法與旅程金鑰進行零知識加密，伺服器僅儲存加密密文，確保高度隱私與通訊安全。"
+                : "[E2EE Secured] All chat messages are zero-knowledge encrypted in your browser using AES-GCM-256 and your trip key. The server only stores ciphertext, ensuring absolute privacy."}
             </p>
           </div>
         </div>

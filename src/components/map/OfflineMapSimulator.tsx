@@ -576,7 +576,7 @@ export default function OfflineMapSimulator({
                       <span className="text-xs text-slate-400 font-mono capitalize truncate block">
                         {spot.isItinerary 
                           ? (lang === "zh" ? `★ 第 ${ (spot.dayIndex || 0) + 1 } 天日程` : `★ Day ${ (spot.dayIndex || 0) + 1 } Plan`) 
-                          : spot.isCustom 
+                          : ('isCustom' in spot && (spot as any).isCustom) 
                           ? (lang === "zh" ? "自訂探查地標" : "User dropped pin") 
                           : (lang === "zh" ? "本地精選推薦" : "OdyShareSmart spot")}
                       </span>
@@ -779,7 +779,7 @@ export default function OfflineMapSimulator({
                         ? spot.isItinerary ? getDayColor(spot.dayIndex || 0) : "#3b82f6"
                         : spot.isItinerary
                         ? getDayColor(spot.dayIndex || 0) // dynamic color for different days
-                        : spot.isCustom
+                        : ('isCustom' in spot && (spot as any).isCustom)
                         ? "#ec4899" // hot pink for user custom-added coordinates
                         : "#64748b"
                     }

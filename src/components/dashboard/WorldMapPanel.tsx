@@ -1,8 +1,33 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
-import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import { X } from "lucide-react";
+import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import { Trip } from "../../types";
 import { MappedProject } from "./ProjectListPanel";
+
+const WorldMapGeographies = React.memo(function WorldMapGeographies({ isLightTheme }: { isLightTheme: boolean }) {
+  return (
+    <Geographies geography="https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json">
+      {({ geographies }) =>
+        geographies.map((geo) => (
+          <Geography
+            key={geo.rsmKey}
+            geography={geo}
+            style={{
+              default: {
+                fill: isLightTheme ? "#cbd5e1" : "#111827",
+                stroke: isLightTheme ? "#94a3b8" : "rgba(255,255,255,0.06)",
+                strokeWidth: 0.35,
+                outline: "none",
+              },
+              hover: { fill: isLightTheme ? "#94a3b8" : "#1f2937", outline: "none" },
+              pressed: { fill: isLightTheme ? "#64748b" : "#374151", outline: "none" },
+            }}
+          />
+        ))
+      }
+    </Geographies>
+  );
+});
 
 export interface GroupedPin {
   key: string;
@@ -21,31 +46,6 @@ interface WorldMapPanelProps {
   lang: "zh" | "en";
   onSwitchTrip: (tripId: string) => void;
 }
-
-const WorldMapGeographies = React.memo(function WorldMapGeographies({ isLightTheme }: { isLightTheme: boolean }) {
-  return (
-    <Geographies geography="https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json">
-      {({ geographies }) =>
-        geographies.map((geo) => (
-          <Geography
-            key={geo.rsmKey}
-            geography={geo}
-            style={{
-              default: {
-                fill: isLightTheme ? "#cbd5e1" : "#1e3a5f",
-                stroke: isLightTheme ? "#94a3b8" : "#0f2744",
-                strokeWidth: 0.3,
-                outline: "none",
-              },
-              hover: { fill: isLightTheme ? "#cbd5e1" : "#1e3a5f", outline: "none" },
-              pressed: { fill: isLightTheme ? "#cbd5e1" : "#1e3a5f", outline: "none" },
-            }}
-          />
-        ))
-      }
-    </Geographies>
-  );
-});
 
 export function WorldMapPanel({
   groupedPins,
