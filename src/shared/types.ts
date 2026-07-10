@@ -14,24 +14,6 @@ export interface Participant {
   lng?: number;
 }
 
-export interface FlightEstimate {
-  id: string;
-  carrier: string;
-  carrierLogo?: string;
-  from: string;
-  to: string;
-  price: number;
-  stops: number;
-  duration: string; // e.g. "12h 45m"
-  departureTime: string;
-  returnDepartureTime?: string;
-  rating: number; // e.g. 8.4
-  votes: string[]; // List of user IDs who voted
-  isCheapest?: boolean;
-  bookingUrl?: string;
-  currency?: string;
-}
-
 export interface Comment {
   id: string;
   authorId: string;
@@ -96,28 +78,6 @@ export interface ChatMessage {
   isTripUpdate?: boolean; // system notification flag
 }
 
-export interface FlightSubscriptionHistory {
-  price: number;
-  score: number;
-  checkedAt: string;
-  message: string;
-}
-
-export interface FlightSubscription {
-  isActive: boolean;
-  from: string;
-  to: string;
-  date: string;
-  baselinePrice: number;
-  currentPrice: number;
-  lastCheckedPrice: number;
-  carrier: string;
-  stops: number;
-  score: number;
-  currency: string;
-  history: FlightSubscriptionHistory[];
-}
-
 export interface PushNotification {
   id: string;
   title: string;
@@ -137,10 +97,8 @@ export interface Trip {
   lat?: number;
   lng?: number;
   participants: Participant[];
-  flightEstimates: FlightEstimate[];
   itineraries: ItineraryItem[];
   backupItineraries?: ItineraryItem[];
-  flightSubscription?: FlightSubscription;
   pushNotifications?: PushNotification[];
   expenses: ExpenseItem[];
   documents: DocumentItem[];

@@ -3,6 +3,7 @@ import { FolderLock, FileText, Download, ShieldCheck, Key, Plus, FileUp } from "
 import { DocumentItem } from "../types";
 import { translations } from "../lib/translations";
 import { encryptMessage, decryptMessage } from "../utils/crypto";
+import { STORAGE_KEYS } from "../lib/constants";
 
 interface DocumentVaultProps {
   documents: DocumentItem[];
@@ -104,7 +105,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     if (!selectedFile) return;
     setIsEncrypting(true);
     try {
-      const activeTripId = tripId || localStorage.getItem("activeTripId") || "default_trip_secret";
+      const activeTripId = tripId || localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_ID) || "default_trip_secret";
       const encryptedData = await encryptMessage(selectedFile.base64Data || "", activeTripId);
       const prefixedData = "ENC:" + encryptedData;
       
@@ -155,8 +156,13 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
     if (!docUrl || docUrl === "#") return;
 
     try {
-      const activeTripId = tripId || localStorage.getItem("activeTripId") || "default_trip_secret";
-      const res = await fetch(docUrl);
+      const activeTripId = tripId || localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_ID) || "default_trip_secret";
+      const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN) || "";
+      const urlWithToken = docUrl.includes("?") 
+        ? `${docUrl}&token=${token}&userId=${currentUser}` 
+        : `${docUrl}?token=${token}&userId=${currentUser}`;
+
+      const res = await fetch(urlWithToken);
       if (!res.ok) throw new Error("Fetch failed");
       const text = await res.text();
       
@@ -204,17 +210,17 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
           <div className="flex items-center gap-2">
             <span className="p-1 rounded bg-emerald-500/20 text-emerald-300">🔐</span>
             <span className="font-extrabold text-white">
-              {activeToast.type === "keygen" ? (lang === "zh" ? "加密安全校驗" : "Crypto Verification") : (lang === "zh" ? "端到端本地解密" : "E2EE Decryption Localized")}
+              {activeToast.type === "keygen" ? t.vaultCryptoVerification : t.vaultLocalDecryption}
             </span>
           </div>
           {activeToast.type === "keygen" ? (
             <div className="font-sans text-slate-300 space-y-1">
-              <p>{lang === "zh" ? "本地 AES-GCM 密鑰對驗證通過，SHA-256 特徵碼如下：" : "Local AES-GCM cryptographic key pair verified. SHA-256 fingerprint:"}</p>
+              <p>{t.vaultFingerprintTip}</p>
               <p className="font-mono bg-black/40 p-1.5 rounded text-[10px] text-emerald-300 mt-1 break-all">{activeToast.keySig}</p>
             </div>
           ) : (
             <p className="font-sans text-slate-300">
-              {lang === "zh" ? `正在利用本地旅程金鑰解密 📄 '${activeToast.fileName}'，並在瀏覽器記憶體中還原下載。` : `Decrypting 📄 '${activeToast.fileName}' locally in-browser using your secure Trip Key.`}
+              {t.vaultDecryptingTip.replace("{fileName}", activeToast.fileName)}
             </p>
           )}
         </div>
@@ -226,14 +232,12 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
             <FolderLock size={16} className="text-blue-400" />
             <span>{t.vaultTitle}</span>
             <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-[9.5px] font-extrabold text-emerald-300 rounded font-sans uppercase">
-              {lang === "zh" ? "端到端加密" : "E2EE AES-GCM"}
+              {t.vaultAesGcmLabel}
             </span>
           </h3>
           <p className="text-xs text-slate-400 mt-1">{t.vaultDesc}</p>
           <p className="text-[10px] text-emerald-400/80 mt-1.5 leading-normal">
-            🛡️ {lang === "zh" 
-              ? "所有文件在離開您的瀏覽器前，均利用 AES-GCM-256 算法與旅程金鑰進行零知識端到端加密，伺服器僅儲存加密密文，保障最高級別隱私安全。" 
-              : "All documents are zero-knowledge end-to-end encrypted in your browser using AES-GCM-256 and your trip key before upload. The server only stores ciphertext, ensuring maximum privacy."}
+            🛡️ {t.vaultSecurityNotice}
           </p>
         </div>
         <button
@@ -247,7 +251,7 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
 
       {showUploadSim && (
         <div className="mb-6 p-5 bg-slate-900/60 border border-white/8 rounded-2xl space-y-4 text-xs animate-fadeIn">
-          <h4 className="font-semibold text-white text-[13px]">{lang === "zh" ? "加密憑證上傳" : "Encrypted Document Upload"}</h4>
+          <h4 className="font-semibold text-white text-[13px]">{t.vaultEncryptedUploadTitle}</h4>
 
           <input
             type="file"
@@ -268,9 +272,9 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
           >
             <FileUp size={24} className="text-slate-400 mb-1" />
             <span className="text-[11.5px] text-slate-300 font-semibold">
-              {lang === "zh" ? "點擊瀏覽檔案 或 拖放檔案至此" : "Click to browse or drag & drop files here"}
+              {t.vaultDragDropPrompt}
             </span>
-            <span className="text-[10px] text-slate-500 mt-0.5">{lang === "zh" ? "或單擊下方快捷項目直接模擬" : "Or tap select preset below"}</span>
+            <span className="text-[10px] text-slate-500 mt-0.5">{t.vaultTapPresetPrompt}</span>
           </div>
 
           <div className="space-y-2">
@@ -323,10 +327,10 @@ export default function DocumentVault({ documents, currentUser, onUploadDocument
               <div className="space-y-1 flex-1 min-w-0">
                 <h4 className="font-semibold text-white truncate text-[14px]" title={doc.name}>{doc.name}</h4>
                 <p className="text-[11px] text-slate-400">
-                  {lang === "zh" ? "上傳者：" : "By: "} {doc.uploadedBy} • {doc.size}
+                  {t.vaultUploadedBy} {doc.uploadedBy} • {doc.size}
                 </p>
                 <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-emerald-300 mt-2 bg-emerald-500/10 border border-emerald-500/15 px-2 py-0.5 rounded-md w-fit font-bold">
-                  <ShieldCheck size={11} /> {lang === "zh" ? "密碼安全金鑰驗證通過" : "Cryptographic Signature Verified"}
+                  <ShieldCheck size={11} /> {t.vaultSignatureVerified}
                 </div>
               </div>
             </div>

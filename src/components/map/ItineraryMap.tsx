@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { ItineraryItem } from "../../types";
 import { MapPin, Navigation, Globe } from "lucide-react";
-import { resolveLatLng } from "../../utils/mapHelpers";
+import { resolveLatLngLocal } from "../../utils/mapHelpers";
+import { translations } from "../../lib/translations";
 
 interface ItineraryMapProps {
   destination?: string;
@@ -24,7 +25,7 @@ export default function ItineraryMap({
   // Extract day markers with coordinates
   const markersData = React.useMemo(() => {
     return items.map((item, idx) => {
-      const coords = resolveLatLng(
+      const coords = resolveLatLngLocal(
         item.locationName || item.title,
         destination,
         item.coordinates?.x || 30 + (idx * 8) % 40,
@@ -49,8 +50,8 @@ export default function ItineraryMap({
     try {
       if (!mapRef.current) {
         // Initialize Map
-        const centerLat = markersData.length > 0 ? markersData[0].lat : resolveLatLng(destination, destination).lat;
-        const centerLng = markersData.length > 0 ? markersData[0].lng : resolveLatLng(destination, destination).lng;
+        const centerLat = markersData.length > 0 ? markersData[0].lat : resolveLatLngLocal(destination, destination).lat;
+        const centerLng = markersData.length > 0 ? markersData[0].lng : resolveLatLngLocal(destination, destination).lng;
 
         const mapInstance = L.map(mapContainerRef.current, {
           center: [centerLat, centerLng],
@@ -178,7 +179,7 @@ export default function ItineraryMap({
     return (
       <div className="w-full h-full min-h-[350px] bg-slate-950 border border-white/5 rounded-2xl p-6 flex flex-col items-center justify-center text-center">
         <Globe className="text-slate-500 mb-2 animate-spin" size={28} />
-        <p className="text-xs text-slate-400">{lang === "zh" ? "地圖服務加載中..." : "Loading Map View..."}</p>
+        <p className="text-xs text-slate-400">{translations[lang].mapLoading}</p>
       </div>
     );
   }

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { FolderLock, FolderPlus, Trash, MapPin, LogOut, Moon, Sun, Languages, Users, UserPlus, X, Check } from "lucide-react";
 import { Trip, Participant } from "../../types";
 import { translations } from "../../lib/translations";
+import { STORAGE_KEYS } from "../../lib/constants";
 
 interface HeaderWorkspaceProps {
   lang: "en" | "zh";
@@ -33,6 +34,7 @@ export default function HeaderWorkspace({
   onOpenInviteModal,
 }: HeaderWorkspaceProps) {
   const isLight = theme === "light";
+  const t = translations[lang];
 
   const [showChangePwdModal, setShowChangePwdModal] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -47,7 +49,7 @@ export default function HeaderWorkspace({
     setPwdError("");
     setPwdSuccess("");
     if (!currentPwd.trim() || !newPwd.trim()) {
-      setPwdError(lang === "zh" ? "請填寫所有欄位" : "Please fill in all fields");
+      setPwdError(t.headerPleaseFillFields);
       return;
     }
 
@@ -57,7 +59,7 @@ export default function HeaderWorkspace({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: currentUser?.username || localStorage.getItem("loggedInUserUsername") || "",
+          username: currentUser?.username || localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_USERNAME) || "",
           currentPassword: currentPwd,
           newPassword: newPwd
         })
@@ -65,12 +67,12 @@ export default function HeaderWorkspace({
       const data = await res.json();
       if (!res.ok) {
         const errMsg = typeof data.error === "object" && data.error !== null
-          ? (data.error.message || data.error.code || (lang === "zh" ? "目前密碼錯誤或新密碼不符強度限制" : "Incorrect current password or strength invalid"))
-          : (data.error || (lang === "zh" ? "目前密碼錯誤或新密碼不符強度限制" : "Incorrect current password or strength invalid"));
+          ? (data.error.message || data.error.code || t.headerPwdStrengthError)
+          : (data.error || t.headerPwdStrengthError);
         setPwdError(errMsg);
         return;
       }
-      setPwdSuccess(lang === "zh" ? "密碼更新成功！" : "Password updated successfully!");
+      setPwdSuccess(t.headerPwdUpdateSuccess);
       setCurrentPwd("");
       setNewPwd("");
       setTimeout(() => {
@@ -78,7 +80,7 @@ export default function HeaderWorkspace({
         setPwdSuccess("");
       }, 1500);
     } catch (err) {
-      setPwdError(lang === "zh" ? "連線失敗，請稍後重試" : "Network error, please retry.");
+      setPwdError(t.headerNetworkError);
     } finally {
       setPwdLoading(false);
     }
@@ -122,7 +124,7 @@ export default function HeaderWorkspace({
               <div className="flex items-center pl-2 pr-1.5 py-0.5 min-w-0">
                 <FolderLock size={13} className="text-blue-400 mr-2 shrink-0" />
                 <span className="text-xs font-semibold text-slate-400 mr-1.5 uppercase tracking-wide select-none shrink-0">
-                  {lang === "zh" ? "旅程專案" : "Workspace:"}
+                  {t.headerWorkspaceLabel}
                 </span>
                 
                 <select
@@ -148,7 +150,7 @@ export default function HeaderWorkspace({
                 className="p-1 px-3 hover:bg-white/5 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition text-xs text-blue-400 hover:text-white min-w-0 shrink-0"
               >
                 <FolderPlus size={12} />
-                <span>{lang === "zh" ? "新增" : "+ New"}</span>
+                <span>{t.headerNewBtn}</span>
               </button>
 
               {/* Delete current project */}
@@ -159,8 +161,8 @@ export default function HeaderWorkspace({
                     id="delete-trip-btn"
                     onClick={() => onDeleteTrip(trip.id)}
                     className="p-1 px-2.5 hover:bg-rose-500/20 rounded-lg font-semibold flex items-center gap-1 cursor-pointer transition text-xs text-rose-300 min-w-0 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"
-                    title={lang === "zh" ? "刪除此專案" : "Delete folder"}
-                    aria-label={lang === "zh" ? "刪除此專案" : "Delete folder"}
+                    title={t.headerDeleteProjectTooltip}
+                    aria-label={t.headerDeleteProjectTooltip}
                   >
                     <Trash size={12} />
                   </button>
@@ -171,7 +173,7 @@ export default function HeaderWorkspace({
             {/* Dynamic Traveler Avatars Stack - Cleansed with More Spacing */}
             <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-4 py-2 rounded-xl overflow-x-auto min-w-0">
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide select-none leading-none min-w-0 shrink-0">
-                {lang === "zh" ? "協同成員" : "Team"}:
+                {t.headerTeamLabel}:
               </span>
               <div className="flex items-center -space-x-1 select-none min-w-0">
                 {(trip.participants || []).map((p) => (
@@ -191,10 +193,10 @@ export default function HeaderWorkspace({
                 id="header-invite-member-btn"
                 onClick={onOpenInviteModal}
                 className="ml-2 h-8 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-medium cursor-pointer transition-all flex items-center justify-center gap-1 shadow-md border border-blue-400/35 min-w-0 shrink-0"
-                title={lang === "zh" ? "快速拉人加入專案" : "Pull collaborator into project"}
+                title={t.headerInviteTooltip}
               >
                 <UserPlus size={12} />
-                <span>{lang === "zh" ? "邀請成員" : "Invite"}</span>
+                <span>{t.headerInviteBtn}</span>
               </button>
             </div>
 
@@ -235,7 +237,7 @@ export default function HeaderWorkspace({
                       className="w-full text-left px-4 py-2 text-slate-200 hover:bg-white/5 transition flex items-center gap-2 cursor-pointer font-medium"
                     >
                       <span>🔑</span>
-                      <span>{lang === "zh" ? "修改密碼" : "Password"}</span>
+                      <span>{t.headerChangePasswordOption}</span>
                     </button>
 
                     <div className="h-[1px] bg-white/5 my-1" />
@@ -248,7 +250,7 @@ export default function HeaderWorkspace({
                       className="w-full text-left px-4 py-2 text-rose-400 hover:bg-rose-500/10 transition flex items-center gap-2 cursor-pointer font-medium"
                     >
                       <LogOut size={12} className="text-rose-400" />
-                      <span>{lang === "zh" ? "登出系統" : "Log out"}</span>
+                      <span>{t.headerLogoutOption}</span>
                     </button>
                   </div>
                 )}
@@ -262,8 +264,8 @@ export default function HeaderWorkspace({
                 type="button"
                 onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
                 className="p-1 px-3 hover:bg-white/5 rounded-lg cursor-pointer transition-all flex items-center justify-center text-amber-300 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                title={lang === "zh" ? "日間/夜間主題切換" : "Toggle theme mode"}
-                aria-label={lang === "zh" ? "日間/夜間主題切換" : "Toggle theme mode"}
+                title={t.headerMobileToggleTooltip}
+                aria-label={t.headerMobileToggleTooltip}
               >
                 {theme === "light" ? (
                   <Moon size={14} className="text-indigo-400" />
@@ -306,8 +308,8 @@ export default function HeaderWorkspace({
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-2 bg-white/5 border border-white/10 rounded-xl text-slate-300 hover:text-white cursor-pointer active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-              aria-label={lang === "zh" ? "切換手機版導航選單" : "Toggle mobile navigation menu"}
-              title={lang === "zh" ? "切換手機版導航選單" : "Toggle mobile menu"}
+              aria-label={t.headerMobileToggleAria}
+              title={t.headerMobileToggleAria}
             >
               {mobileMenuOpen ? <X size={20} /> : <span className="block w-5 h-4.5 relative">
                 <span className="block w-5 h-0.5 bg-current rounded absolute top-0"></span>
@@ -327,7 +329,7 @@ export default function HeaderWorkspace({
           
           <div className="relative w-72 h-full bg-[#0f111a] border-l border-white/10 shadow-2xl p-6 flex flex-col gap-6 overflow-y-auto animate-fade-in-scale">
             <div className="flex items-center justify-between border-b border-white/5 pb-4">
-              <h2 className="text-[15px] font-semibold text-white">{lang === "zh" ? "旅程選單" : "Menu Options"}</h2>
+              <h2 className="text-[15px] font-semibold text-white">{t.headerMobileMenuTitle}</h2>
               <button onClick={() => setMobileMenuOpen(false)} className="text-slate-400 hover:text-white p-1">
                 <X size={18} />
               </button>
@@ -336,7 +338,7 @@ export default function HeaderWorkspace({
             {/* Mobile Project switcher */}
             <div className="space-y-2">
               <label className="text-[12px] font-semibold text-slate-400 uppercase tracking-wider block">
-                {lang === "zh" ? "旅程專案" : "Workspace:"}
+                {t.headerWorkspaceLabel}
               </label>
               <div className="flex flex-col bg-white/5 border border-white/5 p-3 rounded-xl gap-3">
                 <select
@@ -364,7 +366,7 @@ export default function HeaderWorkspace({
                     className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold flex items-center justify-center gap-1.5 text-[12px]"
                   >
                     <FolderPlus size={13} />
-                    <span>{lang === "zh" ? "新增" : "New"}</span>
+                    <span>{t.headerNewBtn.replace("+ ", "")}</span>
                   </button>
 
                   {(trip.tripsList || []).length > 1 && (
@@ -385,7 +387,7 @@ export default function HeaderWorkspace({
             {/* Mobile Travelers Stack */}
             <div className="space-y-2">
               <label className="text-[12px] font-semibold text-slate-400 uppercase tracking-wider block">
-                {lang === "zh" ? "協同成員" : "Team members"}
+                {t.headerMobileTeamLabel}
               </label>
               <div className="bg-white/5 border border-white/5 p-3.5 rounded-xl space-y-3.5">
                 <div className="flex flex-wrap gap-2">
@@ -408,7 +410,7 @@ export default function HeaderWorkspace({
                   className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[12px] font-medium transition flex items-center justify-center gap-1.5"
                 >
                   <UserPlus size={13} />
-                  <span>{lang === "zh" ? "邀請協同成員" : "Invite Members"}</span>
+                  <span>{t.headerMobileInviteBtn}</span>
                 </button>
               </div>
             </div>
@@ -416,19 +418,19 @@ export default function HeaderWorkspace({
             {/* Settings & Extras */}
             <div className="space-y-3 border-t border-white/5 pt-4">
               <div className="flex items-center justify-between text-[13px]">
-                <span className="text-slate-400">{lang === "zh" ? "介面主題" : "Interface Mode"}</span>
+                <span className="text-slate-400">{t.headerInterfaceThemeLabel}</span>
                 <button
                   type="button"
                   onClick={() => setTheme((prev: any) => prev === "light" ? "dark" : "light")}
                   className="p-1 px-3 bg-white/5 border border-white/10 rounded-lg text-amber-300 flex items-center gap-1.5"
                 >
                   {theme === "light" ? <Moon size={13} className="text-indigo-400" /> : <Sun size={13} className="text-amber-400" />}
-                  <span className="text-[12px] text-slate-300">{theme === "light" ? "日間" : "夜間"}</span>
+                  <span className="text-[12px] text-slate-300">{theme === "light" ? t.headerThemeLight : t.headerThemeDark}</span>
                 </button>
               </div>
 
               <div className="flex items-center justify-between text-[13px]">
-                <span className="text-slate-400">{lang === "zh" ? "系統語言" : "Language"}</span>
+                <span className="text-slate-400">{t.headerLanguageLabel}</span>
                 <select
                   value={lang}
                   onChange={(e) => setLang(e.target.value as "en" | "zh")}
@@ -453,7 +455,7 @@ export default function HeaderWorkspace({
                 }}
                 className="w-full py-2 bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-200 rounded-lg flex items-center justify-center gap-1.5 text-[12px]"
               >
-                🔑 {lang === "zh" ? "變更密碼" : "Change Password"}
+                🔑 {t.headerChangePasswordBtn}
               </button>
 
               <button
@@ -464,7 +466,7 @@ export default function HeaderWorkspace({
                 className="w-full py-2.5 bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/30 text-rose-400 rounded-lg flex items-center justify-center gap-1.5 text-[12px] font-bold"
               >
                 <LogOut size={13} />
-                <span>{lang === "zh" ? "登出系統" : "Log out"}</span>
+                <span>{t.headerLogoutOption}</span>
               </button>
             </div>
           </div>
@@ -494,15 +496,15 @@ export default function HeaderWorkspace({
             </button>
 
             <h3 className="text-sm font-semibold mb-1.5 flex items-center gap-1.5">
-              🔑 {lang === "zh" ? "變更協作密碼" : "Change Account Password"}
+              🔑 {t.headerChangePasswordModalTitle}
             </h3>
             <p className="text-[12px] text-slate-400 mb-4">
-              {lang === "zh" ? "請輸入原本密碼及符合高強度的安全新密碼" : "Input your legacy credentials and robust new key."}
+              {t.headerChangePasswordModalDesc}
             </p>
 
             <form onSubmit={handleChangePasswordSubmit} className="space-y-3">
               <div className="space-y-1">
-                <span className="block text-[11px] font-semibold text-slate-400 uppercase font-sans">{lang === "zh" ? "當前安全密碼" : "Current Password"}</span>
+                <span className="block text-[11px] font-semibold text-slate-400 uppercase font-sans">{t.headerCurrentPasswordLabel}</span>
                 <input
                   type="password"
                   required
@@ -517,12 +519,12 @@ export default function HeaderWorkspace({
 
               <div className="space-y-1">
                 <span className="block text-[11px] font-semibold text-slate-400 uppercase font-sans font-sans">
-                  {lang === "zh" ? "高強度新密碼" : "New Secure Password"}
+                  {t.headerNewPasswordLabel}
                 </span>
                 <input
                   type="password"
                   required
-                  placeholder={lang === "zh" ? "包含大、小寫及符號" : "Upper, lower & symbols required"}
+                  placeholder={t.headerNewPasswordPlaceholder}
                   value={newPwd}
                   onChange={(e) => setNewPwd(e.target.value)}
                   className={`w-full px-3.5 py-2.5 rounded-xl text-xs border focus:outline-none ${
@@ -530,7 +532,7 @@ export default function HeaderWorkspace({
                   }`}
                 />
                 <p className="text-[11px] text-slate-400 leading-tight">
-                  {lang === "zh" ? "（必備: 1個大寫字母, 1個小寫字母, 1個特殊符號）" : "(Constraint: 1 uppercase, 1 lowercase, 1 symbol)"}
+                  {t.headerNewPasswordConstraint}
                 </p>
               </div>
 
@@ -542,7 +544,7 @@ export default function HeaderWorkspace({
                 disabled={pwdLoading}
                 className="w-full mt-2 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs rounded-xl shadow transition duration-200 cursor-pointer disabled:opacity-50"
               >
-                {pwdLoading ? (lang === "zh" ? "更新中..." : "Updating password...") : (lang === "zh" ? "儲存新密碼" : "Save New Password")}
+                {pwdLoading ? t.headerUpdatingStatus : t.headerSaveNewPasswordBtn}
               </button>
             </form>
           </div>

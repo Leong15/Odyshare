@@ -6,7 +6,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import type { Participant } from "../types";
-import { SESSION_TTL_MS } from "../lib/constants";
+import { SESSION_TTL_MS, STORAGE_KEYS } from "../lib/constants";
 import { apiClient } from "../lib/apiClient";
 
 
@@ -40,7 +40,7 @@ export interface AuthActions {
 
 export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
   const [loggedInUserId, setLoggedInUserId] = useState<string | null>(
-    () => readStorage("loggedInUserId") || null
+    () => readStorage(STORAGE_KEYS.LOGGED_IN_USER_ID) || null
   );
   const [currentUser, setCurrentUser] = useState<Participant | null>(null);
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
@@ -51,8 +51,14 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
   const [authError, setAuthError] = useState<string | null>(null);
 
   const handleLogout = useCallback(() => {
-    ["loggedInUserId", "loggedInUserName", "loggedInUserColor",
-      "loggedInUserUsername", "loginTimestamp", "sessionToken"].forEach((k) =>
+    [
+      STORAGE_KEYS.LOGGED_IN_USER_ID,
+      STORAGE_KEYS.LOGGED_IN_USER_NAME,
+      STORAGE_KEYS.LOGGED_IN_USER_COLOR,
+      STORAGE_KEYS.LOGGED_IN_USER_USERNAME,
+      STORAGE_KEYS.LOGIN_TIMESTAMP,
+      STORAGE_KEYS.SESSION_TOKEN
+    ].forEach((k) =>
       localStorage.removeItem(k)
     );
     setLoggedInUserId(null);
@@ -64,7 +70,7 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
     if (!loggedInUserId) return;
 
     const check = () => {
-      const loginTime = localStorage.getItem("loginTimestamp");
+      const loginTime = localStorage.getItem(STORAGE_KEYS.LOGIN_TIMESTAMP);
       if (loginTime && Date.now() - Number(loginTime) > SESSION_TTL_MS) {
         setAuthError(
           lang === "zh"
@@ -73,7 +79,7 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
         );
         handleLogout();
       } else if (!loginTime) {
-        localStorage.setItem("loginTimestamp", String(Date.now()));
+        localStorage.setItem(STORAGE_KEYS.LOGIN_TIMESTAMP, String(Date.now()));
       }
     };
 
@@ -137,13 +143,13 @@ export function useAuth(lang: "en" | "zh"): AuthState & AuthActions {
         if (!user) {
           throw new Error("User data missing from response");
         }
-        localStorage.setItem("loggedInUserId", user.id);
-        localStorage.setItem("loggedInUserName", user.name);
-        localStorage.setItem("loggedInUserColor", user.avatarColor || "#3b82f6");
-        localStorage.setItem("loggedInUserUsername", user.username || "");
-        localStorage.setItem("loginTimestamp", String(Date.now()));
+        localStorage.setItem(STORAGE_KEYS.LOGGED_IN_USER_ID, user.id);
+        localStorage.setItem(STORAGE_KEYS.LOGGED_IN_USER_NAME, user.name);
+        localStorage.setItem(STORAGE_KEYS.LOGGED_IN_USER_COLOR, user.avatarColor || "#3b82f6");
+        localStorage.setItem(STORAGE_KEYS.LOGGED_IN_USER_USERNAME, user.username || "");
+        localStorage.setItem(STORAGE_KEYS.LOGIN_TIMESTAMP, String(Date.now()));
         if (token) {
-          localStorage.setItem("sessionToken", token);
+          localStorage.setItem(STORAGE_KEYS.SESSION_TOKEN, token);
         }
 
         setLoggedInUserId(user.id);

@@ -9,9 +9,9 @@ import crypto from "crypto";
 import type { Trip, Participant } from "../../src/types";
 import type { MemoryDB } from "../types/db";
 import {
-  readTripsDB, writeTripsDB, getDB, writeDB, registerSSEClient, unregisterSSEClient,
+  readTripsDB, writeTripsDB, writeTripsDBAndConfirm, getDB, writeDB, writeDBAndConfirm, registerSSEClient, unregisterSSEClient,
 } from "../db/index.js";
-import { resolveCoordinates } from "../utils/geocoding.js";
+import { resolveCoordinatesRemote } from "../utils/geocoding.js";
 import { ok, fail } from "../utils/apiResponse.js";
 import { createLogger } from "../utils/logger.js";
 import { SSE_KEEPALIVE_INTERVAL_MS } from "../utils/constants.js";
@@ -24,7 +24,6 @@ const logger = createLogger("TripRoute");
 import itineraryRouter from "./itinerary.js";
 import expenseRouter from "./expense.js";
 import membersRouter from "./members.js";
-import flightSubRouter from "./flightSubscription.js";
 
 const router = Router();
 
@@ -32,7 +31,6 @@ const router = Router();
 router.use("/itinerary", itineraryRouter);
 router.use("/expense", expenseRouter);
 router.use("/", membersRouter);           // invite / kick / invitations
-router.use("/", flightSubRouter);         // /:id/flight-subscription
 
 // ── Google Routes API proxy ──────────────────────────────────────────────────
 router.post("/google-route", async (req: Request, res: Response) => {
@@ -111,7 +109,7 @@ router.get("/", async (req: Request, res: Response) => {
     ];
 
     for (const { id, dest } of toResolve) {
-      const coords = await resolveCoordinates(dest);
+      const coords = await resolveCoordinatesRemote(dest);
       if (!coords) continue;
       const idx = (db as MemoryDB).trips.findIndex((t: Trip) => t.id === id);
       if (idx !== -1) {
@@ -134,10 +132,14 @@ router.get("/", async (req: Request, res: Response) => {
 
 // ── POST /api/trip/update ────────────────────────────────────────────────────
 router.post("/update", async (req: Request, res: Response) => {
-  const current = readTripsDB(req);
-  const updated = { ...current, ...req.body, updatedAt: new Date().toISOString() };
-  writeTripsDB(updated, req);
-  res.json(ok({ trip: readTripsDB(req) }));
+  try {
+    const current = readTripsDB(req);
+    const updated = { ...current, ...req.body, updatedAt: new Date().toISOString() };
+    await writeTripsDBAndConfirm(updated, req);
+    res.json(ok({ trip: readTripsDB(req) }));
+  } catch (err: any) {
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to update trip"));
+  }
 });
 
 // ── POST /api/trip/select ────────────────────────────────────────────────────
@@ -155,98 +157,109 @@ router.post("/select", (req: Request, res: Response) => {
 
 // ── POST /api/trip/create ────────────────────────────────────────────────────
 router.post("/create", async (req: Request, res: Response) => {
-  const { name, destination, startDate, endDate, totalBudget } = req.body;
-  const userId = (req as any).userId as string;
-  const db = getDB();
+  try {
+    const { name, destination, startDate, endDate, totalBudget } = req.body;
+    const userId = (req as any).userId as string;
+    const db = getDB();
 
-  const creator = db.users.find((u: any) => u.id === userId);
-  const participants = creator
-    ? [{
-        id: creator.id,
-        name: creator.name,
-        email: creator.email || `${creator.username}@example.com`,
-        avatarColor: creator.avatarColor || "#3b82f6",
-        publicKey: "pub_key_sec_" + Math.random().toString(36).slice(2, 6),
-        budgetLimit: 1500,
-      }]
-    : [{ id: "u1", name: "Traveler", email: "traveler@example.com", avatarColor: "#3b82f6", publicKey: "pub_key_default" }];
+    const creator = db.users.find((u: any) => u.id === userId);
+    const participants = creator
+      ? [{
+          id: creator.id,
+          name: creator.name,
+          email: creator.email || `${creator.username}@example.com`,
+          avatarColor: creator.avatarColor || "#3b82f6",
+          publicKey: "pub_key_sec_" + Math.random().toString(36).slice(2, 6),
+          budgetLimit: 1500,
+        }]
+      : [{ id: "u1", name: "Traveler", email: "traveler@example.com", avatarColor: "#3b82f6", publicKey: "pub_key_default" }];
 
-  const destStr = destination || "Unknown Destination";
-  const coords = await resolveCoordinates(destStr);
-  const newTripId = "trip-" + Date.now();
+    const destStr = destination || "Unknown Destination";
+    const coords = await resolveCoordinatesRemote(destStr);
+    const newTripId = "trip-" + Date.now();
 
-  const newTrip: any = {
-    id: newTripId,
-    name: name || "New Trip",
-    destination: destStr,
-    startDate: startDate || new Date().toISOString().split("T")[0],
-    endDate: endDate || new Date(Date.now() + 7 * 864e5).toISOString().split("T")[0],
-    totalBudget: totalBudget ? Number(totalBudget) : 3000,
-    lat: coords?.lat,
-    lng: coords?.lng,
-    participants,
-    flightEstimates: [],
-    itineraries: [],
-    expenses: [],
-    documents: [],
-    chats: [
-      createSystemMessage(`🚀 Welcome to ${name || "New Trip"}! Add itineraries, vote on flights, and track budgets.`, {
-        idPrefix: "start",
-        avatarColor: "#64748b",
-        isTripUpdate: false
-      })
-    ],
-  };
+    const newTrip: any = {
+      id: newTripId,
+      name: name || "New Trip",
+      destination: destStr,
+      startDate: startDate || new Date().toISOString().split("T")[0],
+      endDate: endDate || new Date(Date.now() + 7 * 864e5).toISOString().split("T")[0],
+      totalBudget: totalBudget ? Number(totalBudget) : 3000,
+      lat: coords?.lat,
+      lng: coords?.lng,
+      participants,
+      itineraries: [],
+      expenses: [],
+      documents: [],
+      chats: [
+        createSystemMessage(`🚀 Welcome to ${name || "New Trip"}! Add itineraries, vote on flights, and track budgets.`, {
+          idPrefix: "start",
+          avatarColor: "#64748b",
+          isTripUpdate: false
+        })
+      ],
+    };
 
-  (db as MemoryDB).trips.push(newTrip);
-  db.activeTripId = newTripId;
-  writeDB(db);
+    (db as MemoryDB).trips.push(newTrip);
+    db.activeTripId = newTripId;
+    await writeDBAndConfirm(db);
 
-  req.headers["x-trip-id"] = newTripId;
-  res.json(ok({ trip: readTripsDB(req) }));
+    req.headers["x-trip-id"] = newTripId;
+    res.json(ok({ trip: readTripsDB(req) }));
+  } catch (err: any) {
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to create trip"));
+  }
 });
 
 // ── POST /api/trip/update-meta ───────────────────────────────────────────────
 router.post("/update-meta", async (req: Request, res: Response) => {
-  const { name, destination, totalBudget, status } = req.body;
-  const current = readTripsDB(req);
-  if (!current) return res.status(404).json(fail("NOT_FOUND", "No active trip found"));
+  try {
+    const { name, destination, totalBudget, status } = req.body;
+    const current = readTripsDB(req);
+    if (!current) return res.status(404).json(fail("NOT_FOUND", "No active trip found"));
 
-  if (name !== undefined) current.name = name.trim();
-  if (totalBudget !== undefined) current.totalBudget = Number(totalBudget) || 3000;
-  if (status !== undefined) current.status = status;
+    if (name !== undefined) current.name = name.trim();
+    if (totalBudget !== undefined) current.totalBudget = Number(totalBudget) || 3000;
+    if (status !== undefined) current.status = status;
 
-  if (destination !== undefined) {
-    const newDest = destination.trim();
-    if (current.destination !== newDest) {
-      current.destination = newDest;
-      const coords = await resolveCoordinates(newDest);
-      current.lat = coords?.lat;
-      current.lng = coords?.lng;
+    if (destination !== undefined) {
+      const newDest = destination.trim();
+      if (current.destination !== newDest) {
+        current.destination = newDest;
+        const coords = await resolveCoordinatesRemote(newDest);
+        current.lat = coords?.lat;
+        current.lng = coords?.lng;
+      }
     }
-  }
 
-  const db = getDB();
-  const idx = (db as MemoryDB).trips.findIndex((t: Trip) => t.id === current.id);
-  if (idx !== -1) {
-    (db as MemoryDB).trips[idx] = current;
-    writeDB(db);
-  }
+    const db = getDB();
+    const idx = (db as MemoryDB).trips.findIndex((t: Trip) => t.id === current.id);
+    if (idx !== -1) {
+      (db as MemoryDB).trips[idx] = current;
+      await writeDBAndConfirm(db);
+    }
 
-  res.json(ok({ trip: current }));
+    res.json(ok({ trip: current }));
+  } catch (err: any) {
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to update trip metadata"));
+  }
 });
 
 // ── POST /api/trip/delete ────────────────────────────────────────────────────
 router.post("/delete", async (req: Request, res: Response) => {
-  const { tripId } = req.body;
-  const db = getDB();
-  if ((db as MemoryDB).trips.length <= 1) {
-    return res.status(400).json(fail("BAD_REQUEST", "Cannot delete the last remaining trip"));
+  try {
+    const { tripId } = req.body;
+    const db = getDB();
+    if ((db as MemoryDB).trips.length <= 1) {
+      return res.status(400).json(fail("BAD_REQUEST", "Cannot delete the last remaining trip"));
+    }
+    (db as MemoryDB).trips = (db as MemoryDB).trips.filter((t: Trip) => t.id !== tripId);
+    if (db.activeTripId === tripId) db.activeTripId = (db as MemoryDB).trips[0].id;
+    await writeDBAndConfirm(db);
+    res.json(ok({ trip: readTripsDB(req) }));
+  } catch (err: any) {
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to delete trip"));
   }
-  (db as MemoryDB).trips = (db as MemoryDB).trips.filter((t: Trip) => t.id !== tripId);
-  if (db.activeTripId === tripId) db.activeTripId = (db as MemoryDB).trips[0].id;
-  writeDB(db);
-  res.json(ok({ trip: readTripsDB(req) }));
 });
 
 // ── POST /api/trip/vote ──────────────────────────────────────────────────────
@@ -255,7 +268,7 @@ router.post("/vote", async (req: Request, res: Response) => {
   const current = readTripsDB(req);
 
   const list =
-    targetType === "itinerary" ? current.itineraries : current.flightEstimates;
+    targetType === "itinerary" ? current.itineraries : [];
   const target = list?.find((i: any) => i.id === targetId);
 
   if (target) {
@@ -275,9 +288,11 @@ router.post("/document/upload", async (req: Request, res: Response) => {
   const { name, size, type, uploadedBy, fileData } = req.body;
   const current = readTripsDB(req);
 
-  let downloadUrl = "#";
+  const newDocId = ITEM_ID_PREFIXES.DOCUMENT + Date.now();
+  let downloadUrl = `/api/trip/document/${newDocId}/download`;
   let calculatedSize = size || "1.2 MB";
   let accessKey = crypto.createHash("sha256").update((name || "doc") + Date.now()).digest("hex").slice(0, 32);
+  const storagePath = `trips/${current.id}/documents/${Date.now()}_${name}`;
 
   if (fileData) {
     try {
@@ -291,26 +306,24 @@ router.post("/document/upload", async (req: Request, res: Response) => {
         calculatedSize = (buffer.length / (1024 * 1024)).toFixed(1) + " MB";
       }
 
-      // Lazily import firebase/storage components
-      const { ref: storageRefLoc, uploadBytes: uploadBytesLoc, getDownloadURL: getDownloadURLLoc } = await import("firebase/storage");
       const { storage: storageInstance } = await import("../db/index.js");
 
-      const storagePath = `trips/${current.id}/documents/${Date.now()}_${name}`;
-      const fileRef = storageRefLoc(storageInstance, storagePath);
-
-      const uint8Array = new Uint8Array(buffer);
-      const snapshot = await uploadBytesLoc(fileRef, uint8Array, {
-        contentType: type || "application/octet-stream"
+      // storageInstance is the admin GCS bucket
+      const file = (storageInstance as any).file(storagePath);
+      await file.save(buffer, {
+        metadata: {
+          contentType: type || "application/octet-stream"
+        }
       });
-      downloadUrl = await getDownloadURLLoc(snapshot.ref);
-      logger.info(`[Firebase Storage] Uploaded '${name}' to '${storagePath}' successfully -> ${downloadUrl}`);
+      logger.info(`[Firebase Storage] Uploaded '${name}' successfully via Admin SDK to storagePath '${storagePath}'`);
     } catch (storageErr) {
       logger.error("[Firebase Storage] Upload failed:", storageErr);
+      downloadUrl = "#";
     }
   }
 
   const newDoc = {
-    id: ITEM_ID_PREFIXES.DOCUMENT + Date.now(),
+    id: newDocId,
     name,
     size: calculatedSize,
     type: type || "application/pdf",
@@ -318,6 +331,7 @@ router.post("/document/upload", async (req: Request, res: Response) => {
     url: downloadUrl,
     accessKey,
     uploadedBy: uploadedBy || "Unknown",
+    storagePath,
   };
   current.documents.push(newDoc);
 
@@ -332,9 +346,73 @@ router.post("/document/upload", async (req: Request, res: Response) => {
   res.json(ok({ document: newDoc, trip: current }));
 });
 
+// ── GET /api/trip/document/:id/download ──────────────────────────────────────
+router.get("/document/:id/download", async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const userId = (req as any).userId as string;
+
+  if (!userId) {
+    return res.status(401).json(fail("UNAUTHORIZED", "User identity required."));
+  }
+
+  // Find the trip containing the document with this ID
+  const dbInstance = getDB();
+  const trips = (dbInstance as MemoryDB).trips;
+
+  let foundTrip: Trip | undefined;
+  let foundDoc: any | undefined;
+
+  for (const t of trips) {
+    const doc = t.documents?.find((d: any) => d.id === id);
+    if (doc) {
+      foundTrip = t;
+      foundDoc = doc;
+      break;
+    }
+  }
+
+  if (!foundTrip || !foundDoc) {
+    return res.status(404).json(fail("NOT_FOUND", "Document not found."));
+  }
+
+  // Verify the user is a participant of the trip that owns the document
+  const isParticipant = foundTrip.participants.some((p: Participant) => p.id === userId);
+  if (!isParticipant) {
+    return res.status(403).json(fail("FORBIDDEN", "You are not a participant of this trip."));
+  }
+
+  if (!foundDoc.storagePath) {
+    return res.status(400).json(fail("BAD_REQUEST", "Document does not have a valid storage path."));
+  }
+
+  try {
+    const { storage: storageInstance } = await import("../db/index.js");
+    const file = (storageInstance as any).file(foundDoc.storagePath);
+
+    const [exists] = await file.exists();
+    if (!exists) {
+      return res.status(404).json(fail("NOT_FOUND", "File does not exist in storage."));
+    }
+
+    res.setHeader("Content-Type", foundDoc.type || "application/octet-stream");
+    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(foundDoc.name)}"`);
+
+    // Stream the file back to the browser
+    file.createReadStream().pipe(res);
+  } catch (err: any) {
+    logger.error("[Firebase Storage] Secure download failed:", err);
+    res.status(500).json(fail("SERVER_ERROR", "Failed to retrieve secure file."));
+  }
+});
+
 // ── POST /api/trip/chat/send ─────────────────────────────────────────────────
 router.post("/chat/send", async (req: Request, res: Response) => {
   const { senderId, senderName, avatarColor, messageDecrypted, messageEncrypted } = req.body;
+  
+  if (!messageEncrypted) {
+    return res.status(400).json(fail("BAD_REQUEST", "Encrypted message payload is required (未提供加密訊息內容)。"));
+  }
+
   const current = readTripsDB(req);
 
   const newMsg = {
@@ -342,8 +420,7 @@ router.post("/chat/send", async (req: Request, res: Response) => {
     senderId,
     senderName,
     avatarColor,
-    messageEncrypted:
-      messageEncrypted || "U2FsdGVkX19" + Buffer.from(messageDecrypted).toString("base64"),
+    messageEncrypted,
     messageDecrypted,
     timestamp: new Date().toISOString(),
   };

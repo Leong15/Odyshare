@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Trip } from "../types";
 import { decryptMessage } from "../utils/crypto";
+import { STORAGE_KEYS } from "../lib/constants";
 
 const POLL_INTERVAL_MS = 4_000;
 
@@ -40,13 +41,13 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
 
   const buildHeaders = useCallback(
     (overrideTripId?: string): Record<string, string> => {
-      const uid = localStorage.getItem("loggedInUserId") || loggedInUserId || "";
+      const uid = localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_ID) || loggedInUserId || "";
       const tid =
         overrideTripId ||
-        localStorage.getItem("activeTripId") ||
+        localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_ID) ||
         tripIdRef.current ||
         "";
-      const token = localStorage.getItem("sessionToken") || "";
+      const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN) || "";
       const headers: Record<string, string> = {
         "x-user-id": uid,
         "x-trip-id": tid,
@@ -60,7 +61,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
   );
 
   const fetchInvitations = useCallback(async () => {
-    const uid = localStorage.getItem("loggedInUserId") || loggedInUserId;
+    const uid = localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_ID) || loggedInUserId;
     if (!uid) return;
     try {
       const res = await fetch("/api/trip/invitations", {
@@ -81,18 +82,18 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
 
   const fetchTripData = useCallback(
     async (showSpinner = false, overrideTripId?: string) => {
-      const uid = localStorage.getItem("loggedInUserId") || loggedInUserId;
+      const uid = localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_ID) || loggedInUserId;
       if (!uid) {
         return;
       }
 
       if (showSpinner) setSyncing(true);
-      if (overrideTripId) localStorage.setItem("activeTripId", overrideTripId);
+      if (overrideTripId) localStorage.setItem(STORAGE_KEYS.ACTIVE_TRIP_ID, overrideTripId);
 
       try {
         const tid =
           overrideTripId ||
-          localStorage.getItem("activeTripId") ||
+          localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_ID) ||
           tripIdRef.current ||
           "";
 
@@ -114,7 +115,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
         if (responseData.success) {
           const data: Trip = responseData.data;
           setTrip(data);
-          if (data?.id) localStorage.setItem("activeTripId", data.id);
+          if (data?.id) localStorage.setItem(STORAGE_KEYS.ACTIVE_TRIP_ID, data.id);
           setErrorState(null);
 
           // Let the parent resolve currentUser from the participant list
@@ -123,7 +124,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
             onUserResolved({
               ...found,
               username:
-                localStorage.getItem("loggedInUserUsername") || found.username || "",
+                localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_USERNAME) || found.username || "",
             });
           }
         } else {
@@ -145,7 +146,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    const uid = localStorage.getItem("loggedInUserId") || loggedInUserId;
+    const uid = localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_ID) || loggedInUserId;
     if (!uid) return;
 
     // Run initial fetch on mount
@@ -158,13 +159,13 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
     const startFallbackPolling = (ms: number) => {
       if (fallbackInterval) clearInterval(fallbackInterval);
       fallbackInterval = setInterval(() => {
-        const currentUid = localStorage.getItem("loggedInUserId") || loggedInUserId;
+        const currentUid = localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_ID) || loggedInUserId;
         if (currentUid) fetchTripData(false);
       }, ms);
     };
 
     const setupSSE = () => {
-      const activeTripId = localStorage.getItem("activeTripId") || tripIdRef.current;
+      const activeTripId = localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_ID) || tripIdRef.current;
       if (!activeTripId) {
         connectionStateRef.current = 'polling';
         startFallbackPolling(4000);
@@ -182,7 +183,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
         eventSource.close();
       }
 
-      const token = localStorage.getItem("sessionToken") || "";
+      const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN) || "";
       eventSource = new EventSource(`/api/trip/events?tripId=${activeTripId}&token=${token}`);
 
       eventSource.onmessage = (event) => {
@@ -331,7 +332,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   const flushOfflineQueue = useCallback(async () => {
-    const queue = JSON.parse(localStorage.getItem("activeTripOfflineQueue") || "[]");
+    const queue = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_OFFLINE_QUEUE) || "[]");
     if (queue.length === 0) return;
 
     // Aggregate all queued partial updates in sequence
@@ -351,7 +352,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
         const responseData = await res.json();
         if (responseData.success) {
           setTrip(responseData.data.trip);
-          localStorage.removeItem("activeTripOfflineQueue");
+          localStorage.removeItem(STORAGE_KEYS.ACTIVE_TRIP_OFFLINE_QUEUE);
           console.log("[PWA] Offline queue successfully synchronized and cleared!");
         }
       }
@@ -381,7 +382,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
 
   // Fetch invitations once on login or mount, then rely on SSE pushes to trigger refreshes
   useEffect(() => {
-    const uid = localStorage.getItem("loggedInUserId") || loggedInUserId;
+    const uid = localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_ID) || loggedInUserId;
     if (uid) {
       fetchInvitations();
     }
@@ -398,9 +399,9 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
 
       // 2. If currently offline, queue and return
       if (!navigator.onLine) {
-        const queue = JSON.parse(localStorage.getItem("activeTripOfflineQueue") || "[]");
+        const queue = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_OFFLINE_QUEUE) || "[]");
         queue.push(updatedFields);
-        localStorage.setItem("activeTripOfflineQueue", JSON.stringify(queue));
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_TRIP_OFFLINE_QUEUE, JSON.stringify(queue));
         console.log("[PWA] Queued partial update in local storage due to offline state.");
         return;
       }
@@ -419,9 +420,9 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
         }
       } catch (err) {
         console.warn("postTripUpdate connection failed, enqueuing local update.", err);
-        const queue = JSON.parse(localStorage.getItem("activeTripOfflineQueue") || "[]");
+        const queue = JSON.parse(localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_OFFLINE_QUEUE) || "[]");
         queue.push(updatedFields);
-        localStorage.setItem("activeTripOfflineQueue", JSON.stringify(queue));
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_TRIP_OFFLINE_QUEUE, JSON.stringify(queue));
       }
     },
     [fetchWithAuth]
@@ -429,7 +430,7 @@ export function useTripSync({ loggedInUserId, onUserResolved, onSessionExpired }
 
   const handleSelectTrip = useCallback(
     async (id: string) => {
-      localStorage.setItem("activeTripId", id);
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_TRIP_ID, id);
       try {
         const res = await fetchWithAuth("/api/trip/select", {
           method: "POST",

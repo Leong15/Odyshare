@@ -1,7 +1,7 @@
 import { CITY_COORDS } from "../lib/constants";
 import { lookupCityCoords, lookupHotLocation, canvasXYToLatLng } from "../lib/mapUtils";
 
-export function resolveLatLng(
+export function resolveLatLngLocal(
   name: string,
   dest: string,
   x: number = 50,

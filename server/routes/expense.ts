@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { readTripsDB, writeTripsDB } from "../db/index.js";
+import { readTripsDB, writeTripsDBAndConfirm } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
 import { createSystemMessage } from "../utils/message.js";
 import { ITEM_ID_PREFIXES } from "../../src/shared/ids.js";
@@ -29,10 +29,10 @@ router.post("/add", async (req: Request, res: Response) => {
       })
     );
 
-    writeTripsDB(current, req);
+    await writeTripsDBAndConfirm(current, req);
     res.json(ok({ trip: current }));
   } catch (err: any) {
-    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to add expense"));
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to add expense (儲存花費失敗)"));
   }
 });
 
@@ -45,10 +45,10 @@ router.post("/delete", async (req: Request, res: Response) => {
     if (current.expenses) {
       current.expenses = current.expenses.filter((e: any) => e.id !== expenseId);
     }
-    writeTripsDB(current, req);
+    await writeTripsDBAndConfirm(current, req);
     res.json(ok({ trip: current }));
   } catch (err: any) {
-    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to delete expense"));
+    res.status(500).json(fail("SERVER_ERROR", err.message || "Failed to delete expense (刪除花費失敗)"));
   }
 });
 

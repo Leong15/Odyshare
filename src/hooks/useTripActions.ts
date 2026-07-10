@@ -7,7 +7,7 @@
 
 import { useCallback } from "react";
 import type { Trip, ItineraryItem, ExpenseItem, DocumentItem, ChatMessage, Participant } from "../types";
-import { ITEM_ID_PREFIXES, SYSTEM_SENDER_ID, SYSTEM_SENDER_NAME } from "../lib/constants";
+import { ITEM_ID_PREFIXES, SYSTEM_SENDER_ID, SYSTEM_SENDER_NAME, STORAGE_KEYS } from "../lib/constants";
 import { encryptMessage } from "../utils/crypto";
 
 // Safe Base64 encoder that handles non-Latin1 characters (Chinese, emoji)
@@ -66,7 +66,7 @@ export function useTripActions({
         const data = await res.json();
         if (res.ok && data.success) {
           const trip = data.data.trip;
-          if (trip?.id) localStorage.setItem("activeTripId", trip.id);
+          if (trip?.id) localStorage.setItem(STORAGE_KEYS.ACTIVE_TRIP_ID, trip.id);
           setTrip(trip);
           await fetchTripData(true, trip?.id);
           return { success: true };
@@ -99,8 +99,8 @@ export function useTripActions({
           const data = await res.json();
           if (data.success) {
             const trip = data.data.trip;
-            if (trip?.id) localStorage.setItem("activeTripId", trip.id);
-            else localStorage.removeItem("activeTripId");
+            if (trip?.id) localStorage.setItem(STORAGE_KEYS.ACTIVE_TRIP_ID, trip.id);
+            else localStorage.removeItem(STORAGE_KEYS.ACTIVE_TRIP_ID);
             setTrip(trip);
             await fetchTripData(true, trip?.id);
           }
@@ -341,7 +341,7 @@ export function useTripActions({
 
   const handleSendChatMessage = useCallback(
     async (msg: string) => {
-      const activeTripId = localStorage.getItem("activeTripId") || "default_trip_secret";
+      const activeTripId = localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_ID) || "default_trip_secret";
       const encryptedMsg = await encryptMessage(msg, activeTripId);
       try {
         const res = await fetchWithAuth("/api/trip/chat/send", {
@@ -384,56 +384,6 @@ export function useTripActions({
       await postTripUpdate({ chats: [...currentChats, systemMsg] });
     },
     [postTripUpdate]
-  );
-
-  // ---------------------------------------------------------------------------
-  // AI flights
-  // ---------------------------------------------------------------------------
-
-  const handleAIRecFlights = useCallback(
-    async (
-      from: string,
-      to: string,
-      date: string,
-      type?: string,
-      returnDate?: string,
-      currentFlightEstimates: any[] = []
-    ): Promise<void> => {
-      try {
-        const res = await fetchWithAuth("/api/ai/recommend-flights", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ from, to, date, type, returnDate }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const flights = data.data?.flights || [];
-          const updated = [...currentFlightEstimates];
-          flights.forEach((f: any, idx: number) => {
-            updated.push({
-              id: `${ITEM_ID_PREFIXES.FLIGHT}${idx}-${Date.now()}`,
-              carrier: f.carrier,
-              carrierLogo: "⭐",
-              from,
-              to,
-              price: f.price,
-              stops: f.stops,
-              duration: f.duration,
-              departureTime: f.departureTime,
-              rating: f.rating,
-              bookingUrl: f.bookingUrl,
-              currency: f.currency,
-              votes: [],
-            });
-          });
-          await postTripUpdate({ flightEstimates: updated });
-        }
-      } catch (err) {
-        console.error("handleAIRecFlights failed:", err);
-        onError?.(lang === "zh" ? "操作失敗，請重試" : "Operation failed, please retry.");
-      }
-    },
-    [fetchWithAuth, postTripUpdate, lang, onError]
   );
 
   // ---------------------------------------------------------------------------
@@ -566,7 +516,6 @@ export function useTripActions({
     handleUploadDocument,
     handleSendChatMessage,
     handlePostAISystemMessage,
-    handleAIRecFlights,
     handleInviteUser,
     handleInviteExternalUser,
     handleUpgradeExternalUser,

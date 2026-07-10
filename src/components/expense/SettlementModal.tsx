@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { X, Download, QrCode, CreditCard, Check, AlertCircle } from "lucide-react";
 import { ExpenseItem, Participant } from "../../types";
 import { getCategoryLabel, getCategoryDotColor } from "../../utils/categoryUtils";
+import { translations } from "../../lib/translations";
 
 interface SettlementModalProps {
   isOpen: boolean;
@@ -27,6 +28,8 @@ export default function SettlementModal({
   lang = "en",
 }: SettlementModalProps) {
   if (!isOpen) return null;
+
+  const t = translations[lang];
 
   const getParticipantName = (id: string) => {
     return participants.find((p) => p.id === id)?.name || id;
@@ -150,7 +153,7 @@ export default function SettlementModal({
               <Download className="text-emerald-400" size={16} />
             </span>
             <h2 className="font-extrabold text-white text-sm">
-              {lang === "zh" ? "旅程費用結算與資料匯出" : "Travel Bill Settlement & Data Export"}
+              {t.settlementModalTitle}
             </h2>
           </div>
           <button
@@ -168,10 +171,10 @@ export default function SettlementModal({
           <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center bg-white/3 border border-white/5 p-4 rounded-xl">
             <div className="space-y-1">
               <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-400">
-                {lang === "zh" ? "📥 離線數據備份與匯出" : "📥 Offline Ledger Downloads"}
+                {t.offlineLedgerDownloads}
               </span>
               <p className="text-[11px] text-slate-300">
-                {lang === "zh" ? "匯出明細至 CSV 試算表或乾淨純文字收據，供群組共享與記帳。" : "Export live items to a CSV spreadsheet or structured text receipt for companion sharing."}
+                {t.exportDetailsLabel}
               </p>
             </div>
             
@@ -181,14 +184,14 @@ export default function SettlementModal({
                 onClick={handleDownloadTxt}
                 className="flex-1 sm:flex-none px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-white/10 hover:border-white/20 text-white font-bold rounded-lg text-[11px] cursor-pointer transition-all shadow-sm"
               >
-                📄 {lang === "zh" ? "下載 TXT 收據" : "Download TXT"}
+                📄 {t.downloadTxtBtn}
               </button>
               <button
                 type="button"
                 onClick={handleDownloadCsv}
                 className="flex-1 sm:flex-none px-3.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/20 hover:border-emerald-500/45 text-emerald-300 font-bold rounded-lg text-[11px] cursor-pointer transition-all shadow-sm"
               >
-                📊 {lang === "zh" ? "下載 CSV 帳目表" : "Download CSV"}
+                📊 {t.downloadCsvBtn}
               </button>
             </div>
           </div>
@@ -201,7 +204,7 @@ export default function SettlementModal({
               <div>
                 <h3 className="font-extrabold text-white text-base">ODYSYNC TRAVEL SETTLEMENT</h3>
                 <p className="text-[10px] text-slate-400 mt-1 font-mono uppercase tracking-widest">
-                  {lang === "zh" ? "旅程費用結算明細收據" : "Official Expenditure Settlement Matrix"}
+                  {t.invoiceHeaderSubtitle}
                 </p>
               </div>
               <div className="text-left sm:text-right text-xs font-mono text-slate-400">
@@ -213,15 +216,15 @@ export default function SettlementModal({
             {/* Financial Overview Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-[repeat(3,minmax(0,1fr))] gap-3 mb-6">
               <div className="bg-white/3 border border-white/5 p-3 rounded-lg text-center">
-                <span className="text-xs text-slate-400 font-bold block">{lang === "zh" ? "總花費金額" : "Total Spent"}</span>
+                <span className="text-xs text-slate-400 font-bold block">{t.totalSpent}</span>
                 <span className="text-base font-extrabold text-emerald-400 font-mono">${totalSpent.toFixed(2)}</span>
               </div>
               <div className="bg-white/3 border border-white/5 p-3 rounded-lg text-center">
-                <span className="text-xs text-slate-400 font-bold block">{lang === "zh" ? "旅程總預算" : "Trip Budget"}</span>
+                <span className="text-xs text-slate-400 font-bold block">{t.tripBudgetTracking}</span>
                 <span className="text-base font-extrabold text-indigo-400 font-mono">${totalBudget.toFixed(2)}</span>
               </div>
               <div className="bg-white/3 border border-white/5 p-3 rounded-lg text-center">
-                <span className="text-xs text-slate-400 font-bold block">{lang === "zh" ? "預算剩餘" : "Remaining"}</span>
+                <span className="text-xs text-slate-400 font-bold block">{t.remaining}</span>
                 <span className="text-base font-extrabold text-white font-mono">${(totalBudget - totalSpent).toFixed(2)}</span>
               </div>
             </div>
@@ -229,7 +232,7 @@ export default function SettlementModal({
             {/* Categories Diagram */}
             <div className="mb-6 space-y-3">
               <h4 className="font-bold text-white text-xs border-b border-white/5 pb-1">
-                {lang === "zh" ? "📊 支出分類比例分析" : "📊 Category Distribution Chart"}
+                {t.categoryDistributionChart}
               </h4>
               <div className="w-full bg-white/5 h-3.5 rounded-full overflow-hidden flex">
                 {categories.map((c) => (
@@ -255,25 +258,25 @@ export default function SettlementModal({
             {/* Repayment Settlement Instructions */}
             <div className="mb-6 space-y-3">
               <h4 className="font-bold text-white text-xs border-b border-white/5 pb-1">
-                {lang === "zh" ? "🤝 最佳化拆帳分攤方案" : "🤝 Optimized Peer-to-Peer Repayments"}
+                {t.optimizedRepaymentsTitle}
               </h4>
               
               {transactions.length === 0 ? (
                 <div className="p-4 text-center bg-emerald-500/15 border border-emerald-500/20 rounded-xl text-emerald-300">
-                  🎉 {lang === "zh" ? "所有帳目已全部結清！無任何組員欠款。" : "All balances reconciled perfectly. No transactions required!"}
+                  🎉 {t.allBalancesReconciledMsg}
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {transactions.map((t, idx) => {
+                  {transactions.map((trans, idx) => {
                     return (
                       <div key={idx} className="bg-slate-900 border border-white/5 rounded-xl p-4 flex justify-between items-center text-xs">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-white bg-white/5 px-2 py-0.5 rounded border border-white/10">{getParticipantName(t.from)}</span>
-                          <span className="text-slate-500">{lang === "zh" ? "需給予" : "owes"}</span>
-                          <span className="font-bold text-indigo-300 bg-indigo-500/5 px-2 py-0.5 rounded border border-indigo-500/10">{getParticipantName(t.to)}</span>
+                          <span className="font-bold text-white bg-white/5 px-2 py-0.5 rounded border border-white/10">{getParticipantName(trans.from)}</span>
+                          <span className="text-slate-500">{t.settleOwes}</span>
+                          <span className="font-bold text-indigo-300 bg-indigo-500/5 px-2 py-0.5 rounded border border-indigo-500/10">{getParticipantName(trans.to)}</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-sm font-extrabold text-emerald-400 font-mono">${t.amount.toFixed(2)}</span>
+                          <span className="text-sm font-extrabold text-emerald-400 font-mono">${trans.amount.toFixed(2)}</span>
                         </div>
                       </div>
                     );
@@ -285,7 +288,7 @@ export default function SettlementModal({
             {/* Individual Balances Table */}
             <div className="space-y-3">
               <h4 className="font-bold text-white text-xs border-b border-white/5 pb-1">
-                {lang === "zh" ? "🧾 成員收支總覽" : "🧾 Individual Balances Reconciliation"}
+                {t.individualBalancesReconciliation}
               </h4>
               <div className="border border-white/5 rounded-xl overflow-hidden font-mono text-xs">
                 <div className="grid grid-cols-[repeat(3,minmax(0,1fr))] bg-white/3 border-b border-white/5 p-2 font-bold text-slate-400">
@@ -316,8 +319,8 @@ export default function SettlementModal({
 
             {/* Invoice Footer */}
             <div className="mt-8 pt-4 border-t border-white/10 text-center text-[10px] text-slate-500 leading-relaxed font-sans">
-              <p>{lang === "zh" ? "感謝您使用 OdySync 旅遊記帳與清算管家" : "Thank you for planning with OdySync Group Workspace."}</p>
-              <p className="mt-0.5">{lang === "zh" ? "所有資料經由加密處理，安全可靠。" : "Safe and secure peer data synchronization."}</p>
+              <p>{t.thankYouPlanningOdy}</p>
+              <p className="mt-0.5">{t.safeSecurePeerSync}</p>
             </div>
 
           </div>
@@ -330,7 +333,7 @@ export default function SettlementModal({
             onClick={onClose}
             className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white rounded-xl transition cursor-pointer font-semibold"
           >
-            {lang === "zh" ? "關閉" : "Close"}
+            {t.closeBtn}
           </button>
         </div>
 

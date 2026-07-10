@@ -5,7 +5,7 @@ import type L_TYPE from "leaflet";
 let L: typeof L_TYPE | null = null;
 import { ItineraryItem, Participant } from "../../types";
 import { translations } from "../../lib/translations";
-import { resolveLatLng, getDayColor } from "../../utils/mapHelpers";
+import { resolveLatLngLocal, getDayColor } from "../../utils/mapHelpers";
 import { latLngToCanvasXY, isSameCoordinate } from "../../lib/mapUtils";
 import { MAP_CONFIG, isItineraryItem } from "../../lib/constants";
 import { MapTarget } from "../../hooks/map/types";
@@ -78,8 +78,8 @@ export default function OfflineMapSimulator({
       time: "10:00",
       title: spot.name,
       description: lang === "zh"
-        ? `偵測到該地區的熱門推薦！`
-        : `Explore local hotspot '${spot.name}' in active destination ${destination}.`,
+        ? t.mapHotspotDetect
+        : t.mapExploreHotspot.replace("{name}", spot.name).replace("{destination}", destination),
       locationName: spot.lat && spot.lng && spot.isCustom ? `${spot.lat.toFixed(6)}, ${spot.lng.toFixed(6)}` : spot.name,
       category: spot.type === "food" ? "restaurant" : "sight",
       cost: 0,
@@ -253,7 +253,7 @@ export default function OfflineMapSimulator({
     if (onUpdateItineraryItem) {
       const pinName = editLocation || editTitle;
       // Pre-resolve coordinates client-side for immediate response
-      const localCoords = resolveLatLng(pinName, destination || "", 50, 50);
+      const localCoords = resolveLatLngLocal(pinName, destination || "", 50, 50);
       const updated = {
         ...activeItem,
         title: editTitle,
@@ -280,8 +280,8 @@ export default function OfflineMapSimulator({
         return {
           ...c,
           name: editTitle,
-          lat: activeItem.coordinates ? resolveLatLng(editTitle, destination, activeItem.coordinates.x, activeItem.coordinates.y).lat : c.lat,
-          lng: activeItem.coordinates ? resolveLatLng(editTitle, destination, activeItem.coordinates.x, activeItem.coordinates.y).lng : c.lng
+          lat: activeItem.coordinates ? resolveLatLngLocal(editTitle, destination, activeItem.coordinates.x, activeItem.coordinates.y).lat : c.lat,
+          lng: activeItem.coordinates ? resolveLatLngLocal(editTitle, destination, activeItem.coordinates.x, activeItem.coordinates.y).lng : c.lng
         };
       }
       return c;
@@ -361,12 +361,12 @@ export default function OfflineMapSimulator({
               {isLocating ? (
                 <>
                   <RefreshCw size={12} className="animate-spin" />
-                  <span>{lang === "zh" ? "取得定位中..." : "Locating..."}</span>
+                  <span>{t.locating}</span>
                 </>
               ) : (
                 <>
                   <span>📍</span>
-                  <span>{lang === "zh" ? "獲得實時 GPS 定位" : "Get Live GPS Location"}</span>
+                  <span>{t.getGpsLocation}</span>
                 </>
               )}
             </button>
@@ -387,20 +387,20 @@ export default function OfflineMapSimulator({
 
         <div className="mb-4 shrink-0 flex items-center justify-between p-2.5 bg-slate-900/40 border border-white/5 rounded-xl text-xs">
           <span className="text-slate-300 font-medium">
-            {lang === "zh" ? "🚶 模擬 GPS 步行移動" : "🚶 Simulate GPS Walking"}
+            {t.mapSimulateGpsWalking}
           </span>
           <button
             id="toggle-sim-move-btn"
             type="button"
             onClick={() => setIsSimulatedMoving(!isSimulatedMoving)}
-            aria-label={lang === "zh" ? "切換模擬 GPS 步行移動" : "Toggle simulate GPS walking"}
+            aria-label={t.mapToggleSimulateGpsWalking}
             className={`px-3 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
               isSimulatedMoving
                 ? "bg-emerald-600 hover:bg-emerald-700 text-white"
                 : "bg-white/5 hover:bg-white/10 text-slate-400 border border-white/5"
             }`}
           >
-            {isSimulatedMoving ? (lang === "zh" ? "已開啟" : "ON") : (lang === "zh" ? "已關閉" : "OFF")}
+            {isSimulatedMoving ? t.mapStatusOn : t.mapStatusOff}
           </button>
         </div>
 
@@ -411,7 +411,7 @@ export default function OfflineMapSimulator({
             </div>
             <div>
               <h3 className="font-extrabold text-white text-xs leading-none">
-                {lang === "zh" ? `${destination} 地理視窗` : `${destination} Map Space`}
+                {t.mapSpace.replace("{destination}", destination)}
               </h3>
               <p className="text-[10px] text-slate-400 mt-1 uppercase font-mono tracking-wider">
                 {offlineMode ? t.cachedLocal : t.realtimeGPS}
@@ -470,7 +470,7 @@ export default function OfflineMapSimulator({
             <input
               id="map-search-input"
               type="text"
-              placeholder={lang === "zh" ? "搜尋或自訂景點..." : "Search or add place..."}
+              placeholder={t.mapSearchOrAddPlace}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 bg-slate-950/70 border border-white/10 rounded-xl text-xs text-white focus:outline-none focus:border-blue-500 transition-all font-sans"
@@ -484,7 +484,7 @@ export default function OfflineMapSimulator({
               className="w-full py-1.5 bg-blue-500/20 hover:bg-blue-500/35 border border-blue-500/30 text-blue-300 rounded-lg text-[10.5px] font-bold flex items-center justify-center gap-1 transition"
             >
               <PlusCircle size={12} />
-              <span>{lang === "zh" ? `新增「${searchQuery}」至地圖上` : `Add "${searchQuery}" map node`}</span>
+              <span>{t.mapAddNode.replace("{query}", searchQuery)}</span>
             </button>
           )}
         </div>
@@ -492,7 +492,7 @@ export default function OfflineMapSimulator({
         {/* Day Filter Selector */}
         <div className="mb-4 shrink-0">
           <label className="block text-[10.5px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
-            {lang === "zh" ? "📅 選擇查看天數" : "📅 Filter by Day"}
+            {t.locationFilters}
           </label>
           <div className="flex gap-1 overflow-x-auto pb-1.5 scrollbar-none">
             <button
@@ -505,7 +505,7 @@ export default function OfflineMapSimulator({
                   : "bg-slate-900/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border-white/5"
               }`}
             >
-              {lang === "zh" ? "全部天數" : "All Days"}
+              {t.allDays}
             </button>
             {uniqueDays.map((dayIdx) => {
               const dayColor = getDayColor(dayIdx);
@@ -524,7 +524,7 @@ export default function OfflineMapSimulator({
                   }}
                 >
                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isActive ? "#ffffff" : dayColor }}></span>
-                  <span>{lang === "zh" ? `第 ${dayIdx + 1} 天` : `Day ${dayIdx + 1}`}</span>
+                  <span>{t.mapDayNumber.replace("{num}", String(dayIdx + 1))}</span>
                 </button>
               );
             })}
@@ -535,7 +535,7 @@ export default function OfflineMapSimulator({
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
           <div className="flex items-center justify-between block mb-1">
             <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">
-              {lang === "zh" ? "📌 規劃路線上的航點" : t.locationsOnRoute}
+              {t.mapLocationsOnRoute}
             </span>
             <span className="text-xs px-1.5 py-0.5 bg-slate-800 rounded text-slate-400 font-mono">
               {filteredObjects.length} pts
@@ -544,7 +544,7 @@ export default function OfflineMapSimulator({
 
           {filteredObjects.length === 0 ? (
             <div className="p-4 rounded-xl border border-dashed border-white/5 text-center text-xs text-slate-500">
-              {lang === "zh" ? "無符合地標。在地圖點擊可手動新增！" : "No nodes match query. Click anywhere on map canvas to plant one."}
+              {t.mapNoNodesMatch}
             </div>
           ) : (
             filteredObjects.map((spot, i) => {
@@ -575,10 +575,10 @@ export default function OfflineMapSimulator({
                       <h4 className="text-xs font-bold text-white leading-tight truncate">{spot.name}</h4>
                       <span className="text-xs text-slate-400 font-mono capitalize truncate block">
                         {spot.isItinerary 
-                          ? (lang === "zh" ? `★ 第 ${ (spot.dayIndex || 0) + 1 } 天日程` : `★ Day ${ (spot.dayIndex || 0) + 1 } Plan`) 
+                          ? t.mapDayPlanLabel.replace("{num}", String((spot.dayIndex || 0) + 1)) 
                           : ('isCustom' in spot && (spot as any).isCustom) 
-                          ? (lang === "zh" ? "自訂探查地標" : "User dropped pin") 
-                          : (lang === "zh" ? "本地精選推薦" : "OdyShareSmart spot")}
+                          ? t.mapUserDroppedPin 
+                          : t.mapSmartSpot}
                       </span>
                     </div>
                   </div>
@@ -590,7 +590,7 @@ export default function OfflineMapSimulator({
         
         {/* Instruction guide under left drawer */}
         <div className="mt-2 text-xs leading-relaxed text-slate-500 italic border-t border-white/5 pt-2 select-none">
-          {lang === "zh" ? "💡 提示：您可直接點擊右側地圖的任何角落，手動標記新的 GPS 自訂探路點！" : "💡 Pro Tip: Click any area on the map to manually register a new custom landing point."}
+          {t.mapManualPinTip}
         </div>
       </div>
 
@@ -833,7 +833,7 @@ export default function OfflineMapSimulator({
                 fontWeight="black"
                 className="pointer-events-none drop-shadow-md select-none font-sans font-extrabold animate-pulse"
               >
-                {lang === "zh" ? "📍 您在此處" : "📍 You're Here"}
+                {t.mapYouAreHere}
               </text>
             </g>
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { resolveLatLng } from "../../utils/mapHelpers";
+import { resolveLatLngLocal } from "../../utils/mapHelpers";
 import { MapTarget } from "./types";
 import { ItineraryItem } from "../../types";
 
@@ -77,7 +77,7 @@ export function useMapPins({
         lang === "zh"
           ? `自訂地標 #${prev.length + 1}`
           : `Dropped Pin #${prev.length + 1}`;
-      const resolved = resolveLatLng(newName, destination, x, y);
+      const resolved = resolveLatLngLocal(newName, destination, x, y);
       const droppedTarget: MapTarget = {
         name: newName,
         x,
@@ -102,7 +102,7 @@ export function useMapPins({
     if (!searchQuery.trim()) return;
     const rx = Math.round(25 + Math.random() * 50);
     const ry = Math.round(25 + Math.random() * 50);
-    const resolved = resolveLatLng(searchQuery.trim(), destination, rx, ry);
+    const resolved = resolveLatLngLocal(searchQuery.trim(), destination, rx, ry);
     const newTarget: MapTarget = {
       name: searchQuery.trim(),
       x: rx,

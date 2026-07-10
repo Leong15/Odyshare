@@ -84,6 +84,73 @@ export function setMemoryDB(data: Partial<MemoryDB>) {
   lastSyncedDB = JSON.parse(JSON.stringify(memoryDB));
 }
 
+// Helper function containing all the Firestore synchronization logic
+async function syncToFirestore(oldDB: MemoryDB, currentDB: MemoryDB): Promise<void> {
+  // 1. Sync Active Config
+  if (currentDB.activeTripId !== oldDB.activeTripId) {
+    await db.collection("config").doc("active").set({ activeTripId: currentDB.activeTripId });
+  }
+
+  // 2. Sync Users
+  const oldUsers = new Map(oldDB.users.map(u => [u.id, u]));
+  const newUsers = new Map(currentDB.users.map(u => [u.id, u]));
+
+  for (const [id, u] of newUsers.entries()) {
+    const oldU = oldUsers.get(id);
+    if (!oldU || JSON.stringify(oldU) !== JSON.stringify(u)) {
+      const { id: _, ...payload } = u;
+      await db.collection("users").doc(id).set(payload);
+    }
+  }
+  for (const id of oldUsers.keys()) {
+    if (!newUsers.has(id)) {
+      await db.collection("users").doc(id).delete();
+    }
+  }
+
+  // 3. Sync Trips Group
+  const oldTrips = new Map(oldDB.trips.map(t => [t.id, t]));
+  const newTrips = new Map(currentDB.trips.map(t => [t.id, t]));
+
+  for (const [id, t] of newTrips.entries()) {
+    const oldT = oldTrips.get(id);
+    if (!oldT || oldT.updatedAt !== t.updatedAt) {
+      const { id: _, ...payload } = { 
+        ...t,
+        participantIds: (t.participants || []).map(p => p.id).filter(Boolean)
+      };
+      await db.collection("trips").doc(id).set(payload);
+    }
+  }
+  for (const id of oldTrips.keys()) {
+    if (!newTrips.has(id)) {
+      await db.collection("trips").doc(id).delete();
+    }
+  }
+
+  // 4. Sync Invitations
+  const oldInvs = new Map(oldDB.invitations.map(i => [i.id, i]));
+  const newInvs = new Map(currentDB.invitations.map(i => [i.id, i]));
+
+  for (const [id, i] of newInvs.entries()) {
+    const oldI = oldInvs.get(id);
+    if (!oldI || JSON.stringify(oldI) !== JSON.stringify(i)) {
+      const { id: _, ...payload } = i;
+      await db.collection("invitations").doc(id).set(payload);
+    }
+  }
+  for (const id of oldInvs.keys()) {
+    if (!newInvs.has(id)) {
+      await db.collection("invitations").doc(id).delete();
+    }
+  }
+
+  // Backup to disk too
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(currentDB, null, 2), "utf-8");
+  } catch (e) {}
+}
+
 // Background Delta Sync of Cache to Firestore (zero lock times, high responsiveness)
 export function writeDB(data: Partial<MemoryDB>) {
   const oldDB = lastSyncedDB;
@@ -98,79 +165,35 @@ export function writeDB(data: Partial<MemoryDB>) {
   // Deep clone memoryDB after updating it so that it becomes the baseline for the next sync
   lastSyncedDB = JSON.parse(JSON.stringify(memoryDB));
 
-
   // Run async firestore updates
   (async () => {
     try {
-      // 1. Sync Active Config
-      if (memoryDB.activeTripId !== oldDB.activeTripId) {
-        await db.collection("config").doc("active").set({ activeTripId: memoryDB.activeTripId });
-      }
-
-      // 2. Sync Users
-      const oldUsers = new Map(oldDB.users.map(u => [u.id, u]));
-      const newUsers = new Map(memoryDB.users.map(u => [u.id, u]));
-
-      for (const [id, u] of newUsers.entries()) {
-        const oldU = oldUsers.get(id);
-        if (!oldU || JSON.stringify(oldU) !== JSON.stringify(u)) {
-          const payload = { ...u };
-          delete payload.id;
-          await db.collection("users").doc(id).set(payload);
-        }
-      }
-      for (const id of oldUsers.keys()) {
-        if (!newUsers.has(id)) {
-          await db.collection("users").doc(id).delete();
-        }
-      }
-
-      // 3. Sync Trips Group
-      const oldTrips = new Map(oldDB.trips.map(t => [t.id, t]));
-      const newTrips = new Map(memoryDB.trips.map(t => [t.id, t]));
-
-      for (const [id, t] of newTrips.entries()) {
-        const oldT = oldTrips.get(id);
-        if (!oldT || oldT.updatedAt !== t.updatedAt) {
-          const payload = { 
-            ...t,
-            participantIds: (t.participants || []).map(p => p.id).filter(Boolean)
-          };
-          delete payload.id;
-          await db.collection("trips").doc(id).set(payload);
-        }
-      }
-      for (const id of oldTrips.keys()) {
-        if (!newTrips.has(id)) {
-          await db.collection("trips").doc(id).delete();
-        }
-      }
-
-      // 4. Sync Invitations
-      const oldInvs = new Map(oldDB.invitations.map(i => [i.id, i]));
-      const newInvs = new Map(memoryDB.invitations.map(i => [i.id, i]));
-
-      for (const [id, i] of newInvs.entries()) {
-        const oldI = oldInvs.get(id);
-        if (!oldI || JSON.stringify(oldI) !== JSON.stringify(i)) {
-          const payload = { ...i };
-          delete payload.id;
-          await db.collection("invitations").doc(id).set(payload);
-        }
-      }
-      for (const id of oldInvs.keys()) {
-        if (!newInvs.has(id)) {
-          await db.collection("invitations").doc(id).delete();
-        }
-      }
-
-      // Backup to disk too
-      try {
-        fs.writeFileSync(DB_PATH, JSON.stringify(memoryDB, null, 2), "utf-8");
-      } catch (e) {}
-
+      await syncToFirestore(oldDB, memoryDB);
     } catch (error) {
       logger.error("[Firebase db.ts] Failed to synchronize delta states to Cloud Firestore:", error);
     }
   })();
+}
+
+// Durable and Awaited Delta Sync of Cache to Firestore (guarantees persistence before response)
+export async function writeDBAndConfirm(data: Partial<MemoryDB>): Promise<void> {
+  const oldDB = lastSyncedDB;
+  
+  memoryDB = {
+    activeTripId: data.activeTripId || memoryDB.activeTripId,
+    users: Array.isArray(data.users) ? data.users : memoryDB.users,
+    trips: Array.isArray(data.trips) ? data.trips : memoryDB.trips,
+    invitations: Array.isArray(data.invitations) ? data.invitations : memoryDB.invitations
+  };
+
+  // Deep clone memoryDB after updating it so that it becomes the baseline for the next sync
+  lastSyncedDB = JSON.parse(JSON.stringify(memoryDB));
+
+  // Await completion directly so that failures are caught and reported
+  try {
+    await syncToFirestore(oldDB, memoryDB);
+  } catch (error) {
+    logger.error("[Firebase db.ts] Failed to synchronize and confirm delta states to Cloud Firestore:", error);
+    throw error;
+  }
 }

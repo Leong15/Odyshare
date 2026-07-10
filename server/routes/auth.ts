@@ -5,10 +5,11 @@ import { safeHash, safeVerify } from "../utils/crypto.js";
 import crypto from "crypto";
 import { ok, fail } from "../utils/apiResponse.js";
 import { sanitizeString } from "../utils/sanitize.js";
-import { LOGIN_RATE_LIMIT_WINDOW_MS, LOGIN_RATE_LIMIT_MAX_ATTEMPTS } from "../utils/constants.js";
+import { LOGIN_RATE_LIMIT_WINDOW_MS, LOGIN_RATE_LIMIT_MAX_ATTEMPTS, AVATAR_COLORS } from "../utils/constants.js";
 import { signSession } from "../utils/session.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { createLogger } from "../utils/logger.js";
+import { createSlidingRateLimiter } from "../utils/rateLimiter.js";
 
 const router = Router();
 const logger = createLogger("Auth");
@@ -20,37 +21,16 @@ function validatePasswordStrength(password: string): boolean {
   return hasUpper && hasLower && hasSpecial;
 }
 
-// Simple in-memory sliding rate-limiter map
-const loginAttempts = new Map<string, { count: number; firstAttempt: number }>();
+// Instantiate isolated rate limiters for login and forgot password
+const loginRateLimiter = createSlidingRateLimiter({
+  windowMs: LOGIN_RATE_LIMIT_WINDOW_MS,
+  maxAttempts: LOGIN_RATE_LIMIT_MAX_ATTEMPTS
+});
 
-function rateLimitLogin(ip: string): boolean {
-  const now = Date.now();
-
-  // Proactive cleanup of expired entries to prevent memory leak
-  for (const [key, val] of loginAttempts.entries()) {
-    if (now - val.firstAttempt > LOGIN_RATE_LIMIT_WINDOW_MS) {
-      loginAttempts.delete(key);
-    }
-  }
-
-  const attempt = loginAttempts.get(ip);
-  if (!attempt) {
-    loginAttempts.set(ip, { count: 1, firstAttempt: now });
-    return true;
-  }
-
-  if (now - attempt.firstAttempt > LOGIN_RATE_LIMIT_WINDOW_MS) {
-    // Reset window after 1 minute
-    loginAttempts.set(ip, { count: 1, firstAttempt: now });
-    return true;
-  }
-
-  attempt.count++;
-  if (attempt.count > LOGIN_RATE_LIMIT_MAX_ATTEMPTS) {
-    return false; // Blocked
-  }
-  return true;
-}
+const forgetPasswordRateLimiter = createSlidingRateLimiter({
+  windowMs: LOGIN_RATE_LIMIT_WINDOW_MS,
+  maxAttempts: LOGIN_RATE_LIMIT_MAX_ATTEMPTS
+});
 
 // ── Email Verification Endpoint ──────────────────────────────────────────────
 router.get("/verify-email", async (req: Request, res: Response) => {
@@ -152,8 +132,7 @@ router.post("/register", async (req: Request, res: Response) => {
   try {
     const hashedPassword = await safeHash(password);
 
-    const colors = ["#3b82f6", "#ec4899", "#10b981", "#f59e0b", "#8b5cf6", "#14b8a6"];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    const randomColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
     const verifyToken = crypto.randomBytes(32).toString("hex");
 
     const hasSmtp = !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASS);
@@ -227,7 +206,7 @@ router.post("/register", async (req: Request, res: Response) => {
 router.post("/login", async (req: Request, res: Response) => {
   await initAdminPromise;
   const ip = req.ip || req.socket.remoteAddress || "unknown";
-  if (!rateLimitLogin(ip)) {
+  if (!loginRateLimiter.check(ip)) {
     return res.status(429).json(fail("TOO_MANY_REQUESTS", "Too many login attempts. Please try again after 1 minute (登入嘗試過於頻繁，請於 1 分鐘後再試)。"));
   }
 
@@ -351,6 +330,11 @@ router.post("/change-password", requireAuth, async (req: Request, res: Response)
 // 4. Forget Password (Verify registered Username and Email to generate secure random password)
 router.post("/forget-password", async (req: Request, res: Response) => {
   await initAdminPromise;
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  if (!forgetPasswordRateLimiter.check(ip)) {
+    return res.status(429).json(fail("TOO_MANY_REQUESTS", "Too many password reset attempts. Please try again after 1 minute (密碼重設嘗試過於頻繁，請於 1 分鐘後再試)。"));
+  }
+
   const { username, email } = req.body;
   if (!username || !email) {
     return res.status(400).json(fail("BAD_REQUEST", "Username and email address are required (請輸入帳號與註冊的 Email 地址)。"));
@@ -366,14 +350,16 @@ router.post("/forget-password", async (req: Request, res: Response) => {
   const cleanUsername = sanitizeString(username);
   const cleanEmail = sanitizeString(email);
 
+  const fuzzyMessage = "若帳號與 Email 相符，我們已寄出新密碼 (If the username and email match, we have sent a new password).";
+
   const db = getDB();
   const user = db.users.find(u => u.username.toLowerCase() === cleanUsername.toLowerCase());
   if (!user) {
-    return res.status(404).json(fail("NOT_FOUND", "User account not found (找不到此帳號)。"));
+    return res.json(ok({ message: fuzzyMessage }));
   }
 
   if (!user.email || user.email.toLowerCase() !== cleanEmail.toLowerCase()) {
-    return res.status(400).json(fail("BAD_REQUEST", "Email address does not match our records (Email 地址與登記資料不符)。"));
+    return res.json(ok({ message: fuzzyMessage }));
   }
 
   try {
@@ -383,20 +369,20 @@ router.post("/forget-password", async (req: Request, res: Response) => {
     const digits = "0123456789";
     const specials = "!@#$%^*"; // simple special characters, exactly 1 will be chosen
     
-    const rSpecial = specials[Math.floor(Math.random() * specials.length)];
-    const rUpper = uppers[Math.floor(Math.random() * uppers.length)];
-    const rDigit1 = digits[Math.floor(Math.random() * digits.length)];
-    const rDigit2 = digits[Math.floor(Math.random() * digits.length)];
+    const rSpecial = specials[crypto.randomInt(0, specials.length)];
+    const rUpper = uppers[crypto.randomInt(0, uppers.length)];
+    const rDigit1 = digits[crypto.randomInt(0, digits.length)];
+    const rDigit2 = digits[crypto.randomInt(0, digits.length)];
     
     let rLowers = "";
     for (let i = 0; i < 4; i++) {
-      rLowers += lowers[Math.floor(Math.random() * lowers.length)];
+      rLowers += lowers[crypto.randomInt(0, lowers.length)];
     }
     
     // Combine to exactly 8 characters with exactly 1 special character
     const arr = (rUpper + rLowers + rDigit1 + rDigit2 + rSpecial).split("");
     for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = crypto.randomInt(0, i + 1);
       const temp = arr[i];
       arr[i] = arr[j];
       arr[j] = temp;
@@ -411,15 +397,15 @@ router.post("/forget-password", async (req: Request, res: Response) => {
     const emailSubject = "OdyShareSync - 密碼重置與安全新密碼通知 (New Password)";
     const emailHtml = `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 24px; color: #1e293b; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0; max-width: 500px;">
-        <h2 style="color: #10b981; margin-top: 0; font-size: 20px; font-weight: 800; text-align: center;">OdyShareSync 安全中心</h2>
-        <p>親愛的 <strong>${user.name}</strong>，您好：</p>
-        <p>我們收到了您的密碼重置請求。為了保障帳號安全，系統已為您隨機生成一組符合安全規格的新密碼：</p>
-        <div style="margin: 20px 0; padding: 16px; background: #f1f5f9; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center; font-family: monospace; font-size: 18px; font-weight: bold; color: #0f172a; letter-spacing: 1.5px;">
-          ${newRandomPassword}
-        </div>
-        <p style="color: #e11d48; font-weight: bold; font-size: 11px;">⚠️ 安全提示：此密碼符合高強度安全規範。登入後，建議您前往「用戶選單」>「修改密碼」變更為您好記的密碼。</p>
-        <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
-        <p style="font-size: 10px; color: #94a3b8; text-align: center;">此信件為系統自動發送，請勿直接回覆。</p>
+         <h2 style="color: #10b981; margin-top: 0; font-size: 20px; font-weight: 800; text-align: center;">OdyShareSync 安全中心</h2>
+         <p>親愛的 <strong>${user.name}</strong>，您好：</p>
+         <p>我們收到了您的密碼重置請求。為了保障帳號安全，系統已為您隨機生成一組符合安全規格的新密碼：</p>
+         <div style="margin: 20px 0; padding: 16px; background: #f1f5f9; border-radius: 8px; border: 1px dashed #cbd5e1; text-align: center; font-family: monospace; font-size: 18px; font-weight: bold; color: #0f172a; letter-spacing: 1.5px;">
+           ${newRandomPassword}
+         </div>
+         <p style="color: #e11d48; font-weight: bold; font-size: 11px;">⚠️ 安全提示：此密碼符合高強度安全規範。登入後，建議您前往「用戶選單」>「修改密碼」變更為您好記的密碼。</p>
+         <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;"/>
+         <p style="font-size: 10px; color: #94a3b8; text-align: center;">此信件為系統自動發送，請勿直接回覆。</p>
       </div>
     `;
 
@@ -437,7 +423,7 @@ router.post("/forget-password", async (req: Request, res: Response) => {
       return res.status(400).json(fail("BAD_REQUEST", `密碼重設失敗：無法發送重設信。原因：${emailErrorMessage}。請聯絡管理員設定 SMTP。`));
     }
 
-    res.json(ok({ message: "A secure random password has been sent to your registered email address. Please check your inbox (安全新密碼已發送至您的註冊信箱，請查看您的信箱並使用其登入)。" }));
+    res.json(ok({ message: fuzzyMessage }));
   } catch (err) {
     logger.error("Forgot password reset failure:", err);
     res.status(500).json(fail("SERVER_ERROR", "Password reset process failure."));

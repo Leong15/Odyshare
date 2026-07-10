@@ -21,7 +21,7 @@ export default function EncryptedWorkspaceChat({
 }: EncryptedWorkspaceChatProps) {
   const [chatInput, setChatInput] = useState<string>("");
   const [showEncryptedState, setShowEncryptedState] = useState<{ [key: string]: boolean }>({});
-  const [securityStandard, setSecurityStandard] = useState<string>("AES-GCM-256 (E2EE)");
+  const [securityStandard, setSecurityStandard] = useState<string>("AES-GCM-256");
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
   const t = translations[lang];
@@ -67,7 +67,7 @@ export default function EncryptedWorkspaceChat({
 
         <div className="flex bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20 text-[10px] text-emerald-300 font-bold font-mono uppercase tracking-wider items-center gap-1.5 select-none">
           <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping" />
-          <span>ECDH + AESGCM-256 Enforced</span>
+          <span>{t.chatAesGcmActive}</span>
         </div>
       </div>
 
@@ -133,7 +133,7 @@ export default function EncryptedWorkspaceChat({
                         {viewEncrypted ? (
                           <div className="space-y-1">
                             <span className="text-[10px] uppercase font-bold tracking-widest text-rose-300 block font-mono">
-                              {lang === "zh" ? "AES-GCM 加密載荷" : "Encrypted Payload"}
+                              {t.chatEncryptedPayloadHeader}
                             </span>
                             <span className="font-mono text-[9.5px] break-all leading-tight opacity-90 block">
                               {msg.messageEncrypted}
@@ -219,9 +219,6 @@ export default function EncryptedWorkspaceChat({
                       <span className="font-bold text-white text-[11px] truncate leading-none">{member.name}</span>
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     </div>
-                    <div className="flex items-center gap-0.5 text-[8.5px] text-slate-400 mt-1 font-mono truncate leading-none">
-                      <span>ECDH: {member.publicKey}</span>
-                    </div>
                   </div>
                 </div>
               ))}
@@ -231,9 +228,7 @@ export default function EncryptedWorkspaceChat({
           <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/15 rounded-xl flex items-start gap-1.5">
             <Info size={12} className="text-emerald-400 shrink-0 mt-0.5" />
             <p className="text-[10px] text-slate-400 leading-normal font-sans">
-              {lang === "zh" 
-                ? "【端到端加密保障】所有對話訊息皆於本地瀏覽器利用 AES-GCM-256 算法與旅程金鑰進行零知識加密，伺服器僅儲存加密密文，確保高度隱私與通訊安全。"
-                : "[E2EE Secured] All chat messages are zero-knowledge encrypted in your browser using AES-GCM-256 and your trip key. The server only stores ciphertext, ensuring absolute privacy."}
+              {t.chatSecurityStandardDesc}
             </p>
           </div>
         </div>

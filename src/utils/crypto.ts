@@ -1,6 +1,12 @@
 /**
- * Real production-ready AES-GCM Client-Side Encryption and Decryption using Web Crypto API.
- * This provides zero-knowledge, room-based message encryption using keys derived from the active Trip Session.
+ * Real AES-GCM Client-Side Encryption and Decryption using Web Crypto API.
+ * 
+ * ⚠️ THREAT MODEL / SECURITY DISCLAIMER:
+ * This implementation is designed to prevent casual database inspection or unauthorized scanning of raw payloads.
+ * It is NOT a zero-knowledge or true end-to-end encryption (E2EE) solution, as the encryption key is derived 
+ * directly from the trip ID. The trip ID is not secret (it appears in headers, query parameters, and local storage, 
+ * and is visible to the server). Anyone with access to the database or server routes can derive the key and decrypt 
+ * the data. 
  */
 
 // Generate a cryptographic key from a shared secret string (e.g. activeTripId)

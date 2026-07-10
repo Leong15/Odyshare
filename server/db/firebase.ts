@@ -1,16 +1,8 @@
 import path from "path";
 import fs from "fs";
-import { initializeApp } from "firebase/app";
-import { getStorage } from "firebase/storage";
-import { 
-  initializeFirestore, 
-  collection as getCol, 
-  doc as getDocRef, 
-  getDocs, 
-  getDoc, 
-  setDoc, 
-  deleteDoc 
-} from "firebase/firestore";
+import { initializeApp, cert } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { seedDefaults } from "./seed.js";
 import { DB_PATH, setMemoryDB } from "./cache.js";
 import type { DBUser, DBInvitation } from "../types/db";
@@ -20,70 +12,49 @@ import { DEFAULT_ACTIVE_TRIP_ID } from "../utils/constants.js";
 
 const logger = createLogger("Firebase");
 
-
 // Load Firebase configuration safely from root
 const configPath = path.join(process.cwd(), "firebase-applet-config.json");
-const rawConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
-const firebaseConfig = {
-  ...rawConfig,
-  apiKey: process.env.FIREBASE_API_KEY || rawConfig.apiKey
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-
-// Initialize Client Firestore with custom database ID and forcing long polling to bypass sandbox environment limitations
-const clientDb = initializeFirestore(
-  firebaseApp,
-  { experimentalForceLongPolling: true },
-  firebaseConfig.firestoreDatabaseId || "ai-studio-0434fc47-5e16-4d10-b891-81f7bf4003e7"
-);
-
-// Polyfill Firestore Admin SDK interface using client SDK methods
-export const db = {
-  collection(collectionName: string) {
-    return {
-      async get() {
-        const colRef = getCol(clientDb, collectionName);
-        const querySnapshot = await getDocs(colRef);
-        const docs = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          data: () => doc.data(),
-          exists: doc.exists()
-        }));
-        return {
-          forEach(callback: (doc: any) => void) {
-            docs.forEach(callback);
-          },
-          docs,
-          size: docs.length
-        };
-      },
-      doc(docId: string) {
-        return {
-          async get() {
-            const docRef = getDocRef(clientDb, collectionName, docId);
-            const docSnap = await getDoc(docRef);
-            return {
-              id: docSnap.id,
-              exists: docSnap.exists(),
-              data: () => docSnap.data()
-            };
-          },
-          async set(data: any) {
-            const docRef = getDocRef(clientDb, collectionName, docId);
-            await setDoc(docRef, data);
-          },
-          async delete() {
-            const docRef = getDocRef(clientDb, collectionName, docId);
-            await deleteDoc(docRef);
-          }
-        };
-      }
-    };
+let rawConfig: any = {};
+if (fs.existsSync(configPath)) {
+  try {
+    rawConfig = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+  } catch (err) {
+    logger.error("Failed to read firebase-applet-config.json:", err);
   }
-} as any;
+}
 
-export const storage = getStorage(firebaseApp);
+let adminApp: any;
+
+// Use Service Account JSON from environment if available, otherwise fallback to local credentials config
+const serviceAccountJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+if (serviceAccountJson) {
+  try {
+    const serviceAccount = JSON.parse(serviceAccountJson);
+    adminApp = initializeApp({
+      credential: cert(serviceAccount),
+      storageBucket: rawConfig.storageBucket || `${serviceAccount.project_id}.firebasestorage.app`
+    });
+    logger.info("Initialized Firebase Admin SDK successfully with service account.");
+  } catch (err) {
+    logger.error("Failed to initialize with FIREBASE_SERVICE_ACCOUNT_JSON, falling back to basic config:", err);
+    adminApp = initializeApp({
+      projectId: rawConfig.projectId,
+      storageBucket: rawConfig.storageBucket
+    });
+  }
+} else {
+  logger.warn("FIREBASE_SERVICE_ACCOUNT_JSON environment variable not found. Initializing with basic config...");
+  adminApp = initializeApp({
+    projectId: rawConfig.projectId,
+    storageBucket: rawConfig.storageBucket
+  });
+}
+
+const databaseId = rawConfig.firestoreDatabaseId || "ai-studio-0434fc47-5e16-4d10-b891-81f7bf4003e7";
+
+// Export standard firestore instance and storage bucket
+export const db = getFirestore(adminApp, databaseId);
+export const storage = getStorage(adminApp).bucket();
 
 // Helper to race a promise against a timeout
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {

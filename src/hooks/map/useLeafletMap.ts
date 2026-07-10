@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import type L_TYPE from "leaflet";
-import { resolveLatLng, getDayColor } from "../../utils/mapHelpers";
+import { resolveLatLngLocal, getDayColor } from "../../utils/mapHelpers";
 import { latLngToCanvasXY } from "../../lib/mapUtils";
 import { MapTarget } from "./types";
 import { Participant } from "../../types";
@@ -61,7 +61,7 @@ export function useLeafletMap({
 
   // Helper to convert real Lat/Lng standard coordinates to pseudo canvas X/Y
   const getSvgCoordsFromLatLng = (lat: number, lng: number): { x: number; y: number } => {
-    let center = resolveLatLng("", destination, 50, 50);
+    let center = resolveLatLngLocal("", destination, 50, 50);
     if (
       tripLat !== undefined &&
       tripLat !== null &&
@@ -84,7 +84,7 @@ export function useLeafletMap({
   // Helper to resolve coordinates
   const getSpotCoords = (spot: any): { lat: number; lng: number } => {
     if (!spot) {
-      return resolveLatLng("", destination || "", 50, 50);
+      return resolveLatLngLocal("", destination || "", 50, 50);
     }
 
     const latNum = Number(spot.lat);
@@ -115,17 +115,18 @@ export function useLeafletMap({
     }
 
     const pinName = spot.locationName || spot.title || spot.name || "";
-    const resolved = resolveLatLng(pinName, destination || "", x, y);
+    const resolved = resolveLatLngLocal(pinName, destination || "", x, y);
 
     if (isNaN(resolved.lat) || isNaN(resolved.lng)) {
-      return resolveLatLng("", destination || "", 50, 50);
+      return resolveLatLngLocal("", destination || "", 50, 50);
     }
     return resolved;
   };
 
   // Leaflet Map Initialization Effect
   useEffect(() => {
-    if (viewMode !== "leaflet" || !mapContainerRef.current || !leafletLoaded || !L) {
+    const leaflet = L;
+    if (viewMode !== "leaflet" || !mapContainerRef.current || !leafletLoaded || !leaflet) {
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
@@ -137,24 +138,24 @@ export function useLeafletMap({
       const centerLat =
         tripLat !== undefined && tripLat !== null && !isNaN(Number(tripLat))
           ? Number(tripLat)
-          : resolveLatLng(destination, destination, 50, 50).lat;
+          : resolveLatLngLocal(destination, destination, 50, 50).lat;
       const centerLng =
         tripLng !== undefined && tripLng !== null && !isNaN(Number(tripLng))
           ? Number(tripLng)
-          : resolveLatLng(destination, destination, 50, 50).lng;
+          : resolveLatLngLocal(destination, destination, 50, 50).lng;
 
-      const mapInstance = L.map(mapContainerRef.current, {
+      const mapInstance = leaflet.map(mapContainerRef.current, {
         center: [centerLat, centerLng],
         zoom: 12,
         attributionControl: false,
       });
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "© OpenStreetMap",
       }).addTo(mapInstance);
 
-      const group = L.layerGroup().addTo(mapInstance);
+      const group = leaflet.layerGroup().addTo(mapInstance);
       markersGroupRef.current = group;
       mapRef.current = mapInstance;
 
@@ -212,8 +213,9 @@ export function useLeafletMap({
 
   // One-time fitBounds to loaded route
   useEffect(() => {
-    if (!mapRef.current || !routePoints || routePoints.length === 0 || !L) return;
-    const routePolyline = L.polyline(routePoints);
+    const leaflet = L;
+    if (!mapRef.current || !routePoints || routePoints.length === 0 || !leaflet) return;
+    const routePolyline = leaflet.polyline(routePoints);
     try {
       const bounds = routePolyline.getBounds();
       if (bounds.isValid()) {
@@ -226,7 +228,8 @@ export function useLeafletMap({
 
   // Sync / Paint markers in Leaflet Group
   useEffect(() => {
-    if (!mapRef.current || !markersGroupRef.current || !L) return;
+    const leaflet = L;
+    if (!mapRef.current || !markersGroupRef.current || !leaflet) return;
 
     const group = markersGroupRef.current;
     const activeKeys = new Set<string>();
@@ -236,7 +239,7 @@ export function useLeafletMap({
       const key = "gps-user";
       activeKeys.add(key);
 
-      const geoIcon = L.divIcon({
+      const geoIcon = leaflet.divIcon({
         className: "custom-leaflet-geo-pin",
         html: `
           <div class="flex flex-col items-center">
@@ -257,7 +260,7 @@ export function useLeafletMap({
         existing.setLatLng([currentGeoLocation.lat, currentGeoLocation.lng]);
         existing.setIcon(geoIcon);
       } else {
-        const marker = L.marker([currentGeoLocation.lat, currentGeoLocation.lng], {
+        const marker = leaflet.marker([currentGeoLocation.lat, currentGeoLocation.lng], {
           icon: geoIcon,
         }).addTo(group);
         markerCacheRef.current.set(key, marker);
@@ -273,7 +276,7 @@ export function useLeafletMap({
       const pColor = p.avatarColor || "#10b981";
       const initials = (p.name || "").substring(0, 2).toUpperCase() || "?";
 
-      const pIcon = L.divIcon({
+      const pIcon = leaflet.divIcon({
         className: "custom-leaflet-participant-pin",
         html: `
           <div class="flex flex-col items-center select-none">
@@ -298,7 +301,7 @@ export function useLeafletMap({
         existing.setLatLng([p.lat, p.lng]);
         existing.setIcon(pIcon);
       } else {
-        const marker = L.marker([p.lat, p.lng], { icon: pIcon })
+        const marker = leaflet.marker([p.lat, p.lng], { icon: pIcon })
           .addTo(group)
           .bindPopup(
             `<strong>${p.name}</strong><br/>${
@@ -329,7 +332,7 @@ export function useLeafletMap({
         ? "🍴"
         : "📍";
 
-      const pinIcon = L.divIcon({
+      const pinIcon = leaflet.divIcon({
         className: `custom-leaflet-pin-wrapper`,
         html: `
           <div class="flex flex-col items-center ${
@@ -364,7 +367,7 @@ export function useLeafletMap({
           onSelectObject(spot);
         });
       } else {
-        const marker = L.marker([pos.lat, pos.lng], { icon: pinIcon })
+        const marker = leaflet.marker([pos.lat, pos.lng], { icon: pinIcon })
           .addTo(group)
           .on("click", () => {
             onSelectObject(spot);
@@ -387,7 +390,7 @@ export function useLeafletMap({
       polylineRef.current = null;
     }
     if (routePoints && routePoints.length > 0) {
-      const pl = L.polyline(routePoints, {
+      const pl = leaflet.polyline(routePoints, {
         color: routeMeta?.mode === "WALKING" ? "#3b82f6" : "#10b981",
         weight: 6,
         opacity: 0.85,

@@ -93,27 +93,17 @@ export default function ExpenseForm({
           setReceiptImage("");
           setOcrError(null);
         } else {
-          setOcrError(
-            lang === "zh"
-              ? "無法從此收據中擷取有效金額項目，請手動輸入。"
-              : "Could not extract a valid amount from receipt. Please input manually."
-          );
+          setOcrError(t.ocrNoAmountError);
         }
       } else {
         const errMsg = !response.success && "error" in response
           ? (response as any).error?.message
-          : (lang === "zh"
-              ? "辨識失敗。可能因收據解析格式不符，請重試或手動輸入。"
-              : "Receipt OCR failed. Format might be unsupported. Please retry or input manually.");
+          : t.ocrRecognitionFailedError;
         setOcrError(errMsg);
       }
     } catch (err) {
       console.error("Receipt OCR failed:", err);
-      setOcrError(
-        lang === "zh"
-          ? "系統連線失敗或伺服器錯誤，請稍後重試。"
-          : "System connection failure or server error, please try again later."
-      );
+      setOcrError(t.ocrConnectionFailedError);
     } finally {
       setOcrParsing(false);
     }
@@ -191,7 +181,7 @@ export default function ExpenseForm({
           onClick={onClose}
           className="text-slate-400 hover:text-white font-medium cursor-pointer"
         >
-          {lang === "zh" ? "取消" : "Cancel"}
+          {t.cancelBtn}
         </button>
       </h4>
 
@@ -200,14 +190,12 @@ export default function ExpenseForm({
         <div className="flex items-center justify-between">
           <span className="font-semibold text-emerald-400 flex items-center gap-1.5 text-[12px]">
             <FileText size={13} className="text-emerald-400 shrink-0" />
-            <span>{lang === "zh" ? "AI 智慧實體收據辨識 (OCR)" : "AI Smart Receipt OCR Scanner"}</span>
+            <span>{t.aiSmartReceiptOcrScanner}</span>
           </span>
           <span className="text-[11px] text-slate-500 font-mono">Powered by Gemini</span>
         </div>
         <p className="text-[12px] text-slate-400 leading-relaxed">
-          {lang === "zh"
-            ? "在國外拿到實體紙本發票時，可選擇相片上傳、即時拍照，或直接貼上/輸入明細，AI 將自動辨識總金額、品項、消費類別，快速完成記帳！"
-            : "When you get physical receipts, upload a photo, take a real-time picture, or paste text. AI will auto-extract total amount, currency, and category!"}
+          {t.aiSmartReceiptOcrScannerDesc}
         </p>
 
         {/* Hidden input elements for camera capture and file selection */}
@@ -235,7 +223,7 @@ export default function ExpenseForm({
             className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg text-[11.5px] cursor-pointer transition-colors h-10 md:h-8"
           >
             <Upload className="w-4 h-4 text-emerald-400" />
-            <span>{lang === "zh" ? "選擇收據相片" : "Select Receipt"}</span>
+            <span>{t.selectReceiptPhoto}</span>
           </button>
 
           <button
@@ -244,20 +232,20 @@ export default function ExpenseForm({
             className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-lg text-[11.5px] cursor-pointer transition-colors h-10 md:h-8"
           >
             <Camera className="w-4 h-4 text-emerald-400" />
-            <span>{lang === "zh" ? "手機即時拍照" : "Take Photo"}</span>
+            <span>{t.takePhotoRealtime}</span>
           </button>
 
           {receiptImage && (
             <div className="relative group flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-lg animate-fadeIn">
               <Image className="w-4 h-4 text-emerald-400" />
               <span className="text-[11px] text-emerald-400 font-medium truncate max-w-[120px]">
-                {lang === "zh" ? "已載入發票圖片" : "Loaded Image"}
+                {t.loadedReceiptImage}
               </span>
               <button
                 type="button"
                 onClick={() => setReceiptImage("")}
                 className="p-1 hover:bg-red-500/20 rounded text-slate-400 hover:text-red-400 cursor-pointer transition-colors"
-                title={lang === "zh" ? "移除圖片" : "Remove Image"}
+                title={t.removeImageTooltip}
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -273,7 +261,7 @@ export default function ExpenseForm({
               type="button"
               onClick={() => setReceiptImage("")}
               className="absolute top-1 right-1 p-1 bg-black/60 hover:bg-red-600 rounded-full text-white cursor-pointer transition-colors shadow-md"
-              title={lang === "zh" ? "移除圖片" : "Remove Image"}
+              title={t.removeImageTooltip}
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -283,9 +271,7 @@ export default function ExpenseForm({
         <div className="flex flex-col sm:flex-row gap-2.5 mt-1">
           <input
             type="text"
-            placeholder={
-              lang === "zh" ? "手動貼上收據文字/備註（選填）..." : "Manual receipt text/memo (optional)..."
-            }
+            placeholder={t.manualReceiptPlaceholder}
             value={ocrInput}
             onChange={(e) => setOcrInput(e.target.value)}
             className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-[12px] text-white outline-none focus:border-emerald-500"
@@ -301,12 +287,12 @@ export default function ExpenseForm({
               {ocrParsing ? (
                 <>
                   <Sparkles size={13} className="animate-spin text-white shrink-0" />
-                  <span>{lang === "zh" ? "辨識中..." : "Extracting..."}</span>
+                  <span>{t.extractingOcrStatus}</span>
                 </>
               ) : (
                 <>
                   <Zap size={13} className="text-amber-400 shrink-0" />
-                  <span>{lang === "zh" ? "智慧一鍵辨識" : "Scan Receipt"}</span>
+                  <span>{t.scanReceiptOcrBtn}</span>
                 </>
               )}
             </button>
@@ -331,18 +317,18 @@ export default function ExpenseForm({
               }}
               className="bg-slate-950 border border-white/10 hover:border-white/25 rounded-xl px-2.5 text-[11px] text-slate-400 cursor-pointer outline-none shrink-0"
             >
-              <option value="">📋 {lang === "zh" ? "載入真實收據範例" : "Load Receipt Template"}</option>
+              <option value="">📋 {t.loadReceiptTemplateDropdown}</option>
               <option value="izakaya">
                 {" "}
-                🍣 {lang === "zh" ? "新宿居酒屋細目 (8,650日圓)" : "Shinjuku Izakaya (8,650 JPY)"}
+                🍣 {t.shinjukuIzakayaTemplate}
               </option>
               <option value="train">
                 {" "}
-                🚄 {lang === "zh" ? "新幹線單程票 (14,500日圓)" : "Shinkansen fare (14,500 JPY)"}
+                🚄 {t.shinkansenTicketTemplate}
               </option>
               <option value="starbucks">
                 {" "}
-                ☕ {lang === "zh" ? "澀谷星巴克咖啡 (1,250日圓)" : "Starbucks Coffee (1,250 JPY)"}
+                ☕ {t.starbucksCoffeeTemplate}
               </option>
             </select>
           </div>
@@ -372,7 +358,7 @@ export default function ExpenseForm({
 
         <div>
           <label className="block text-slate-300 font-medium mb-1.5">
-            {lang === "zh" ? "拆分方式" : "Split Method"}
+            {t.splitMethodLabel}
           </label>
           <div className="flex gap-2.5">
             <button
@@ -386,7 +372,7 @@ export default function ExpenseForm({
             >
               <span className="flex items-center gap-1.5">
                 <Users size={14} />
-                <span>{lang === "zh" ? "人頭等額平分" : "Equal Split"}</span>
+                <span>{t.equalSplitOption}</span>
               </span>
             </button>
             <button
@@ -400,7 +386,7 @@ export default function ExpenseForm({
             >
               <span className="flex items-center gap-1.5">
                 <Percent size={14} />
-                <span>{lang === "zh" ? "單人付全額 (依個人明細拆分)" : "Payer Pays All (Split by custom shares)"}</span>
+                <span>{t.payerPaysAllOption}</span>
               </span>
             </button>
           </div>
@@ -430,7 +416,7 @@ export default function ExpenseForm({
       ) : (
         <div className="p-4 bg-slate-950/60 rounded-xl border border-white/5 space-y-3 overflow-hidden text-left">
           <div className="font-semibold text-slate-300 border-b border-white/5 pb-2 mb-3">
-            {lang === "zh" ? "請輸入各成員在此筆消費中的金額（由付款人先支付全額）" : "Input each member's specific share (Payer paid the full sum on behalf of everyone):"}
+            {t.inputCustomSharesHeader}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-[repeat(2,minmax(0,1fr))] gap-3 text-sm overflow-hidden">
             {participants.map((p) => {
@@ -442,7 +428,7 @@ export default function ExpenseForm({
                     className="flex items-center gap-2.5 justify-between border-b border-white/5 pb-2.5 opacity-35"
                   >
                     <span className="text-slate-500 truncate">
-                      {p.name} ({lang === "zh" ? "未參與分攤" : "Not sharing"})
+                      {p.name} ({t.notSharingStatus})
                     </span>
                   </div>
                 );
@@ -546,21 +532,19 @@ export default function ExpenseForm({
       <div className="p-3 bg-white/5 border border-white/5 rounded-xl space-y-3 text-left">
         <div className="font-bold text-slate-300 flex items-center gap-1.5">
           <ShoppingBag size={14} className="text-slate-300" />
-          <span>{lang === "zh" ? "免稅退稅 & 折扣比例調整 (可填單項或不填)" : "Tax Refund & Discount Adjustment (Optional)"}</span>
+          <span>{t.taxRefundDiscountTitle}</span>
           <span className="bg-amber-500/10 text-amber-400 text-xs px-1.5 py-0.5 rounded border border-amber-500/10 font-mono">
-            {lang === "zh" ? "後續自動等比扣減" : "Proportional adjustment"}
+            {t.proportionalAdjustmentBadge}
           </span>
         </div>
         <p className="text-xs text-slate-400 leading-normal">
-          {lang === "zh"
-            ? "系統已套用專業演算法：以「退稅後費用總額」為基數計算退稅百分比，精準回推各成員對應之應付額。收據往往只有一個退稅總額，在此輸入後，系統會自動在各個成員的自付款項中，按原始金額比例分減扣除，計算出極致精準的實際付款額！"
-            : "The system utilizes advanced tax algorithm: Refund % is calculated using the post-refund actual cost as the base, precisely back-calculating individual shares. The ledger automatically distributes deductions according to individual raw ratios for precise splits!"}
+          {t.taxRefundAlgorithmDesc}
         </p>
 
         {/* Country presets dropdown */}
         <div className="text-xs">
           <label className="block text-slate-400 mb-1">
-            {lang === "zh" ? "⚡ 快速套用目的地國家退稅比例" : "⚡ Quick Country Tax Preset"}
+            {t.quickCountryTaxPresetLabel}
           </label>
           <select
             onChange={(e) => {
@@ -575,20 +559,20 @@ export default function ExpenseForm({
             value={taxRefundPercent}
             className="w-full bg-slate-950 border border-white/10 rounded-lg p-2 text-white bg-slate-900 outline-none focus:border-amber-500 cursor-pointer"
           >
-            <option value="">{lang === "zh" ? "-- 請選擇國家套用比例 (或手動於下方填寫) --" : "-- Choose country to auto-fill --"}</option>
-            <option value="10">🇯🇵 {lang === "zh" ? "日本 (10% 消費稅免稅)" : "Japan (10% Tax Refund)"}</option>
-            <option value="5">🇹🇼 {lang === "zh" ? "台灣 (5% 營業稅退稅)" : "Taiwan (5% Tax Refund)"}</option>
-            <option value="10">🇰🇷 {lang === "zh" ? "韓國 (10% 附加稅退稅)" : "South Korea (10% Tax Refund)"}</option>
-            <option value="8">🇸🇬 {lang === "zh" ? "新加坡 (8% 消費稅/GST退稅)" : "Singapore (8% GST Refund)"}</option>
-            <option value="7">🇹🇭 {lang === "zh" ? "泰國 (7% 增值稅退稅)" : "Thailand (7% VAT Refund)"}</option>
-            <option value="12">🇪🇺 {lang === "zh" ? "歐洲標準/歐盟 (平均約 12% 增值稅退稅)" : "Europe/EU (Avg. ~12% Tax Refund)"}</option>
+            <option value="">{t.chooseCountryPlaceholder}</option>
+            <option value="10">🇯🇵 {t.japanRefundOption}</option>
+            <option value="5">🇹🇼 {t.taiwanRefundOption}</option>
+            <option value="10">🇰🇷 {t.koreaRefundOption}</option>
+            <option value="8">🇸🇬 {t.singaporeRefundOption}</option>
+            <option value="7">🇹🇭 {t.thailandRefundOption}</option>
+            <option value="12">🇪🇺 {t.europeRefundOption}</option>
           </select>
         </div>
 
         <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-3 text-xs">
           <div>
             <label className="block text-slate-400 mb-1">
-              {lang === "zh" ? "折減退稅金額 $" : "Deduction/Refund ($ Amount)"}
+              {t.deductionRefundAmountLabel}
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-2.5 flex items-center text-slate-500">$</span>
@@ -605,7 +589,7 @@ export default function ExpenseForm({
           </div>
           <div>
             <label className="block text-slate-400 mb-1">
-              {lang === "zh" ? "或是退稅比例 %" : "Or Refund Percent (%)"}
+              {t.orRefundPercentLabel}
             </label>
             <div className="relative">
               <input
@@ -633,14 +617,12 @@ export default function ExpenseForm({
                 className="w-3.5 h-3.5 rounded border-white/10 bg-slate-900 text-amber-500 focus:ring-0 cursor-pointer"
               />
               <span>
-                {lang === "zh"
-                  ? "扣除平台/百貨手續費 (例如 Global Blue / 門市 1.5% - 2%)"
-                  : "Deduct processing fee (e.g. Global Blue 1.5% - 2%)"}
+                {t.deductProcessingFeeLabel}
               </span>
             </label>
             {taxRefundDeductFee && (
               <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
-                <span className="text-slate-400">{lang === "zh" ? "手續費率:" : "Fee rate:"}</span>
+                <span className="text-slate-400">{t.feeRateLabel}</span>
                 <div className="relative w-20">
                   <input
                     type="number"
@@ -663,24 +645,22 @@ export default function ExpenseForm({
         {rawTotalVal > 0 && (
           <div className="bg-slate-950 border border-white/5 rounded-lg p-3 space-y-2 mt-2 overflow-hidden">
             <div className="font-bold text-blue-300 border-b border-white/5 pb-1 text-xs flex items-center justify-between">
-              <span>{lang === "zh" ? "即時試算分攤預覽" : "Live Share Preview"}</span>
+              <span>{t.liveSharePreviewTitle}</span>
               <span className="font-mono text-slate-400 text-xs">
-                {lang === "zh"
-                  ? `退稅比例: ${(ratioVal * 100).toFixed(1)}% 實付`
-                  : `Refund ratio: ${(ratioVal * 100).toFixed(1)}% act`}
+                {t.refundRatioActual.replace("{ratio}", (ratioVal * 100).toFixed(1))}
               </span>
             </div>
             <div className="space-y-1 font-mono text-xs">
               <div className="flex justify-between text-slate-400">
-                <span>{lang === "zh" ? "原始原價總金額：" : "Raw total sum:"}</span>
+                <span>{t.rawTotalSumLabel}</span>
                 <span>${rawTotalVal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-rose-400">
-                <span>{lang === "zh" ? "免稅/退稅/折扣額：" : "Refund reduction:"}</span>
+                <span>{t.refundReductionLabel}</span>
                 <span>-${refundVal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-emerald-400 font-bold border-b border-white/5 pb-1.5 mb-1.5">
-                <span>{lang === "zh" ? "折實總付款額：" : "Actual total cost:"}</span>
+                <span>{t.actualTotalCostLabel}</span>
                 <span>${finalPriceVal.toFixed(2)}</span>
               </div>
 
@@ -708,13 +688,13 @@ export default function ExpenseForm({
                       </span>
                       <span className="shrink-0">
                         <span className="text-slate-500 font-normal">
-                          ${pRaw.toFixed(2)} {lang === "zh" ? "原價" : "raw"}
+                          ${pRaw.toFixed(2)} {t.rawPriceLabel}
                         </span>
                         <span className="text-slate-600 font-normal mx-1">→</span>
                         <span className="text-emerald-400 font-bold">${pFinal.toFixed(2)}</span>
                         {pSaved > 0 && (
                           <span className="text-amber-400 text-xs ml-1.5">
-                            ({lang === "zh" ? `減$${pSaved.toFixed(1)}` : `-$${pSaved.toFixed(1)}`})
+                            ({t.savedAmountLabel.replace("{amount}", pSaved.toFixed(1))})
                           </span>
                         )}
                       </span>
@@ -731,9 +711,7 @@ export default function ExpenseForm({
       <div className="p-3 bg-slate-900/60 border border-white/5 rounded-xl text-[10.5px] text-slate-400 font-medium leading-relaxed font-sans flex items-start gap-2 mt-2">
         <span className="text-amber-400 shrink-0">ℹ️</span>
         <div>
-          {lang === "zh"
-            ? "系統提示：跨幣別記帳時，系統採用固定模擬匯率 (USD/JPY: 155, USD/TWD: 32) 進行換算與統計，非實時市場匯率。"
-            : "System Tip: For multi-currency entries, conversions use fixed simulated rates (USD/JPY: 155, USD/TWD: 32) for travel expense consolidation."}
+          {t.exchangeRatesSimulatedTip}
         </div>
       </div>
 

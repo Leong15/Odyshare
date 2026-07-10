@@ -1,11 +1,12 @@
 import { Request } from "express";
 import { db } from "./firebase.js";
-import { getDB, writeDB } from "./cache.js";
+import { getDB, writeDB, writeDBAndConfirm } from "./cache.js";
 import { DEFAULT_TRIP } from "./seed.js";
 import { broadcastTripChange } from "./sse.js";
 import type { Trip, Participant } from "../../src/types";
 import type { DBUser, DBInvitation } from "../types/db";
 import { createLogger } from "../utils/logger.js";
+import { DEFAULT_PARTICIPANT_BUDGET_LIMIT } from "../utils/constants.js";
 
 const logger = createLogger("CRUD");
 
@@ -34,7 +35,6 @@ export function mapTripSummary(t: any) {
     participants: t.participants || [],
     expenses: t.expenses || [],
     itineraries: t.itineraries || [],
-    flightEstimates: t.flightEstimates || [],
     documents: t.documents || [],
     chats: t.chats || []
   };
@@ -80,10 +80,9 @@ export function getTripForRequest(req: Request) {
           email: user?.email || "user@example.com",
           avatarColor: user?.avatarColor || "#3b82f6",
           publicKey: "pub_key_sec_user_initial",
-          budgetLimit: 1500
+          budgetLimit: DEFAULT_PARTICIPANT_BUDGET_LIMIT
         }
       ],
-      flightEstimates: [],
       itineraries: [
         {
           id: "it-init-" + Date.now(),
@@ -109,14 +108,13 @@ export function getTripForRequest(req: Request) {
   }
 
   // Fallback to global active trip or first trip
-  if (!trip) {
-    trip = dbState.trips.find(t => t.id === dbState.activeTripId) || dbState.trips[0];
-  }
+  const activeTrip = trip || dbState.trips.find(t => t.id === dbState.activeTripId) || dbState.trips[0] || DEFAULT_TRIP;
 
   // Enrich participants with their actual database username if match is found
-  if (trip && trip.participants) {
-    trip = { ...trip, participants: enrichParticipants(trip.participants, dbState.users) };
-  }
+  const enrichedTrip = {
+    ...activeTrip,
+    participants: enrichParticipants(activeTrip.participants || [], dbState.users)
+  };
 
   // Filter visible trips scoped strictly to user
   const visibleTrips = userId 
@@ -124,9 +122,9 @@ export function getTripForRequest(req: Request) {
     : dbState.trips;
 
   return {
-    ...trip,
+    ...enrichedTrip,
     tripsList: visibleTrips.map(mapTripSummary)
-  };
+  } as Trip & { tripsList: Trip[] };
 }
 
 export function saveTripForRequest(req: Request, updatedTrip: Trip) {
@@ -149,7 +147,7 @@ export function saveTripForRequest(req: Request, updatedTrip: Trip) {
   }
 }
 
-export function readTripsDB(req?: Request) {
+export function readTripsDB(req?: Request): Trip & { tripsList: Trip[] } {
   if (req) {
     return getTripForRequest(req);
   }
@@ -160,18 +158,20 @@ export function readTripsDB(req?: Request) {
     dbState.activeTripId = active.id;
     writeDB(dbState);
   } else if (!active) {
-    active = JSON.parse(JSON.stringify(DEFAULT_TRIP));
-    dbState.activeTripId = active.id;
-    dbState.trips = [active];
+    const defaultTrip: Trip = JSON.parse(JSON.stringify(DEFAULT_TRIP));
+    active = defaultTrip;
+    dbState.activeTripId = defaultTrip.id;
+    dbState.trips = [defaultTrip];
     writeDB(dbState);
   }
-  if (active && active.participants) {
-    active = { ...active, participants: enrichParticipants(active.participants, dbState.users) };
+  let enrichedActive: Trip = active;
+  if (enrichedActive.participants) {
+    enrichedActive = { ...enrichedActive, participants: enrichParticipants(enrichedActive.participants, dbState.users) };
   }
   return {
-    ...active,
+    ...enrichedActive,
     tripsList: dbState.trips.map(mapTripSummary)
-  };
+  } as Trip & { tripsList: Trip[] };
 }
 
 export function writeTripsDB(data: Trip, req?: Request) {
@@ -190,6 +190,49 @@ export function writeTripsDB(data: Trip, req?: Request) {
     dbState.trips.push(cleanData);
   }
   writeDB(dbState);
+
+  // Broadcast change to SSE listeners
+  if (cleanData.id) {
+    broadcastTripChange(cleanData.id);
+  }
+}
+
+export async function saveTripForRequestAndConfirm(req: Request, updatedTrip: Trip): Promise<void> {
+  const dbState = getDB();
+  const cleanData = { ...updatedTrip };
+  delete cleanData.tripsList;
+  cleanData.updatedAt = new Date().toISOString();
+  
+  const idx = dbState.trips.findIndex(t => t.id === cleanData.id);
+  if (idx !== -1) {
+    dbState.trips[idx] = cleanData;
+  } else {
+    dbState.trips.push(cleanData);
+  }
+  await writeDBAndConfirm(dbState);
+
+  // Broadcast change to SSE listeners
+  if (cleanData.id) {
+    broadcastTripChange(cleanData.id);
+  }
+}
+
+export async function writeTripsDBAndConfirm(data: Trip, req?: Request): Promise<void> {
+  if (req) {
+    await saveTripForRequestAndConfirm(req, data);
+    return;
+  }
+  const dbState = getDB();
+  const cleanData = { ...data };
+  delete cleanData.tripsList;
+  cleanData.updatedAt = new Date().toISOString();
+  const idx = dbState.trips.findIndex(t => t.id === dbState.activeTripId);
+  if (idx !== -1) {
+    dbState.trips[idx] = cleanData;
+  } else {
+    dbState.trips.push(cleanData);
+  }
+  await writeDBAndConfirm(dbState);
 
   // Broadcast change to SSE listeners
   if (cleanData.id) {

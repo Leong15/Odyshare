@@ -36,7 +36,7 @@ const geocodeCache = new Map<string, { lat: number; lng: number } | null>();
  * 1. Try static table (instant, no network)
  * 2. Try Nominatim with a 6-second timeout
  */
-export async function resolveCoordinates(
+export async function resolveCoordinatesRemote(
   destination: string
 ): Promise<{ lat: number; lng: number } | null> {
   if (!destination || destination === "Unknown Destination") return null;

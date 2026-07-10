@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { resolveLatLng } from "../../utils/mapHelpers";
+import { resolveLatLngLocal } from "../../utils/mapHelpers";
 
 function resolveActiveItemLatLng(activeItem: any, destination: string) {
   if (!activeItem) return null;
   return activeItem.coordinates
-    ? resolveLatLng(
+    ? resolveLatLngLocal(
         activeItem.locationName || activeItem.title,
         destination,
         activeItem.coordinates.x,

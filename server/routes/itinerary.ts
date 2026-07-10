@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { readTripsDB, writeTripsDB } from "../db/index.js";
-import { resolveCoordinates } from "../utils/geocoding.js";
+import { resolveCoordinatesRemote } from "../utils/geocoding.js";
 import { ok, fail } from "../utils/apiResponse.js";
 import { latLngToCanvasXY } from "../../src/lib/mapUtils.js";
 import { ITEM_ID_PREFIXES } from "../../src/shared/ids.js";
@@ -14,7 +14,7 @@ router.post("/add", async (req: Request, res: Response) => {
     const current = readTripsDB(req);
 
     // Resolve coordinates for map pins from geocoding utility
-    const coords = await resolveCoordinates(locationName || title);
+    const coords = await resolveCoordinatesRemote(locationName || title);
 
     const newItem = {
       id: ITEM_ID_PREFIXES.ITINERARY + Date.now(),
@@ -58,7 +58,7 @@ router.post("/edit", async (req: Request, res: Response) => {
 
       // Automatically re-geocode coordinate when address or location name is modified
       if (oldItem.locationName !== item.locationName) {
-        const coords = await resolveCoordinates(item.locationName || item.title);
+        const coords = await resolveCoordinatesRemote(item.locationName || item.title);
         if (coords) {
           lat = coords.lat;
           lng = coords.lng;

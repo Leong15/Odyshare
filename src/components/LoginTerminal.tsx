@@ -1,4 +1,5 @@
 import React from "react";
+import { translations } from "../lib/translations";
 
 interface LoginTerminalProps {
   lang: "en" | "zh";
@@ -40,6 +41,7 @@ export default function LoginTerminal({
   onAuthSubmit,
 }: LoginTerminalProps) {
   const isLight = theme === "light";
+  const t = translations[lang];
 
   const [showForgotModal, setShowForgotModal] = React.useState(false);
   const [forgotStep, setForgotStep] = React.useState(1);
@@ -54,11 +56,11 @@ export default function LoginTerminal({
     setRecoveryError("");
     setRecoverySuccess("");
     if (!recoveryUsername.trim()) {
-      setRecoveryError(lang === "zh" ? "請輸入帳號" : "Please input account ID");
+      setRecoveryError(t.loginPleaseInputAccount);
       return;
     }
     if (!recoveryEmail.trim()) {
-      setRecoveryError(lang === "zh" ? "請輸入電子信箱" : "Please input email address");
+      setRecoveryError(t.loginPleaseInputEmail);
       return;
     }
     try {
@@ -73,16 +75,16 @@ export default function LoginTerminal({
       const data = await res.json();
       if (!res.ok) {
         const errMsg = typeof data.error === "object" && data.error !== null
-          ? (data.error.message || data.error.code || (lang === "zh" ? "密碼重設失敗，帳號與信箱不符" : "Reset failed. Account and Email mismatched."))
-          : (data.error || (lang === "zh" ? "密碼重設失敗，帳號與信箱不符" : "Reset failed. Account and Email mismatched."));
+          ? (data.error.message || data.error.code || t.loginResetFailed)
+          : (data.error || t.loginResetFailed);
         setRecoveryError(errMsg);
         return;
       }
-      const successMsg = data.data && data.data.message ? data.data.message : (data.message || (lang === "zh" ? "密碼已重設，請至信箱收取新密碼！" : "Password has been reset, please check your inbox!"));
+      const successMsg = data.data && data.data.message ? data.data.message : (data.message || t.loginResetSuccess);
       setRecoverySuccess(successMsg);
       setForgotStep(2);
     } catch (err) {
-      setRecoveryError(lang === "zh" ? "連線連線錯誤，請稍後重試" : "Network error, please retry.");
+      setRecoveryError(t.loginNetworkError);
     }
   };
 
@@ -103,10 +105,10 @@ export default function LoginTerminal({
             <span className="font-extrabold text-sm tracking-widest">OSS</span>
           </div>
           <h2 className={`text-lg sm:text-xl font-black ${isLight ? "text-slate-900" : "text-white"}`}>
-            {lang === "zh" ? "OdyShareSync 旅伴協作平台" : "OdyShareSync Travel System"}
+            {t.loginBrandTitle}
           </h2>
           <p className={`text-[11px] font-medium ${isLight ? "text-slate-500" : "text-slate-450"}`}>
-            {lang === "zh" ? "專屬獨立帳號加密登入管理 • 旅伴行程對帳終端" : "Secure independent accounts workspace term"}
+            {t.loginSubtitle}
           </p>
         </div>
 
@@ -124,7 +126,7 @@ export default function LoginTerminal({
                 : (isLight ? "text-slate-500 hover:text-slate-800" : "text-slate-400 hover:text-slate-200")
             }`}
           >
-            🔑 {lang === "zh" ? "登入帳號" : "Login"}
+            🔑 {t.loginBtnTab}
           </button>
           <button
             type="button"
@@ -138,7 +140,7 @@ export default function LoginTerminal({
                 : (isLight ? "text-slate-400 hover:text-slate-100" : "text-slate-400 hover:text-slate-200")
             }`}
           >
-            📝 {lang === "zh" ? "註冊新帳號" : "Register"}
+            📝 {t.registerBtnTab}
           </button>
         </div>
 
@@ -149,12 +151,12 @@ export default function LoginTerminal({
             <>
               <div className="space-y-1">
                 <label className={`block text-[10.5px] font-black uppercase tracking-wider font-mono ${isLight ? "text-slate-600" : "text-slate-400"}`}>
-                  {lang === "zh" ? "旅伴顯示名字 *" : "Display Traveler Name *"}
+                  {t.displayTravelerName}
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder={lang === "zh" ? "e.g. 小明 / Ben Chan" : "e.g. Ben Chan"}
+                  placeholder={t.displayTravelerNamePlaceholder}
                   value={authName}
                   onChange={(e) => setAuthName(e.target.value)}
                   className={`w-full px-3.5 py-2.5 rounded-xl text-base md:text-xs border focus:outline-none transition-all ${
@@ -168,12 +170,12 @@ export default function LoginTerminal({
               {/* Email Address */}
               <div className="space-y-1">
                 <label className={`block text-[10.5px] font-black uppercase tracking-wider font-mono ${isLight ? "text-slate-600" : "text-slate-400"}`}>
-                  {lang === "zh" ? "電子信箱 (Email) *" : "Email Address *"}
+                  {t.emailAddressLabel}
                 </label>
                 <input
                   type="email"
                   required
-                  placeholder={lang === "zh" ? "e.g. user@example.com" : "e.g. user@example.com"}
+                  placeholder={t.emailAddressPlaceholder}
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
                   className={`w-full px-3.5 py-2.5 rounded-xl text-base md:text-xs border focus:outline-none transition-all ${
@@ -189,12 +191,12 @@ export default function LoginTerminal({
           {/* Username / Login ID */}
           <div className="space-y-1">
             <label className={`block text-[10.5px] font-black uppercase tracking-wider font-mono ${isLight ? "text-slate-600" : "text-slate-400"}`}>
-              {lang === "zh" ? "登入帳號 (Login ID) *" : "Login ID / Username *"}
+              {t.loginIdLabel}
             </label>
             <input
               type="text"
               required
-              placeholder={lang === "zh" ? "請輸入帳號英文或數字..." : "Enter your username..."}
+              placeholder={t.loginIdPlaceholder}
               value={authUsername}
               onChange={(e) => setAuthUsername(e.target.value)}
               className={`w-full px-3.5 py-2.5 rounded-xl text-base md:text-xs border focus:outline-none transition-all font-mono ${
@@ -209,7 +211,7 @@ export default function LoginTerminal({
           <div className="space-y-1">
             <div className="flex justify-between items-center">
               <label className={`block text-[10.5px] font-black uppercase tracking-wider font-mono ${isLight ? "text-slate-600" : "text-slate-400"}`}>
-                {lang === "zh" ? "安全密碼 *" : "Security Password *"}
+                {t.securityPasswordLabel}
               </label>
               <button
                 type="button"
@@ -223,7 +225,7 @@ export default function LoginTerminal({
                 }}
                 className="text-[10px] text-blue-500 hover:text-blue-600 font-bold hover:underline cursor-pointer"
               >
-                {lang === "zh" ? "忘記密碼？" : "Forgot Password?"}
+                {t.forgotPasswordLink}
               </button>
             </div>
             <input
@@ -253,8 +255,8 @@ export default function LoginTerminal({
             className="w-full glass-button-primary bg-gradient-to-r from-blue-600 to-indigo-600 hover:scale-[1.01] text-white font-extrabold text-xs py-3 rounded-xl shadow-lg shadow-blue-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
           >
             {authMode === "login" 
-              ? (lang === "zh" ? "解鎖進入系統" : "Unlock Workspace")
-              : (lang === "zh" ? "創建帳號並進入" : "Create Account & Unlock")
+              ? t.unlockWorkspaceBtn
+              : t.createAccountAndUnlockBtn
             }
           </button>
         </form>
@@ -310,19 +312,17 @@ export default function LoginTerminal({
             </button>
 
             <h3 className="text-sm font-black mb-3">
-              🔑 {lang === "zh" ? "密碼安全找回與重置" : "Password Security Recovery"}
+              🔑 {t.forgotPasswordModalTitle}
             </h3>
 
             {forgotStep === 1 && (
               <form onSubmit={handleStartRecovery} className="space-y-3.5">
                 <p className="text-[11px] text-slate-400 leading-normal">
-                  {lang === "zh" 
-                    ? "請輸入您的登入帳號及註冊的電子信箱。確認符合後，系統將隨機生成一組符合安全規格的高強度新密碼發送給您：" 
-                    : "Enter your Login ID and registered Email. If verified, we will generate a secure random password and notify you via email:"}
+                  {t.forgotPasswordModalDesc}
                 </p>
                 <div className="space-y-2">
                   <div className="space-y-1">
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">{lang === "zh" ? "帳號 (Login ID)" : "Login ID"}</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">{t.loginIdLabel.replace(" *", "")}</span>
                     <input
                       type="text"
                       required
@@ -336,7 +336,7 @@ export default function LoginTerminal({
                   </div>
 
                   <div className="space-y-1">
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">{lang === "zh" ? "註冊的電子信箱 (Email)" : "Registered Email"}</span>
+                    <span className="block text-[10px] font-bold text-slate-400 uppercase font-mono">{t.emailAddressLabel.replace(" *", "")}</span>
                     <input
                       type="email"
                       required
@@ -354,7 +354,7 @@ export default function LoginTerminal({
                   type="submit"
                   className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
                 >
-                  {lang === "zh" ? "送出並發送密碼信" : "Send Safe Password Notification"}
+                  {t.sendPasswordBtn}
                 </button>
               </form>
             )}
@@ -369,7 +369,7 @@ export default function LoginTerminal({
                   onClick={() => setShowForgotModal(false)}
                   className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
                 >
-                  {lang === "zh" ? "回登入頁面" : "Back to Login"}
+                  {t.backToLoginBtn}
                 </button>
               </div>
             )}

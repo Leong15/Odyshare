@@ -8,6 +8,7 @@ import { TripMetaEditForm } from "./dashboard/TripMetaEditForm";
 import { ProjectListPanel } from "./dashboard/ProjectListPanel";
 import { WorldMapPanel } from "./dashboard/WorldMapPanel";
 import { ConfirmModal } from "./common/ConfirmModal";
+import { translations } from "../lib/translations";
 
 export type DashboardTrip = TripSummary;
 
@@ -55,6 +56,7 @@ export default function TripDashboard({
   onEditTripMeta,
   onDeleteTrip
 }: TripDashboardProps) {
+  const t = translations[lang];
   const [isEditing, setIsEditing] = useState(false);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -185,12 +187,10 @@ export default function TripDashboard({
               </div>
               <div>
                 <h4 className="text-sm font-black text-white uppercase tracking-wider font-sans">
-                  {lang === "zh" ? "終端核心載入中" : "Calibrating Workspace"}
+                  {t.calibratingWorkspaceTitle}
                 </h4>
                 <p className="text-xs text-slate-400 mt-1.5 leading-relaxed font-sans">
-                  {lang === "zh" 
-                    ? "正在調閱與同步該協作目標之端到端加密通訊及支出預算單據..." 
-                    : "Synchronizing cryptographic database shards and group channels..."}
+                  {t.calibratingWorkspaceDesc}
                 </p>
               </div>
             </motion.div>
@@ -205,7 +205,7 @@ export default function TripDashboard({
           <div className="space-y-1.5 flex-1 w-full max-w-xl">
             <div className="flex items-center gap-1.5 text-[10px] text-blue-400 font-bold uppercase tracking-widest">
               <Shield size={11} />
-              <span>{lang === "zh" ? "OdyShareSync 全域特工控制台" : "OdyShareSync Travel Portfolio Cockpit"}</span>
+              <span>{t.dashboardCockpitLabel}</span>
             </div>
             
             {isEditing ? (
@@ -218,15 +218,13 @@ export default function TripDashboard({
             ) : (
               <>
                 <h2 className="text-lg md:text-xl font-black text-white tracking-tight flex items-center gap-2">
-                  <span>{lang === "zh" ? "歡迎回到系統控制台" : "OdyShareSync Command Center"}</span>
+                  <span>{t.dashboardWelcome}</span>
                   <span className="text-[9px] bg-blue-500/10 border border-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded font-mono font-bold tracking-wider">
                     SECURE PORTFOLIO
                   </span>
                 </h2>
                 <p className="text-[11.5px] text-zinc-400 font-medium leading-relaxed max-w-lg">
-                  {lang === "zh" 
-                    ? `您正在檢視跨專案全域整合資訊。點擊下方專案集隨時開拓、切換或在地圖上檢視各目標。當前選定之漫遊專案為「${trip?.name}」。`
-                    : `You are looking at your complete travel portfolio. Click on any project node below or target pin on the interactive map to jump directly into its group workspace.`}
+                  {t.dashboardWelcomeDesc.replace("{tripName}", trip?.name || "")}
                 </p>
               </>
             )}
@@ -240,7 +238,7 @@ export default function TripDashboard({
                 className="flex-1 md:flex-initial px-3.5 py-2 bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl border border-white/5 transition flex items-center justify-center gap-1.5 text-xs font-black cursor-pointer"
               >
                 <Edit size={12} className="text-blue-400" />
-                <span>{lang === "zh" ? "快速修改此專案" : "Edit Active Trip"}</span>
+                <span>{t.editActiveTripBtn}</span>
               </button>
 
               <button
@@ -250,7 +248,7 @@ export default function TripDashboard({
                 className="flex-1 md:flex-initial px-3.5 py-2 bg-rose-950/20 hover:bg-rose-900 border border-rose-500/20 text-rose-300 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition flex items-center justify-center gap-1.5 text-xs font-black cursor-pointer"
               >
                 <Trash2 size={12} />
-                <span>{lang === "zh" ? "刪除此漫遊" : "Delete Current"}</span>
+                <span>{t.deleteCurrentBtn}</span>
               </button>
             </div>
           )}
@@ -279,14 +277,10 @@ export default function TripDashboard({
       </div>
       <ConfirmModal
         isOpen={showDeleteConfirm}
-        title={lang === "zh" ? "確認刪除專案" : "Delete Project Workspace"}
-        message={
-          lang === "zh" 
-            ? `確定要永久刪除「${trip?.name}」這項協作專案嗎？此操作將使所有團員的通訊包、預算明細、離線定位數據永久消逝且不可復原！`
-            : `Are you sure you want to permanently delete workspace '${trip?.name}'? This deletes all co-travel chats, document vaults, budgets, and data for all participants and is non-reversible!`
-        }
-        confirmText={lang === "zh" ? "確認刪除" : "Confirm Delete"}
-        cancelText={lang === "zh" ? "取消" : "Cancel"}
+        title={t.deleteProjectModalTitle}
+        message={t.deleteProjectModalDesc.replace("{tripName}", trip?.name || "")}
+        confirmText={t.confirmDelete}
+        cancelText={t.inviteCancelBtn}
         onConfirm={performDeleteProject}
         onCancel={() => setShowDeleteConfirm(false)}
       />

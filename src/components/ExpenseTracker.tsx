@@ -8,12 +8,12 @@ import {
   getExpenseActualTotal,
   calculateSettleMatrix,
   calculatePersonalMetrics,
-  getParticipantAdjustedSpent,
 } from "../utils/expenseCalculator";
 
 import ExpenseForm from "./expense/ExpenseForm";
 import BudgetSummaryWidget from "./expense/BudgetSummaryWidget";
 import MemberLimitsWidget from "./expense/MemberLimitsWidget";
+import { CollapsibleSection } from "./common/CollapsibleSection";
 
 interface ExpenseTrackerProps {
   expenses: ExpenseItem[];
@@ -117,7 +117,7 @@ export default function ExpenseTracker({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-[repeat(3,minmax(0,1fr))] gap-6">
+    <div className="grid grid-cols-1 lg:grid-cols-[repeat(3,minmax(0,1fr))] gap-6 text-left">
       {/* Primary Action Panel: Transaction Ledger */}
       <div className="lg:col-span-2 space-y-4">
         <div className="glass-container rounded-2xl p-6 md:p-8 shadow-lg border border-white/10 h-full flex flex-col">
@@ -125,9 +125,7 @@ export default function ExpenseTracker({
             <div>
               <h3 className="font-extrabold text-white text-sm">{t.groupTransactionLedger}</h3>
               <p className="text-xs text-slate-400">
-                {lang === "zh"
-                  ? "勾選/取消勾選任意帳目，即時重新計算右側預算與拆帳結算書"
-                  : "Check/uncheck entries to recalculate splits & budgets dynamically"}
+                {t.ledgerDescText}
               </p>
             </div>
             <button
@@ -155,7 +153,7 @@ export default function ExpenseTracker({
             {expenses.length === 0 ? (
               <div className="text-center py-16 bg-white/3 rounded-2xl border border-dashed border-white/5 p-4">
                 <p className="text-xs text-slate-400">
-                  No active shared bills found. Click 'Add New Cost' to log some!
+                  {t.ledgerNoSharedBills}
                 </p>
               </div>
             ) : (
@@ -206,12 +204,12 @@ export default function ExpenseTracker({
                             </h4>
                             {expenseData.splitType === "individual" && (
                               <span className="bg-purple-500/15 text-purple-300 border border-purple-500/10 text-[9px] px-1 py-0.2 rounded shrink-0">
-                                {lang === "zh" ? "個別自付" : "Individual Split"}
+                                {t.ledgerIndividualSplit}
                               </span>
                             )}
                             {(expenseData.taxRefundTotalAmount || expenseData.taxRefundPercent) && (
                               <span className="bg-amber-500/15 text-amber-300 border border-amber-500/10 text-[9px] px-1 py-0.2 rounded font-mono shrink-0">
-                                {lang === "zh" ? "已退稅" : "Tax Off"}{" "}
+                                {t.ledgerTaxOff}{" "}
                                 {expenseData.taxRefundTotalAmount
                                   ? `$${expenseData.taxRefundTotalAmount}`
                                   : `${expenseData.taxRefundPercent}%`}
@@ -283,81 +281,68 @@ export default function ExpenseTracker({
         />
 
         {/* Widget 2: Personal Balance Tracker */}
-        <div className="glass-container rounded-2xl border border-white/10 shadow-lg animate-fadeIn overflow-hidden bg-gradient-to-br from-white/2 to-white/0">
-          <div
-            onClick={() => setIsPersonalCollapsed(!isPersonalCollapsed)}
-            className="flex items-center justify-between p-4 bg-white/[0.02] border-b border-white/5 cursor-pointer hover:bg-white/[0.04] transition select-none"
-          >
-            <div className="flex items-center gap-2 min-w-0 flex-1 text-left">
-              <ChevronRight
-                size={16}
-                className={`text-slate-400 transform transition-transform duration-200 shrink-0 ${
-                  isPersonalCollapsed ? "" : "rotate-90"
-                }`}
-              />
-              <DollarSign size={14} className="text-blue-400 shrink-0" />
-              <h3 className="font-extrabold text-white text-xs flex flex-col leading-tight truncate">
-                <span>
-                  {lang === "zh"
-                    ? `${getActiveUserFriendlyName()} 的個人對帳與實付`
-                    : `${getActiveUserFriendlyName()}'s Net Balances`}
+        <CollapsibleSection
+          title={
+            <div className="flex items-center justify-between w-[calc(100%-12px)]">
+              <div className="flex flex-col leading-tight truncate text-left">
+                <span className="text-white text-xs font-extrabold">
+                  {getActiveUserFriendlyName()}{t.netBalancesSuffix}
                 </span>
                 <span className="text-[10px] text-slate-400 font-normal truncate">
-                  {lang === "zh" ? "計入代付還款後的實付支出" : "Personal consumption & peer refund matrix"}
+                  {t.personalMatrixDesc}
                 </span>
-              </h3>
+              </div>
+              {isPersonalCollapsed && (
+                <span className="text-[10.5px] font-bold text-emerald-300 font-mono bg-emerald-500/10 border border-emerald-500/15 rounded-lg px-2 py-0.5 shrink-0 ml-2 animate-fadeIn">
+                  ${netSpentAdjusted.toFixed(1)}
+                </span>
+              )}
+            </div>
+          }
+          headerIcon={<DollarSign size={14} className="text-blue-400 shrink-0" />}
+          defaultCollapsed={isPersonalCollapsed}
+          className="glass-container rounded-2xl border border-white/10 shadow-lg p-4 space-y-4"
+          titleClassName="flex-1 min-w-0"
+        >
+          <div className="pt-2 space-y-3 text-left">
+            <div className="bg-slate-900/40 rounded-xl p-3 border border-white/5 space-y-2 font-mono text-[11px]">
+              <div className="flex justify-between">
+                <span className="text-slate-400">{t.totalYouPaid}</span>
+                <span className="text-slate-200">${paidByMe.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">
+                  {t.fairShareCount}
+                </span>
+                <span className="text-slate-200">${myOwedShare.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between border-t border-white/5 pt-1.5 font-bold">
+                <span className="text-slate-350">{t.groupFriendBalance}</span>
+                <span
+                  className={netOwed > 0.01 ? "text-emerald-400" : netOwed < -0.01 ? "text-rose-400" : "text-slate-400"}
+                >
+                  {netOwed > 0.01
+                    ? `+${t.owed} $${netOwed.toFixed(2)}`
+                    : netOwed < -0.01
+                    ? `-${t.owe} $${Math.abs(netOwed).toFixed(2)}`
+                    : "$0"}
+                </span>
+              </div>
             </div>
 
-            {isPersonalCollapsed && (
-              <span className="text-[10.5px] font-bold text-emerald-300 font-mono bg-emerald-500/10 border border-emerald-500/15 rounded-lg px-2 py-0.5 shrink-0 ml-2 animate-fadeIn">
-                ${netSpentAdjusted.toFixed(1)}
-              </span>
-            )}
+            <div className="p-3 bg-blue-500/10 border border-blue-500/15 rounded-xl">
+              <div className="flex justify-between items-center">
+                <span className="text-[11px] font-bold text-slate-200">
+                  {t.adjustedNetSpent}
+                </span>
+                <span className="text-sm font-black text-emerald-300 font-mono">${netSpentAdjusted.toFixed(2)}</span>
+              </div>
+              <p className="text-[9.5px] text-slate-400 leading-relaxed mt-1 font-sans">
+                {t.adjustedNetSpentDesc}
+              </p>
+            </div>
           </div>
-
-          {!isPersonalCollapsed && (
-            <div className="p-4 space-y-3 animate-fadeIn text-left">
-              <div className="bg-slate-900/40 rounded-xl p-3 border border-white/5 space-y-2 font-mono text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">{lang === "zh" ? "你代付的共享總額:" : "Total You Paid:"}</span>
-                  <span className="text-slate-200">${paidByMe.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">
-                    {lang === "zh" ? "你的個人應付分攤:" : "Your Fair Share Count:"}
-                  </span>
-                  <span className="text-slate-200">${myOwedShare.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between border-t border-white/5 pt-1.5 font-bold">
-                  <span className="text-slate-350">{lang === "zh" ? "對等友人結算差額:" : "Group Friend Balance:"}</span>
-                  <span
-                    className={netOwed > 0.01 ? "text-emerald-400" : netOwed < -0.01 ? "text-rose-400" : "text-slate-400"}
-                  >
-                    {netOwed > 0.01
-                      ? `+${lang === "zh" ? "應收" : "Owed"} $${netOwed.toFixed(2)}`
-                      : netOwed < -0.01
-                      ? `-${lang === "zh" ? "應還" : "Owe"} $${Math.abs(netOwed).toFixed(2)}`
-                      : "$0"}
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-3 bg-blue-500/10 border border-blue-500/15 rounded-xl">
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-bold text-slate-200">
-                    {lang === "zh" ? "調整還錢後實際負擔額：" : "Your Adjusted Net Spent:"}
-                  </span>
-                  <span className="text-sm font-black text-emerald-300 font-mono">${netSpentAdjusted.toFixed(2)}</span>
-                </div>
-                <p className="text-[9.5px] text-slate-400 leading-relaxed mt-1 font-sans">
-                  {lang === "zh"
-                    ? "💡 這是計入代付返還/收取款項後的實際旅費消費額 (合計支出總額)。"
-                    : "💡 This represents your absolute actual expenditure after accounting for friend reimbursements."}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+        </CollapsibleSection>
 
         {/* Widget 3: Member Limits Manager */}
         <MemberLimitsWidget
@@ -373,165 +358,145 @@ export default function ExpenseTracker({
         />
 
         {/* Widget 4: Automatic Settlements */}
-        <div className="glass-container rounded-2xl border border-white/10 shadow-lg flex flex-col animate-fadeIn overflow-hidden bg-gradient-to-br from-white/2 to-white/0">
-          <div
-            onClick={() => setIsSettlementCollapsed(!isSettlementCollapsed)}
-            className="flex items-center justify-between p-4 bg-white/[0.02] border-b border-white/5 cursor-pointer hover:bg-white/[0.04] transition select-none"
-          >
-            <div className="flex items-center gap-2 min-w-0 flex-1 text-left">
-              <ChevronRight
-                size={16}
-                className={`text-slate-400 transform transition-transform duration-200 shrink-0 ${
-                  isSettlementCollapsed ? "" : "rotate-90"
-                }`}
-              />
-              <Users size={14} className="text-emerald-400 shrink-0" />
-              <h3 className="font-extrabold text-white text-xs flex flex-col leading-tight truncate">
-                <span>{t.automaticExpenseSplits}</span>
+        <CollapsibleSection
+          title={
+            <div className="flex items-center justify-between w-[calc(100%-12px)]">
+              <div className="flex flex-col leading-tight truncate text-left">
+                <span className="text-white text-xs font-extrabold">{t.automaticExpenseSplits}</span>
                 <span className="text-[10px] text-slate-400 font-normal truncate">
-                  {lang === "zh" ? "點擊展開自動拆帳還款方案" : "Minimized peer repayment route map"}
+                  {t.minimizedRepaymentRouteMap}
                 </span>
-              </h3>
+              </div>
+              {isSettlementCollapsed && (
+                <span
+                  className={`text-[10px] font-bold rounded-lg px-2 py-0.5 shrink-0 ml-2 animate-fadeIn ${
+                    transactions.length === 0 ? "text-emerald-400 bg-emerald-500/10" : "text-amber-300 bg-amber-500/10"
+                  }`}
+                >
+                  {transactions.length === 0 ? t.noOwes : `${transactions.length} ${t.itemsCount}`}
+                </span>
+              )}
             </div>
-
-            {isSettlementCollapsed && (
-              <span
-                className={`text-[10px] font-bold rounded-lg px-2 py-0.5 shrink-0 ml-2 animate-fadeIn ${
-                  transactions.length === 0 ? "text-emerald-400 bg-emerald-500/10" : "text-amber-300 bg-amber-500/10"
-                }`}
-              >
-                {transactions.length === 0 ? lang === "zh" ? "無欠款" : "Settled" : `${transactions.length} items`}
-              </span>
-            )}
-          </div>
-
-          {!isSettlementCollapsed && (
-            <div className="p-4 space-y-4 animate-fadeIn text-left">
-              {/* Simulation Mode / Settlement Snapshot Filter */}
-              <div className={`p-3 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300 ${
-                lockedSnapshot 
-                  ? "bg-amber-500/10 border-amber-500/20" 
-                  : "bg-white/3 border-white/5"
-              }`}>
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${lockedSnapshot ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
-                    <span className="text-[11px] font-extrabold text-slate-200">
-                      {lockedSnapshot 
-                        ? (lang === "zh" ? "模擬鎖定模式 (Simulation Snapshot)" : "Simulation Snapshot Locked")
-                        : (lang === "zh" ? "即時拆帳模式 (Real-time Split)" : "Real-time Split Mode")
-                      }
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 leading-normal max-w-[280px] sm:max-w-[420px]">
-                    {lockedSnapshot
-                      ? (lang === "zh" 
-                          ? `已鎖定於 ${lockedSnapshot.timestamp} 的結算快照。後續記帳異動不會干擾此還款方案。`
-                          : `Snapshot locked on ${lockedSnapshot.timestamp}. Subsequent ledger edits won't disrupt this view.`)
-                      : (lang === "zh"
-                          ? "記帳、退稅或勾選狀態若有異動，下方拆帳矩陣將會即時動態重新計算。"
-                          : "Calculated dynamically in real-time as you check/uncheck ledger items or add new bills.")
-                    }
-                  </p>
+          }
+          headerIcon={<Users size={14} className="text-emerald-400 shrink-0" />}
+          defaultCollapsed={isSettlementCollapsed}
+          className="glass-container rounded-2xl border border-white/10 shadow-lg p-4 space-y-4"
+          titleClassName="flex-1 min-w-0"
+        >
+          <div className="pt-2 space-y-4 text-left animate-fadeIn">
+            {/* Simulation Mode / Settlement Snapshot Filter */}
+            <div className={`p-3 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300 ${
+              lockedSnapshot 
+                ? "bg-amber-500/10 border-amber-500/20" 
+                : "bg-white/3 border-white/5"
+            }`}>
+              <div className="space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${lockedSnapshot ? "bg-amber-400 animate-pulse" : "bg-emerald-400"}`} />
+                  <span className="text-[11px] font-extrabold text-slate-200">
+                    {lockedSnapshot ? t.simulationLocked : t.realtimeSplitMode}
+                  </span>
                 </div>
-
-                {lockedSnapshot ? (
-                  <button
-                    type="button"
-                    onClick={() => setLockedSnapshot(null)}
-                    className="h-8 px-3 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/25 text-amber-300 font-bold rounded-lg text-[10.5px] cursor-pointer flex items-center gap-1 transition shrink-0"
-                  >
-                    <span>🔓 {lang === "zh" ? "解除鎖定" : "Unlock Live"}</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const now = new Date();
-                      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                      setLockedSnapshot({
-                        balances: { ...balances },
-                        transactions: [...transactions],
-                        uncheckedExpenseIds: [...uncheckedExpenseIds],
-                        timestamp: timeStr,
-                      });
-                    }}
-                    className="h-8 px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold rounded-lg text-[10.5px] cursor-pointer flex items-center gap-1 transition shrink-0"
-                  >
-                    <span>🔒 {lang === "zh" ? "鎖定快照" : "Save Snapshot"}</span>
-                  </button>
-                )}
+                <p className="text-[10px] text-slate-400 leading-normal max-w-[280px] sm:max-w-[420px]">
+                  {lockedSnapshot
+                    ? t.simulationLockedDesc.replace("{timestamp}", lockedSnapshot.timestamp)
+                    : t.realtimeSplitDesc
+                  }
+                </p>
               </div>
 
-              <p className="text-[11px] text-slate-400 mb-1 leading-relaxed font-sans">
-                {lang === "zh"
-                  ? "以左側勾選的帳目計出的自動化費用拆帳結算書："
-                  : "Reconciliation settlement calculated live based on checked ledger entries:"}
-              </p>
-
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-xl mb-3">
-                <div className="text-[10.5px] text-indigo-300 font-bold leading-relaxed max-w-[75%]">
-                  {lang === "zh"
-                    ? "結算完成！可一鍵導出精美 HTML/PDF 結帳收據，並為台灣(街口/LINE Pay)與香港(FPS)自動生成還款二維碼。"
-                    : "Settlement complete! Generate printable receipts & customized payment links (LINE Pay, Jkopay, FPS) for your companions."}
-                </div>
+              {lockedSnapshot ? (
                 <button
                   type="button"
-                  onClick={() => setShowSettlementModal(true)}
-                  className="h-12 sm:h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl transition-all cursor-pointer shadow-lg text-[10.5px] flex items-center justify-center gap-1 shrink-0 self-end sm:self-auto"
+                  onClick={() => setLockedSnapshot(null)}
+                  className="h-8 px-3 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/25 text-amber-300 font-bold rounded-lg text-[10.5px] cursor-pointer flex items-center gap-1 transition shrink-0"
                 >
-                  <Users size={12} />
-                  <span>{lang === "zh" ? "匯出結算與繳費" : "Export & Repay"}</span>
+                  <span>🔓 {t.unlockLive}</span>
                 </button>
-              </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    setLockedSnapshot({
+                      balances: { ...balances },
+                      transactions: [...transactions],
+                      uncheckedExpenseIds: [...uncheckedExpenseIds],
+                      timestamp: timeStr,
+                    });
+                  }}
+                  className="h-8 px-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold rounded-lg text-[10.5px] cursor-pointer flex items-center gap-1 transition shrink-0"
+                >
+                  <span>🔒 {t.saveSnapshot}</span>
+                </button>
+              )}
+            </div>
 
-              <div className="space-y-3">
-                {transactions.length === 0 ? (
-                  <div className="py-6 text-center bg-white/3 rounded-xl border border-dashed border-white/5">
-                    <p className="text-xs text-slate-400 font-sans">{t.ledgerReconciled}</p>
-                  </div>
-                ) : (
-                  transactions.map((transaction, idx) => (
-                    <div
-                      key={idx}
-                      className="bg-white/3 border border-white/5 p-3 rounded-xl flex items-center justify-between text-xs animate-fadeIn text-left"
-                    >
-                      <div className="flex items-center gap-1.5 font-bold text-slate-200">
-                        <span className="text-white">{getParticipantName(transaction.from)}</span>
-                        <ChevronRight size={12} className="text-slate-500" />
-                        <span className="text-white">{getParticipantName(transaction.to)}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-extrabold text-white font-mono">${transaction.amount.toFixed(2)}</span>
-                        <span className="block text-xs text-slate-500 uppercase tracking-wider font-extrabold">
-                          {t.reimburse}
-                        </span>
-                      </div>
+            <p className="text-[11px] text-slate-400 mb-1 leading-relaxed font-sans">
+              {t.reconciliationReceiptDesc}
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-xl mb-3">
+              <div className="text-[10.5px] text-indigo-300 font-bold leading-relaxed max-w-[75%]">
+                {t.settlementCompletedBanner}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowSettlementModal(true)}
+                className="h-12 sm:h-9 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold rounded-xl transition-all cursor-pointer shadow-lg text-[10.5px] flex items-center justify-center gap-1 shrink-0 self-end sm:self-auto"
+              >
+                <Users size={12} />
+                <span>{t.exportAndRepay}</span>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {transactions.length === 0 ? (
+                <div className="py-6 text-center bg-white/3 rounded-xl border border-dashed border-white/5">
+                  <p className="text-xs text-slate-400 font-sans">{t.ledgerReconciled}</p>
+                </div>
+              ) : (
+                transactions.map((transaction, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-white/3 border border-white/5 p-3 rounded-xl flex items-center justify-between text-xs animate-fadeIn text-left"
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-slate-200">
+                      <span className="text-white">{getParticipantName(transaction.from)}</span>
+                      <ChevronRight size={12} className="text-slate-500" />
+                      <span className="text-white">{getParticipantName(transaction.to)}</span>
                     </div>
-                  ))
-                )}
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-white/5 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2 text-center text-xs">
-                {participants.map((p) => {
-                  const b = balances[p.id] || 0;
-                  return (
-                    <div key={p.id} className="p-2 bg-white/3 rounded-lg border border-white/5 font-sans">
-                      <span className="font-bold text-slate-400 block truncate">{p.name}</span>
-                      <span
-                        className={`font-mono font-bold ${
-                          b > 0.01 ? "text-emerald-400" : b < -0.01 ? "text-rose-400" : "text-slate-500"
-                        }`}
-                      >
-                        {b > 0.01 ? `+$${b.toFixed(0)}` : b < -0.01 ? `-$${Math.abs(b).toFixed(0)}` : "$0"}
+                    <div className="text-right">
+                      <span className="font-extrabold text-white font-mono">${transaction.amount.toFixed(2)}</span>
+                      <span className="block text-xs text-slate-500 uppercase tracking-wider font-extrabold">
+                        {t.reimburse}
                       </span>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                ))
+              )}
             </div>
-          )}
-        </div>
+
+            <div className="mt-4 pt-3 border-t border-white/5 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2 text-center text-xs">
+              {participants.map((p) => {
+                const b = balances[p.id] || 0;
+                return (
+                  <div key={p.id} className="p-2 bg-white/3 rounded-lg border border-white/5 font-sans">
+                    <span className="font-bold text-slate-400 block truncate">{p.name}</span>
+                    <span
+                      className={`font-mono font-bold ${
+                        b > 0.01 ? "text-emerald-400" : b < -0.01 ? "text-rose-400" : "text-slate-500"
+                      }`}
+                    >
+                      {b > 0.01 ? `+$${b.toFixed(0)}` : b < -0.01 ? `-$${Math.abs(b).toFixed(0)}` : "$0"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CollapsibleSection>
       </div>
 
       <SettlementModal

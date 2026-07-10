@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import type { Participant } from "../../src/types";
-import { getDB, writeDB, readTripsDB, writeTripsDB, broadcastTripChange } from "../db/index.js";
+import { getDB, writeDB, readTripsDB, writeTripsDB, writeTripsDBAndConfirm, broadcastTripChange } from "../db/index.js";
 import { ok, fail } from "../utils/apiResponse.js";
-import { DEFAULT_PARTICIPANT_BUDGET_LIMIT } from "../utils/constants.js";
+import { DEFAULT_PARTICIPANT_BUDGET_LIMIT, AVATAR_COLORS } from "../utils/constants.js";
 import { createSystemMessage } from "../utils/message.js";
 
 const router = Router();
@@ -72,8 +72,7 @@ router.post("/invite-external", async (req: Request, res: Response) => {
 
     // Create custom external participant
     const externalId = "ext-" + Date.now() + "-" + Math.random().toString(36).substring(2, 6);
-    const colors = ["#f59e0b", "#ec4899", "#10b981", "#8b5cf6", "#06b6d4", "#ef4444", "#3b82f6", "#10b981"];
-    const avatarColor = colors[Math.floor(Math.random() * colors.length)];
+    const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 
     const newParticipant: Participant = {
       id: externalId,
@@ -180,7 +179,7 @@ router.post("/upgrade-external", async (req: Request, res: Response) => {
       })
     );
 
-    writeTripsDB(current, req);
+    await writeTripsDBAndConfirm(current, req);
     res.json(ok({ trip: current }));
   } catch (err: any) {
     res.status(500).json(fail("SERVER_ERROR", err.message || "Upgrade failed"));

@@ -1,6 +1,6 @@
 // server/types/db.ts
 import type { Trip, Participant, ExpenseItem, ItineraryItem, 
-              ChatMessage, FlightEstimate, DocumentItem } from '../../src/types';
+              ChatMessage, DocumentItem } from '../../src/types';
 
 export interface DBUser {
   id: string;

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { verifySession } from "../utils/session.js";
+import { verifySessionDetailed } from "../utils/session.js";
 import { fail } from "../utils/apiResponse.js";
 
 export interface AuthenticatedRequest extends Request {
@@ -19,11 +19,14 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json(fail("UNAUTHORIZED", "Missing or invalid authorization token (未提供有效登入驗證憑證)。"));
   }
 
-  const userId = verifySession(token);
-  if (!userId) {
-    return res.status(401).json(fail("UNAUTHORIZED", "Session expired or invalid. Please sign in again (登入逾期或憑證無效，請重新登入)。"));
+  const result = verifySessionDetailed(token);
+  if (result.error === "SESSION_EXPIRED") {
+    return res.status(401).json(fail("SESSION_EXPIRED", "Session expired. Please sign in again (登入已逾期，請重新登入)。"));
+  }
+  if (result.error === "INVALID" || !result.userId) {
+    return res.status(401).json(fail("UNAUTHORIZED", "Session invalid. Please sign in again (登入憑證無效，請重新登入)。"));
   }
 
-  (req as any).userId = userId;
+  (req as any).userId = result.userId;
   next();
 }

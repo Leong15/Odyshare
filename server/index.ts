@@ -3,7 +3,6 @@ import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
-import { startScheduler } from "./scheduler.js";
 import { initFirebase } from "./db/index.js";
 
 // Routes inside modular files
@@ -62,8 +61,6 @@ async function start() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`OdyShareSync Server running on http://0.0.0.0:${PORT}`);
-    // Start automated scheduler monitoring
-    startScheduler();
   });
 
   // Connect and load database state from Firebase Firestore in the background

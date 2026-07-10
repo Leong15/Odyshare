@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { AutocompleteInput } from "./common/AutocompleteInput";
 import { POPULAR_HOT_PLACES } from "../lib/constants";
+import { translations } from "../lib/translations";
 
 interface CreateTripModalProps {
   lang: "en" | "zh";
@@ -31,6 +32,8 @@ export default function CreateTripModal({
   isCreating = false,
   error = null,
 }: CreateTripModalProps) {
+  const t = translations[lang];
+
   const filteredSuggestions = POPULAR_HOT_PLACES.filter(place => {
     if (!newTripDestination) return true; // Show all when focused on empty input
     const search = newTripDestination.toLowerCase();
@@ -56,7 +59,7 @@ export default function CreateTripModal({
         className="glass-container w-full max-w-md rounded-2xl p-6 border border-white/20 shadow-2xl relative space-y-4"
       >
         <h3 className="font-extrabold text-white text-sm border-b border-white/5 pb-2 font-sans">
-          📂 {lang === "zh" ? "新增旅行團隊協作空間" : "Launch Collaborative Trip Workspace"}
+          📂 {t.launchCollaborativeTripWorkspace}
         </h3>
 
         {error && (
@@ -68,7 +71,7 @@ export default function CreateTripModal({
         <div className="space-y-3.5 text-xs">
           <div>
             <label className="block text-slate-350 font-bold mb-1 font-sans">
-              {lang === "zh" ? "旅行主題名稱 *" : "Trip / Project Name *"}
+              {t.tripProjectName}
             </label>
             <input
               type="text"
@@ -83,7 +86,7 @@ export default function CreateTripModal({
 
           <div>
             <label className="block text-slate-350 font-bold mb-1 font-sans">
-              {lang === "zh" ? "出發目的地站點 *" : "Destination Station / City *"}
+              {t.destinationStationCity}
             </label>
             <AutocompleteInput
               value={newTripDestination}
@@ -107,7 +110,7 @@ export default function CreateTripModal({
 
           <div>
             <label className="block text-slate-350 font-bold mb-1 font-sans">
-              {lang === "zh" ? "預算預留上限" : "Total Budget Reserved"}
+              {t.totalBudgetReserved}
             </label>
             <input
               type="number"
@@ -127,7 +130,7 @@ export default function CreateTripModal({
             disabled={isCreating}
             className="flex-1 py-1.5 md:py-2 bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 rounded-xl font-bold cursor-pointer disabled:opacity-40"
           >
-            {lang === "zh" ? "返回" : "Cancel"}
+            {t.cancelBtn}
           </button>
           <button
             type="submit"
@@ -137,10 +140,10 @@ export default function CreateTripModal({
             {isCreating ? (
               <>
                 <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0 animate-duration-1000" />
-                <span>{lang === "zh" ? "創立中..." : "Creating..."}</span>
+                <span>{t.creatingStatus}</span>
               </>
             ) : (
-              <span>{lang === "zh" ? "創立專案" : "Create Project"}</span>
+              <span>{t.createProjectBtn}</span>
             )}
           </button>
         </div>

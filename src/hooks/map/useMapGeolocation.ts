@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { resolveLatLng } from "../../utils/mapHelpers";
-import { MAP_CONFIG } from "../../lib/constants";
+import { resolveLatLngLocal } from "../../utils/mapHelpers";
+import { MAP_CONFIG, STORAGE_KEYS } from "../../lib/constants";
 import { MapTarget } from "./types";
 
 interface UseMapGeolocationProps {
@@ -35,7 +35,7 @@ export function useMapGeolocation({
     ) {
       return { lat: Number(tripLat), lng: Number(tripLng) };
     }
-    return resolveLatLng(destination, destination, 34, 65);
+    return resolveLatLngLocal(destination, destination, 34, 65);
   });
   const [geoError, setGeoError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState<boolean>(false);
@@ -89,7 +89,7 @@ export function useMapGeolocation({
   useEffect(() => {
     if (!currentGeoLocation) return;
 
-    const targetUserId = currentUserId || localStorage.getItem("loggedInUserId");
+    const targetUserId = currentUserId || localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_ID);
     if (!targetUserId) return;
 
     const timer = setTimeout(() => {

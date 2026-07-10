@@ -15,7 +15,6 @@ export const DEFAULT_TRIP = {
   lat: 35.6762,
   lng: 139.6503,
   participants: [],
-  flightEstimates: [],
   itineraries: [],
   expenses: [],
   documents: [],

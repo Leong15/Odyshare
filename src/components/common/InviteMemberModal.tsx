@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, UserPlus } from "lucide-react";
 import { Participant } from "../../types";
+import { translations } from "../../lib/translations";
 
 interface InviteMemberModalProps {
   isOpen: boolean;
@@ -26,6 +27,8 @@ export default function InviteMemberModal({
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState<boolean>(false);
 
+  const t = translations[lang];
+
   if (!isOpen) return null;
 
   const handleInviteSubmit = async (e: React.FormEvent) => {
@@ -37,18 +40,14 @@ export default function InviteMemberModal({
     const res = await onInviteUser(inviteUsername.trim());
     setIsInviting(false);
     if (res.success) {
-      setInviteSuccess(
-        lang === "zh"
-          ? "🎉 邀請成功送出！受邀人需接受邀請才能進入此專案。"
-          : "🎉 Invite sent! Invitee must accept to access project."
-      );
+      setInviteSuccess(t.inviteSuccessMsg);
       setInviteUsername("");
       setTimeout(() => {
         onClose();
         setInviteSuccess(null);
       }, 3000);
     } else {
-      setInviteError(res.error || (lang === "zh" ? "找不到此成員帳號" : "User not found"));
+      setInviteError(res.error || t.inviteUserNotFound);
     }
   };
 
@@ -57,10 +56,10 @@ export default function InviteMemberModal({
     setInviteSuccess(null);
     const res = await onKickParticipant(userId);
     if (res.success) {
-      setInviteSuccess(lang === "zh" ? "✔️ 成員已成功踢除/移除。" : "✔️ Member kicked successfully.");
+      setInviteSuccess(t.inviteKickSuccess);
       setTimeout(() => setInviteSuccess(null), 2500);
     } else {
-      setInviteError(res.error || (lang === "zh" ? "踢除失敗" : "Failed to kick member"));
+      setInviteError(res.error || t.inviteKickFailed);
     }
   };
 
@@ -88,10 +87,10 @@ export default function InviteMemberModal({
           </div>
           <div>
             <h3 className="text-sm sm:text-base font-extrabold text-white font-sans">
-              {lang === "zh" ? "拉入旅伴加入當前專案" : "Pull Traveler into Project"}
+              {t.inviteModalTitle}
             </h3>
             <p className="text-[10.5px] text-slate-400 mt-0.5 leading-none">
-              {lang === "zh" ? "立刻實現多瀏覽器/多帳號即時協同規劃" : "Enable multi-device real-time sync planning"}
+              {t.inviteModalDesc}
             </p>
           </div>
         </div>
@@ -99,7 +98,7 @@ export default function InviteMemberModal({
         <form onSubmit={handleInviteSubmit} className="space-y-4">
           <div>
             <label className="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-1.5 font-sans">
-              {lang === "zh" ? "旅群組員的帳號名稱 (Username)" : "Team Member's Username"}
+              {t.inviteUsernameLabel}
             </label>
             <div className="relative">
               <input
@@ -107,7 +106,7 @@ export default function InviteMemberModal({
                 required
                 value={inviteUsername}
                 onChange={(e) => setInviteUsername(e.target.value)}
-                placeholder={lang === "zh" ? "輸入組員帳號，例如：chloe" : "e.g. chloe, david"}
+                placeholder={t.inviteUsernamePlaceholder}
                 className="w-full bg-slate-950 border border-white/10 focus:border-emerald-500/50 rounded-xl py-2 px-3 text-xs text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-emerald-500/35 transition font-sans"
                 disabled={isInviting}
                 autoFocus
@@ -118,7 +117,7 @@ export default function InviteMemberModal({
           {/* Suggestions Box to optimize user testing experience */}
           <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 text-[11px] text-emerald-350 space-y-1.5">
             <p className="font-extrabold flex items-center gap-1 font-sans">
-              💡 {lang === "zh" ? "可以用於協同測試的內建帳號：" : "Built-in accounts for easy sync testing:"}
+              💡 {t.inviteTestAccountsLabel}
             </p>
             <div className="grid grid-cols-3 gap-2 mt-1">
               {["chloe", "david", "sophy"].map((testName) => (
@@ -133,16 +132,14 @@ export default function InviteMemberModal({
               ))}
             </div>
             <p className="text-[9.5px] text-slate-450 mt-1 leading-normal italic font-sans">
-              {lang === "zh"
-                ? "* 點擊上方帳號快速填寫！你也可以在登出後註冊新帳號來邀請對帳。"
-                : "* Click to select! You can also log out, register new users, and invite them."}
+              {t.inviteTestAccountsDesc}
             </p>
           </div>
 
           {/* 👥 Current Team / Kick Members Section */}
           <div className="border-t border-white/5 pt-4 mt-2">
             <label className="block text-[11px] font-extrabold text-slate-450 uppercase tracking-wider mb-2 font-sans">
-              {lang === "zh" ? "📋 管理組員 / 踢除組員" : "📋 Current Team Members (Kick / Remove)"}
+              {t.inviteManageTeamLabel}
             </label>
             <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1 select-none">
               {(participants || []).map((p) => {
@@ -163,7 +160,7 @@ export default function InviteMemberModal({
                         onClick={() => handleKickClick(p.id)}
                         className="text-[10.5px] text-rose-400 hover:text-rose-200 font-bold underline cursor-pointer font-sans"
                       >
-                        {lang === "zh" ? "踢除" : "Kick"}
+                        {t.inviteKickBtn}
                       </button>
                     )}
                   </div>
@@ -192,7 +189,7 @@ export default function InviteMemberModal({
               onClick={onClose}
               className="px-3.5 py-1.5 bg-white/5 hover:bg-white/10 rounded-xl text-[11px] font-bold text-slate-350 cursor-pointer transition border border-white/5 font-sans"
             >
-              {lang === "zh" ? "取消" : "Cancel"}
+              {t.inviteCancelBtn}
             </button>
             <button
               type="submit"
@@ -200,9 +197,9 @@ export default function InviteMemberModal({
               className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-555 border border-emerald-500/30 text-[11px] font-bold text-white rounded-xl cursor-pointer transition shadow-lg shadow-emerald-600/15 flex items-center gap-1 disabled:opacity-50 font-sans"
             >
               {isInviting ? (
-                <span>{lang === "zh" ? "邀請中..." : "Inviting..."}</span>
+                <span>{t.inviteSendingStatus}</span>
               ) : (
-                <span>{lang === "zh" ? "確認加入" : "Add Member"}</span>
+                <span>{t.inviteSubmitBtn}</span>
               )}
             </button>
           </div>

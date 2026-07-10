@@ -22,6 +22,7 @@ const EncryptedWorkspaceChat = lazy(() => import("./components/chat/EncryptedWor
 import { useAuth } from "./hooks/useAuth";
 import { useTripSync } from "./hooks/useTripSync";
 import { useTripActions } from "./hooks/useTripActions";
+import { STORAGE_KEYS } from "./lib/constants";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
 
 export default function App() {
@@ -30,7 +31,7 @@ export default function App() {
   
   // Theme Switching
   const [theme, setTheme] = useState<"light" | "dark" | any>(() => {
-    return (localStorage.getItem("theme") as "light" | "dark") || "dark";
+    return (localStorage.getItem(STORAGE_KEYS.THEME) as "light" | "dark") || "dark";
   });
 
   // Local state for actions error reporting
@@ -74,7 +75,7 @@ export default function App() {
     } else {
       document.body.classList.remove("light-theme");
     }
-    localStorage.setItem("theme", theme);
+    localStorage.setItem(STORAGE_KEYS.THEME, theme);
   }, [theme]);
 
   // Form Submission handlers

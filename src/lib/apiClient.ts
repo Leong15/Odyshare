@@ -5,6 +5,7 @@
  */
 
 import { ApiSuccess, ApiError, ApiResponse } from "../shared/apiTypes";
+import { STORAGE_KEYS } from "./constants";
 
 export type { ApiSuccess, ApiError, ApiResponse };
 
@@ -17,18 +18,18 @@ class ApiClient {
     const headers: Record<string, string> = { ...customHeaders };
 
     // 1. Authorization Token
-    const token = localStorage.getItem("sessionToken");
+    const token = localStorage.getItem(STORAGE_KEYS.SESSION_TOKEN);
     if (token && !headers["Authorization"] && !headers["authorization"]) {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
     // 2. Contextual headers
-    const userId = localStorage.getItem("loggedInUserId");
+    const userId = localStorage.getItem(STORAGE_KEYS.LOGGED_IN_USER_ID);
     if (userId && !headers["x-user-id"]) {
       headers["x-user-id"] = userId;
     }
 
-    const tripId = localStorage.getItem("activeTripId");
+    const tripId = localStorage.getItem(STORAGE_KEYS.ACTIVE_TRIP_ID);
     if (tripId && !headers["x-trip-id"]) {
       headers["x-trip-id"] = tripId;
     }

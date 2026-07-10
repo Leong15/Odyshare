@@ -93,8 +93,8 @@ export function MapNodeEditor({
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] text-slate-400 font-mono">
                   {activeItem.id && isItineraryItem(activeItem.id)
-                    ? `📅 ${lang === "zh" ? "日程安排" : "Itinerary Plan"}`
-                    : `📍 ${lang === "zh" ? "自訂探針" : "Custom Drop"}`}
+                    ? `📅 ${t.mapItineraryPlan}`
+                    : `📍 ${t.mapCustomDrop}`}
                 </span>
                 {activeItem.time && (
                   <span className="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded font-bold text-amber-300 font-mono">
@@ -123,7 +123,7 @@ export function MapNodeEditor({
                 className="w-full flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs py-1.8 px-3 rounded-lg transition-all cursor-pointer disabled:bg-blue-900/50"
               >
                 <Navigation size={11} className={isNavigating ? "animate-spin" : ""} />
-                <span>{isNavigating ? (lang === "zh" ? "行駛..." : "Nav...") : t.cooperativeDrive}</span>
+                <span>{isNavigating ? t.mapNavigatingStatus : t.cooperativeDrive}</span>
               </button>
 
               <button
@@ -131,7 +131,7 @@ export function MapNodeEditor({
                 onClick={() => setIsEditingActiveItem(true)}
                 className="w-full block text-center bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs py-1.8 px-3 rounded-lg transition cursor-pointer"
               >
-                ✏️ {lang === "zh" ? "編輯行程" : "Edit Node"}
+                ✏️ {t.editNode}
               </button>
             </div>
           </div>
@@ -140,11 +140,11 @@ export function MapNodeEditor({
           <div className="bg-slate-950/60 rounded-xl p-3 border border-white/5 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-400 font-extrabold tracking-wider uppercase flex items-center gap-1">
-                🗺️ {lang === "zh" ? "地圖實時路徑規劃 (Routes API)" : "Google Live Route Planning"}
+                🗺️ {t.mapRoutePlanning}
               </span>
               {routeLoading && (
                 <span className="text-xs text-blue-400 animate-pulse font-mono">
-                  {lang === "zh" ? "計算中..." : "Calculating..."}
+                  {t.routeCalculating}
                 </span>
               )}
             </div>
@@ -162,7 +162,7 @@ export function MapNodeEditor({
                 }`}
               >
                 <span>🚶‍♂️</span>
-                <span>{lang === "zh" ? "步行最短" : "Shortest Walk"}</span>
+                <span>{t.shortestWalk}</span>
               </button>
 
               {/* Drive Button */}
@@ -177,7 +177,7 @@ export function MapNodeEditor({
                 }`}
               >
                 <span>🚗</span>
-                <span>{lang === "zh" ? "自駕路線" : "Driving Route"}</span>
+                <span>{t.drivingRoute}</span>
               </button>
 
               {/* Public Transit Button */}
@@ -192,7 +192,7 @@ export function MapNodeEditor({
                 }`}
               >
                 <span>🚌</span>
-                <span>{lang === "zh" ? "公眾交通" : "Public Transit"}</span>
+                <span>{t.publicTransit}</span>
               </a>
             </div>
 
@@ -202,8 +202,8 @@ export function MapNodeEditor({
                 <span className="text-blue-300 font-bold flex items-center gap-1">
                   {routeMeta.mode === "WALKING" ? "🚶‍♂️ " : "🚗 "}
                   {routeMeta.mode === "WALKING"
-                    ? lang === "zh" ? "步行路徑" : "Walk Path"
-                    : lang === "zh" ? "自駕路徑" : "Drive Path"}
+                    ? t.mapWalkPath
+                    : t.mapDrivePath}
                 </span>
                 <div className="font-mono text-white font-black space-x-1.5 text-right">
                   <span>📍 {routeMeta.distanceMsg}</span>
@@ -220,9 +220,7 @@ export function MapNodeEditor({
 
             {!currentGeoLocation && (
               <p className="text-[9.5px] text-slate-400 text-center italic">
-                {lang === "zh"
-                  ? "💡 請先點選左上角「獲得實時 GPS 定位」解鎖導航路徑"
-                  : "💡 Click 'Get Live GPS Location' on left to unlock dynamic pathing"}
+                {t.mapGpsHint}
               </p>
             )}
           </div>
@@ -236,7 +234,7 @@ export function MapNodeEditor({
                 onClick={handleDeleteOrCreateNode}
                 className="px-3 py-1.5 bg-rose-600/25 hover:bg-rose-600/40 text-rose-300 rounded-lg hover:text-white transition cursor-pointer flex items-center gap-1.5"
               >
-                🗑️ {lang === "zh" ? "自日程刪除" : "Delete Plan"}
+                🗑️ {t.mapDeletePlan}
               </button>
             ) : (
               // Custom dropped pin actions
@@ -248,14 +246,14 @@ export function MapNodeEditor({
                   }}
                   className="px-3 py-1.5 bg-amber-600/25 hover:bg-amber-600/45 text-amber-300 rounded-lg transition cursor-pointer flex items-center gap-1"
                 >
-                  💾 {lang === "zh" ? "儲存至行程" : "Save to Schedule"}
+                  💾 {t.saveToSchedule}
                 </button>
                 <button
                   type="button"
                   onClick={handleDeleteOrCreateNode}
                   className="px-3 py-1.5 bg-rose-600/25 hover:bg-rose-600/40 text-rose-300 rounded-lg hover:text-white transition cursor-pointer flex items-center gap-1"
                 >
-                  ❌ {lang === "zh" ? "移除自訂標記" : "Remove Pin"}
+                  ❌ {t.removePin}
                 </button>
               </>
             )}
@@ -264,7 +262,7 @@ export function MapNodeEditor({
               onClick={() => setActiveItem(null)}
               className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-slate-350 hover:text-white rounded-lg transition cursor-pointer"
             >
-              {lang === "zh" ? "關閉" : "Close"}
+              {t.closeBtn}
             </button>
           </div>
         </div>
@@ -273,7 +271,7 @@ export function MapNodeEditor({
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
             <h4 className="font-extrabold text-xs text-amber-400 font-mono tracking-wide uppercase">
-              🔧 {lang === "zh" ? "編輯航點細節" : "Edit Landmark Parameters"}
+              🔧 {t.mapEditLandmark}
             </h4>
             <span className="text-[10px] text-slate-500 font-mono">
               [{activeItem.coordinates?.x}, {activeItem.coordinates?.y}]
@@ -283,52 +281,52 @@ export function MapNodeEditor({
           <div className="space-y-2">
             <div>
               <label className="text-[10px] text-slate-400 font-bold block mb-0.5">
-                {lang === "zh" ? "航點標題 / 活動" : "Landmark Name"}
+                {t.mapLandmarkName}
               </label>
               <input
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 className="w-full bg-slate-950 border border-white/10 p-1.5 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500"
-                placeholder={lang === "zh" ? "輸入標題..." : "E.g., Tokyo Sea-Tac Plaza"}
+                placeholder={t.mapTitlePlaceholder}
               />
             </div>
 
             <div>
               <label className="text-[10px] text-slate-400 font-bold block mb-0.5">
-                {lang === "zh" ? "詳細地址 / 位置" : "Map Address"}
+                {t.mapAddressLabel}
               </label>
               <input
                 type="text"
                 value={editLocation}
                 onChange={(e) => setEditLocation(e.target.value)}
                 className="w-full bg-slate-950 border border-white/10 p-1.5 rounded-lg text-xs text-white focus:outline-none"
-                placeholder={lang === "zh" ? "輸入位置..." : "Specific address"}
+                placeholder={t.mapAddressPlaceholder}
               />
               {activeItem?.lat !== undefined && activeItem?.lng !== undefined && (
                 <p className="text-[10px] mt-1 text-slate-400 font-mono">
-                  📍 {lang === "zh" ? "點擊座標" : "Coordinates"}: {activeItem.lat.toFixed(6)}, {activeItem.lng.toFixed(6)}
+                  📍 {t.mapCoordinatesLabel}: {activeItem.lat.toFixed(6)}, {activeItem.lng.toFixed(6)}
                 </p>
               )}
             </div>
 
             <div>
               <label className="text-[10px] text-slate-400 font-bold block mb-0.5">
-                {lang === "zh" ? "航點說明" : "Description / Notes"}
+                {t.mapDescLabel}
               </label>
               <textarea
                 value={editDesc}
                 onChange={(e) => setEditDesc(e.target.value)}
                 rows={2}
                 className="w-full bg-slate-950 border border-white/10 p-1.5 rounded-lg text-xs text-white focus:outline-none leading-normal"
-                placeholder={lang === "zh" ? "輸入備註與計畫..." : "E.g., taste fresh fish, walk to next terminal"}
+                placeholder={t.mapDescPlaceholder}
               />
             </div>
 
             <div className="grid grid-cols-4 gap-2">
               <div>
                 <label className="text-[9px] text-slate-400 font-bold block mb-0.5">
-                  {lang === "zh" ? "出發時間" : "Time"}
+                  {t.mapTimeLabel}
                 </label>
                 <input
                   type="time"
@@ -339,7 +337,7 @@ export function MapNodeEditor({
               </div>
               <div>
                 <label className="text-[9px] text-slate-400 font-bold block mb-0.5">
-                  {lang === "zh" ? "預算 ($)" : "Budget ($)"}
+                  {t.mapBudgetLabel}
                 </label>
                 <input
                   type="number"
@@ -350,30 +348,30 @@ export function MapNodeEditor({
               </div>
               <div>
                 <label className="text-[9px] text-slate-400 font-bold block mb-0.5">
-                  {lang === "zh" ? "哪一天" : "Day Number"}
+                  {t.mapDayLabel}
                 </label>
                 <select
                   value={editDay}
                   onChange={(e) => setEditDay(Number(e.target.value))}
                   className="w-full bg-slate-950 border border-white/10 p-1 rounded text-xs text-white"
                 >
-                  <option value={0}>{lang === "zh" ? "第 1 天" : "Day 1"}</option>
-                  <option value={1}>{lang === "zh" ? "第 2 天" : "Day 2"}</option>
-                  <option value={2}>{lang === "zh" ? "第 3 天" : "Day 3"}</option>
+                  <option value={0}>{t.mapDayOption1}</option>
+                  <option value={1}>{t.mapDayOption2}</option>
+                  <option value={2}>{t.mapDayOption3}</option>
                 </select>
               </div>
               <div>
                 <label className="text-[9px] text-slate-400 font-bold block mb-0.5">
-                  {lang === "zh" ? "活動分類" : "Category"}
+                  {t.mapCategoryLabel}
                 </label>
                 <select
                   value={editCategory}
                   onChange={(e) => setEditCategory(e.target.value as any)}
                   className="w-full bg-slate-950 border border-white/10 p-1 rounded text-xs text-white"
                 >
-                  <option value="sight">🏞️ {lang === "zh" ? "景點" : "Sight"}</option>
-                  <option value="food">🍴 {lang === "zh" ? "美食" : "Food"}</option>
-                  <option value="hotel">🏨 {lang === "zh" ? "住宿" : "Hotel"}</option>
+                  <option value="sight">🏞️ {t.mapSightOption}</option>
+                  <option value="food">🍴 {t.mapFoodOption}</option>
+                  <option value="hotel">🏨 {t.mapHotelOption}</option>
                 </select>
               </div>
             </div>
@@ -385,7 +383,7 @@ export function MapNodeEditor({
               onClick={() => setIsEditingActiveItem(false)}
               className="px-3 py-1.5 bg-white/5 hover:bg-white/15 text-slate-300 rounded-lg transition cursor-pointer"
             >
-              ↩️ {lang === "zh" ? "返回" : "Back"}
+              ↩️ {t.backBtn}
             </button>
 
             {activeItem.id && isItineraryItem(activeItem.id) ? (
@@ -394,7 +392,7 @@ export function MapNodeEditor({
                 onClick={handleUpdateExistingItineraryPlan}
                 className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition cursor-pointer"
               >
-                💾 {lang === "zh" ? "保存行程" : "Update Destination"}
+                💾 {t.mapUpdateDestination}
               </button>
             ) : (
               <>
@@ -403,14 +401,14 @@ export function MapNodeEditor({
                   onClick={handleUpdateCustomPinOnly}
                   className="px-3 py-1.5 bg-amber-600/30 hover:bg-amber-600/50 text-amber-350 border border-amber-500/25 rounded-lg transition cursor-pointer"
                 >
-                  ✏️ {lang === "zh" ? "僅修改標記名字" : "Rename Pin Only"}
+                  ✏️ {t.mapRenamePinOnly}
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveToItineraryPlan}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition cursor-pointer"
                 >
-                  💾 {lang === "zh" ? "加入行程" : "Insert to Itinerary"}
+                  💾 {t.mapInsertToItinerary}
                 </button>
               </>
             )}

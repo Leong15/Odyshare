@@ -119,9 +119,7 @@ export default function ItineraryPlanner({
               <span className="flex items-center gap-1.5 flex-wrap">
                 <Sparkles size={13} className="text-amber-300 animate-pulse shrink-0" />
                 <span>
-                  {lang === "zh"
-                    ? "OdyShareSmart AI 已成功進行網關日程智慧優化！如果您或其他組員不滿意，可隨時還原至優化前的項目配置。"
-                    : "OdyShareSmart AI has optimized details! If you or others dislike this setup, feel free to restore original elements."}
+                  {t.aiOptimizedBanner}
                 </span>
               </span>
             </div>
@@ -130,7 +128,7 @@ export default function ItineraryPlanner({
               className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold rounded-lg border border-amber-500/30 transition cursor-pointer flex items-center gap-1 shrink-0 text-xs"
             >
               <RefreshCw size={11} className="shrink-0" />
-              <span>{lang === "zh" ? "還原至舊版行程" : "Restore original"}</span>
+              <span>{t.restoreOriginalBtn}</span>
             </button>
           </div>
         )}
@@ -164,10 +162,10 @@ export default function ItineraryPlanner({
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pb-4 border-b border-white/5 text-left">
                 <div>
                   <h2 className="text-lg font-bold text-white tracking-tight leading-none">
-                    {lang === "zh" ? `第 ${activeDay + 1} 天 行程清單` : `Day ${activeDay + 1} Timeline`}
+                    {t.dayTimelineHeader.replace("{day}", String(activeDay + 1))}
                   </h2>
                   <p className="text-xs text-slate-400 mt-1.5">
-                    {filteredItems.length} {lang === "zh" ? "個選定活動景點" : "selected activities"}
+                    {filteredItems.length} {t.selectedActivities}
                   </p>
                 </div>
 
@@ -187,11 +185,11 @@ export default function ItineraryPlanner({
                         ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25"
                         : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
                     }`}
-                    title={lang === "zh" ? "切換地圖檢視模式" : "Toggle Split Map View"}
-                    aria-label={lang === "zh" ? "切換地圖檢視模式" : "Toggle Split Map View"}
+                    title={t.toggleSplitMapView}
+                    aria-label={t.toggleSplitMapView}
                   >
                     <Map size={13} className="shrink-0" />
-                    <span>{lang === "zh" ? "地圖" : "Map"}</span>
+                    <span>{t.itineraryMap}</span>
                   </button>
 
                   <button
@@ -202,23 +200,23 @@ export default function ItineraryPlanner({
                         ? "bg-blue-500/15 text-blue-300 border-blue-500/30 hover:bg-blue-500/25"
                         : "bg-white/5 text-slate-300 border-white/10 hover:bg-white/10"
                     }`}
-                    title={lang === "zh" ? "顯示或隱藏 AI 與討論板側邊欄" : "Toggle AI & Chat sidebar"}
-                    aria-label={lang === "zh" ? "顯示或隱藏 AI 與討論板側邊欄" : "Toggle AI & Chat sidebar"}
+                    title={t.toggleAiChatSidebar}
+                    aria-label={t.toggleAiChatSidebar}
                   >
                     {isSidebarOpen ? (
                       <ChevronRight size={13} className="shrink-0" />
                     ) : (
                       <ChevronLeft size={13} className="shrink-0" />
                     )}
-                    <span>{lang === "zh" ? "討論" : "Chat"}</span>
+                    <span>{t.itineraryChat}</span>
                   </button>
 
                   <button
                     id="add-itinerary-trigger"
                     onClick={() => setShowAddForm(!showAddForm)}
                     className="flex items-center gap-1.5 glass-button-primary text-white font-semibold py-2 px-3.5 rounded-xl cursor-pointer shrink-0 text-xs shadow-sm h-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    title={lang === "zh" ? "新增每日行程活動" : "Add daily activity"}
-                    aria-label={lang === "zh" ? "新增每日行程活動" : "Add daily activity"}
+                    title={t.addDailyActivityTooltip}
+                    aria-label={t.addDailyActivityTooltip}
                   >
                     <Plus size={14} /> {t.addDailyActivity}
                   </button>
